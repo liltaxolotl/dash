@@ -254,8 +254,7 @@ const RHYTHM = [
 ];
 const MILES = [
 ];
-// folder = local project folder; the name becomes a clickable link that opens it.
-const PROJECTS_ROOT = 'file:///c:/Storage/Claude/Claude-Assistant/projects/';
+// path = real project folder on this PC; the name becomes a clickable link that opens it.
 const PROJECTS = [
 ];
 // Job & client leads. The lead-hunter agent prepends new finds here.
@@ -286,8 +285,8 @@ const LS_TOKEN = 'lupita-gh-token-v1';
 let done = JSON.parse(localStorage.getItem(LS_DONE) || '{}');
 let custom = JSON.parse(localStorage.getItem(LS_CUSTOM) || '[]');
 let view = 'today';
-const saveDone = () => localStorage.setItem(LS_DONE, JSON.stringify(done));
-const saveCustom = () => localStorage.setItem(LS_CUSTOM, JSON.stringify(custom));
+const saveDone = () => { localStorage.setItem(LS_DONE, JSON.stringify(done)); pushStateSoon(); };
+const saveCustom = () => { localStorage.setItem(LS_CUSTOM, JSON.stringify(custom)); pushStateSoon(); };
 const getToken = () => localStorage.getItem(LS_TOKEN) || '';
 
 /* ---------- DATE HELPERS ---------- */
@@ -501,6 +500,57 @@ async function fetchData(){
   if(d||ev) render();
 }
 
+/* ---------- CROSS-DEVICE STATE SYNC ----------
+   Checkmarks + custom to-dos sync through state.json in the private repo, so the
+   desktop copy and the phone app stay identical. Newest save wins. If the token
+   can't write to the repo, everything still works per-device. */
+const STATE_PATH='state.json';
+const LS_SAVEDAT='lupita-state-savedat-v1';
+let stateSha=null, statePushTimer=null;
+const ghHdr = () => ({Authorization:'Bearer '+getToken(), Accept:'application/vnd.github+json'});
+const stateUrl = () => `https://api.github.com/repos/${LEAD_FEED.owner}/${LEAD_FEED.repo}/contents/${STATE_PATH}`;
+const b64enc = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const b64dec = s => JSON.parse(decodeURIComponent(escape(atob(s.replace(/\s/g,'')))));
+async function loadState(){
+  if(!getToken()) return;
+  try{
+    const res=await fetch(stateUrl()+`?ref=${LEAD_FEED.branch}&t=${Date.now()}`,{headers:ghHdr(), cache:'no-store'});
+    if(!res.ok) return;
+    const j=await res.json(); stateSha=j.sha;
+    const s=b64dec(j.content);
+    if(s && (s.savedAt||0) > Number(localStorage.getItem(LS_SAVEDAT)||0)){
+      done=s.done||{}; custom=s.custom||[];
+      localStorage.setItem(LS_DONE, JSON.stringify(done));
+      localStorage.setItem(LS_CUSTOM, JSON.stringify(custom));
+      localStorage.setItem(LS_SAVEDAT, String(s.savedAt||0));
+      render();
+    }
+  }catch(err){}
+}
+function pushStateSoon(){
+  if(!getToken()) return;
+  clearTimeout(statePushTimer);
+  statePushTimer=setTimeout(pushState, 1500);
+}
+async function pushState(){
+  if(!getToken()) return;
+  const savedAt=Date.now();
+  localStorage.setItem(LS_SAVEDAT, String(savedAt));
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, savedAt}), branch:LEAD_FEED.branch};
+  try{
+    if(stateSha) payload.sha=stateSha;
+    let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
+    if(res.status===409||res.status===422){
+      // sha out of date (other device pushed): refresh it and retry once
+      const g=await fetch(stateUrl()+`?ref=${LEAD_FEED.branch}&t=${Date.now()}`,{headers:ghHdr(), cache:'no-store'});
+      if(!g.ok) return;
+      payload.sha=(await g.json()).sha;
+      res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
+    }
+    if(res.ok) stateSha=(await res.json()).content.sha;
+  }catch(err){}
+}
+
 function render(){
   // greeting
   const h=today.getHours? new Date().getHours():12;
@@ -552,7 +602,7 @@ function render(){
   dPROJECTS.forEach(p=>{ const r=document.createElement('div'); r.className='proj';
     const n=document.createElement('div'); n.className='pname';
     // folder links only work on the desktop copy (file protocol)
-    if(p.folder && location.protocol==='file:'){ const a=document.createElement('a'); a.href=PROJECTS_ROOT+p.folder;
+    if(p.path && location.protocol==='file:'){ const a=document.createElement('a'); a.href='file:///'+encodeURI(p.path);
       a.textContent='🎬 '+p.name; a.title='open project folder';
       a.style.color='inherit'; a.style.textDecoration='none';
       a.onmouseenter=()=>a.style.textDecoration='underline';
@@ -613,7 +663,7 @@ function saveToken(){
   const inp=document.getElementById('ghToken'); const v=inp.value.trim(); if(!v) return;
   localStorage.setItem(LS_TOKEN, v); inp.value='';
   document.getElementById('leadAuth').style.display='none';
-  fetchLeads();
+  fetchLeads(); fetchData(); loadState();
 }
 document.getElementById('ghSave').onclick=saveToken;
 document.getElementById('ghToken').addEventListener('keydown',e=>{ if(e.key==='Enter') saveToken(); });
@@ -621,6 +671,9 @@ document.getElementById('ghToken').addEventListener('keydown',e=>{ if(e.key==='E
 render();
 fetchLeads();
 fetchData();
+loadState();
+// pick up changes made on the other device when you come back to this one
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ loadState(); fetchData(); } });
 </script>
 </body>
 </html>
