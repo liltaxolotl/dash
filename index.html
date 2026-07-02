@@ -547,9 +547,14 @@ async function pushState(){
       payload.sha=(await g.json()).sha;
       res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
     }
-    if(res.ok) stateSha=(await res.json()).content.sha;
+    if(res.ok){ stateSha=(await res.json()).content.sha; }
+    else if(res.status===401||res.status===403){
+      setLeadStatus("Sync token can't save changes. Paste a token with read AND write access to fix cross-device sync.");
+    }
   }catch(err){}
 }
+// keep devices in step while the page stays open
+setInterval(()=>{ loadState(); }, 60000);
 
 function render(){
   // greeting
