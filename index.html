@@ -201,6 +201,8 @@
         <div id="leadBody" style="display:none">
           <div class="note" id="leadStatus"></div>
           <ul class="list" id="leadList"></ul>
+          <button id="leadHunt" title="ask the lead hunter to search for brand-new leads"
+            style="width:100%; margin:.4rem 0; padding:.45rem; border:1px dashed var(--lav-deep); border-radius:8px; background:none; cursor:pointer; color:var(--lav-deep); font-size:.85rem">🎯 Hunt new leads now</button>
           <div id="leadAuth" style="display:none">
             <div class="note">One-time setup: paste a GitHub token so this dashboard can read your private leads feed. (Steps are in the chat.)</div>
             <div class="add-row">
@@ -672,6 +674,24 @@ function saveToken(){
 }
 document.getElementById('ghSave').onclick=saveToken;
 document.getElementById('ghToken').addEventListener('keydown',e=>{ if(e.key==='Enter') saveToken(); });
+
+// on-demand lead hunt: writes hunt-request.json; the home PC watches for it and
+// runs the lead-hunter, so credits only burn when Lupita actually asks for a hunt
+async function requestHunt(){
+  if(!getToken()){ setLeadOpen(true); setLeadStatus('Paste your token below first, then tap 🎯 again.'); render(); return; }
+  setLeadStatus('Requesting a fresh hunt...');
+  const url=`https://api.github.com/repos/${LEAD_FEED.owner}/${LEAD_FEED.repo}/contents/hunt-request.json`;
+  const payload={message:'hunt requested from dashboard', content:b64enc({requestedAt:Date.now()}), branch:LEAD_FEED.branch};
+  try{
+    const g=await fetch(url+`?ref=${LEAD_FEED.branch}&t=${Date.now()}`,{headers:ghHdr(), cache:'no-store'});
+    if(g.ok) payload.sha=(await g.json()).sha;
+    const res=await fetch(url,{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
+    if(res.ok) setLeadStatus('Hunt requested! 🎯 Fresh leads usually land in 15-20 min (home computer must be on). Tap ↻ in a bit.');
+    else if(res.status===401||res.status===403) setLeadStatus('Token can\'t write. Paste a read+write token to use the hunt button.');
+    else setLeadStatus('Could not request the hunt right now. Try again in a minute.');
+  }catch(err){ setLeadStatus('Could not request the hunt (offline?).'); }
+}
+document.getElementById('leadHunt').onclick=(e)=>{ e.stopPropagation(); requestHunt(); };
 
 render();
 fetchLeads();
