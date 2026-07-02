@@ -210,6 +210,7 @@
               <button id="ghSave">Save</button>
             </div>
           </div>
+          <button id="ghChange" style="display:none; border:none; background:none; cursor:pointer; color:var(--lav-deep); font-size:.75rem; padding:.2rem 0; text-decoration:underline">🔑 change token</button>
         </div>
       </div>
 
@@ -600,7 +601,9 @@ function render(){
   renderLeads();
   const lv=liveLeads();
   document.getElementById('leadCount').textContent = lv.length ? (lv.filter(it=>!done[it.id]).length+' open') : '';
-  document.getElementById('leadAuth').style.display = getToken() ? 'none' : 'block';
+  const authOpen = !getToken() || window._showTokenBox;
+  document.getElementById('leadAuth').style.display = authOpen ? 'block' : 'none';
+  document.getElementById('ghChange').style.display = authOpen ? 'none' : 'block';
 
   fillList(document.getElementById('rhythmList'), dRHYTHM, 'rhythm', false);
   fillList(document.getElementById('mileList'), dMILES, 'mile', false);
@@ -669,11 +672,12 @@ document.getElementById('leadRefresh').onclick=(e)=>{ e.stopPropagation(); setLe
 function saveToken(){
   const inp=document.getElementById('ghToken'); const v=inp.value.trim(); if(!v) return;
   localStorage.setItem(LS_TOKEN, v); inp.value='';
-  document.getElementById('leadAuth').style.display='none';
+  window._showTokenBox=false; render();
   fetchLeads(); fetchData(); loadState();
 }
 document.getElementById('ghSave').onclick=saveToken;
 document.getElementById('ghToken').addEventListener('keydown',e=>{ if(e.key==='Enter') saveToken(); });
+document.getElementById('ghChange').onclick=()=>{ window._showTokenBox=true; render(); document.getElementById('ghToken').focus(); };
 
 // on-demand lead hunt: writes hunt-request.json; the home PC watches for it and
 // runs the lead-hunter, so credits only burn when Lupita actually asks for a hunt
