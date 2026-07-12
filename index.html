@@ -223,6 +223,10 @@
   .tb{border:1px solid var(--line); background:#faf6ff; border-radius:8px; cursor:pointer; font-size:.82rem; padding:3px 8px; line-height:1.2}
   .tb:hover{border-color:var(--lav); background:#f3ebff; transform:translateY(-1px)}
   .day-anchor{font-size:.74rem; font-weight:600; color:var(--soft); padding:4px 6px 8px; border-bottom:1px dashed var(--line)}
+  .pl-item.blk{background:#fbf7fc; border-radius:10px; border-bottom:none; margin-top:7px; padding:7px 8px}
+  .pl-item.blk b{font-weight:800}
+  .blk-time{display:inline-block; min-width:92px; font-weight:700; color:var(--lav-deep); font-size:.78rem}
+  .blk-tasks{margin-left:22px; border-left:2px dashed var(--line); padding-left:9px}
   .day-theme{font-size:.68rem; font-weight:800; padding:2px 9px; border-radius:99px; background:#ece4ff; color:var(--lav-deep)}
   details.plan-day details.plan-day{margin:8px 0; box-shadow:none; background:#fdfafe}
   details.plan-day.day-done>summary{opacity:.55}
@@ -236,6 +240,11 @@
   .money-row select{width:auto; border:1px solid var(--line); border-radius:10px; padding:7px 10px; font-family:inherit; font-size:.86rem; color:var(--ink); background:#fff}
   .money-recent{font-size:.76rem; color:var(--soft); margin-top:7px; display:flex; flex-direction:column; gap:2px}
   .money-recent div{display:flex; align-items:center; gap:6px}
+  .apps-btn.spend{background:linear-gradient(90deg,#f0a35e,#ef6a86)}
+  .bw-row{display:grid; grid-template-columns:1fr auto auto auto; gap:12px; font-size:.8rem; padding:7px 6px; border-bottom:1px dashed var(--line); align-items:baseline}
+  .bw-row:last-child{border-bottom:none}
+  .bw-row.bw-cur{background:#fff0f7; border-radius:8px}
+  .bw-lbl{font-weight:700}
   .confetti{position:fixed; top:-24px; z-index:999; pointer-events:none; animation:confall 1.7s ease-in forwards}
   @keyframes confall{to{transform:translateY(106vh) rotate(560deg); opacity:0}}
   .pl-intro{font-size:.83rem; color:var(--soft); line-height:1.55; padding:4px 6px 8px}
@@ -337,6 +346,17 @@
       <div class="card">
         <h2>🎬 Active Projects</h2>
         <div id="projList"></div>
+      </div>
+
+      <div class="card">
+        <h2 id="archToggle" style="cursor:pointer; user-select:none">
+          <span id="archCaret" style="display:inline-block; width:.9em; font-size:.8em; color:var(--soft)">▸</span>
+          📦 Archive <span class="pill" id="archCount"></span>
+        </h2>
+        <div id="archBody" style="display:none">
+          <div class="note" style="margin:0 0 8px">Checked-off to-dos, bills, appointments, and leads land here with the day you finished them, so the active lists stay clean. ↩ puts one back.</div>
+          <ul class="list" id="archList"></ul>
+        </div>
       </div>
     </div>
   </div>
@@ -455,20 +475,44 @@
         <div class="apps-sub" id="appsSub">0 / 50 this week</div>
       </div>
       <div class="apps-track" style="margin-top:10px">
-        <div class="apps-head">💵 Money in <span class="apps-total" id="moneyAllTime"></span></div>
+        <div class="apps-head">💵 Budget <span class="apps-total" id="moneyAllTime"></span></div>
         <div class="money-row">
-          <input id="moneyAmt" type="number" min="0" step="0.01" placeholder="$ amount">
+          <input id="moneyAmt" type="number" min="0" step="0.01" placeholder="$ in">
           <select id="moneySrc">
             <option value="commission">commission</option>
             <option value="print">print</option>
             <option value="tutoring">tutoring</option>
             <option value="gig">gig</option>
-            <option value="other">other</option>
+            <option value="other income">other income</option>
           </select>
-          <button class="apps-btn" id="moneyAdd">+ log it</button>
-          <span class="apps-sub" id="moneyWeek" style="margin:0 0 0 auto"></span>
+          <button class="apps-btn" id="moneyAdd">+ money in</button>
         </div>
+        <div class="money-row" style="margin-top:7px">
+          <input id="spendAmt" type="number" min="0" step="0.01" placeholder="$ out">
+          <select id="spendSrc">
+            <option value="rent">rent</option>
+            <option value="car insurance">car insurance</option>
+            <option value="credit card">credit card</option>
+            <option value="groceries">groceries</option>
+            <option value="eating out">eating out</option>
+            <option value="gas">gas</option>
+            <option value="art supplies">art supplies</option>
+            <option value="subscriptions">subscriptions</option>
+            <option value="other expense">other expense</option>
+          </select>
+          <button class="apps-btn spend" id="spendAdd">− money out</button>
+        </div>
+        <div class="apps-sub" id="moneyWeek" style="margin-top:8px"></div>
+        <details class="plan-day" style="margin-top:8px">
+          <summary><span class="caret">▸</span>📒 Week by week <span class="sub">income · spending · net</span></summary>
+          <div class="pd-body" id="budgetWeeks"></div>
+        </details>
         <div class="money-recent" id="moneyRecent"></div>
+      </div>
+
+      <div class="apps-track" style="margin-top:10px">
+        <div class="apps-head">⚡ Quick actions</div>
+        <div class="pl-links" id="quickBar" style="padding:0"></div>
       </div>
     </div>
 
@@ -531,11 +575,14 @@ let EVENTS = [];     // events.json: Apple Calendar mirror, optional
 const LS_DONE = 'lupita-dash-done-v1';
 const LS_CUSTOM = 'lupita-dash-custom-v1';
 const LS_TOKEN = 'lupita-gh-token-v1';
+const LS_ARCH = 'lupita-archive-v1';
 let done = JSON.parse(localStorage.getItem(LS_DONE) || '{}');
 let custom = JSON.parse(localStorage.getItem(LS_CUSTOM) || '[]');
+let arch = JSON.parse(localStorage.getItem(LS_ARCH) || '{}');   // id -> {t:text, k:kind, at:'YYYY-MM-DD'}
 let view = 'today';
 const saveDone = () => { localStorage.setItem(LS_DONE, JSON.stringify(done)); pushStateSoon(); };
 const saveCustom = () => { localStorage.setItem(LS_CUSTOM, JSON.stringify(custom)); pushStateSoon(); };
+const saveArch = () => { localStorage.setItem(LS_ARCH, JSON.stringify(arch)); pushStateSoon(); };
 const getToken = () => localStorage.getItem(LS_TOKEN) || '';
 
 /* ---------- DATE HELPERS ---------- */
@@ -573,7 +620,18 @@ function itemRow(it, kind, deletable){
   li.className='item'+(isDone?' done':'')+((st==='over'&&!isDone)?' overdue':'');
   const cb=document.createElement('input');
   cb.type='checkbox'; cb.className='cbox'; cb.checked=isDone;
-  cb.onchange=()=>{ if(cb.checked) done[it.id]=true; else delete done[it.id]; saveDone(); render(); };
+  cb.onchange=()=>{
+    const archivable=(kind==='task'||kind==='bill'||kind==='appt');
+    if(cb.checked){
+      done[it.id]=true;
+      if(archivable){
+        // log the completion date, show the ✓ for a beat, then tuck it into the Archive
+        arch[it.id]={t:it.text, k:kind, at:iso(new Date())}; saveArch();
+        li.classList.add('done'); saveDone(); setTimeout(render,900); return;
+      }
+    } else { delete done[it.id]; if(arch[it.id]){ delete arch[it.id]; saveArch(); } }
+    saveDone(); render();
+  };
   const body=document.createElement('div'); body.className='body';
   const txt=document.createElement('div'); txt.className='txt'; txt.textContent=it.text;
   const meta=document.createElement('div'); meta.className='meta';
@@ -601,11 +659,39 @@ function itemRow(it, kind, deletable){
 
 function fillList(el, items, kind, deletable){
   el.innerHTML='';
-  const vis=items.filter(it=>!it.date || inView(it.date))
+  const archivable=(kind==='task'||kind==='bill'||kind==='appt');
+  const vis=items.filter(it=>(!it.date || inView(it.date)) && !(archivable&&arch[it.id]))
     .sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
   if(!vis.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Nothing here for this view. 🌿'; el.appendChild(e); return; }
   vis.forEach(it=>el.appendChild(itemRow(it,kind,deletable)));
 }
+
+/* ---------- 📦 ARCHIVE ---------- */
+const KIND_LBL={task:'to-do', bill:'bill', appt:'appt', lead:'lead'};
+function renderArchive(){
+  const entries=Object.entries(arch).sort((a,b)=>(b[1].at||'').localeCompare(a[1].at||''));
+  document.getElementById('archCount').textContent=entries.length?entries.length+' done':'';
+  const ul=document.getElementById('archList'); ul.innerHTML='';
+  if(!entries.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Nothing archived yet. Finish something and it lands here. 🌱'; ul.appendChild(e); return; }
+  entries.slice(0,60).forEach(([id,a])=>{
+    const li=document.createElement('li'); li.className='item done';
+    const body=document.createElement('div'); body.className='body';
+    const txt=document.createElement('div'); txt.className='txt'; txt.textContent=a.t;
+    const meta=document.createElement('div'); meta.className='meta';
+    const w=document.createElement('span'); w.className='when'; w.textContent='✓ '+(a.at||''); meta.appendChild(w);
+    const t=document.createElement('span'); t.className='tag '+(a.k==='lead'?'work':(a.k==='bill'?'bill':a.k==='appt'?'appt':'life')); t.textContent=KIND_LBL[a.k]||a.k; meta.appendChild(t);
+    body.appendChild(txt); body.appendChild(meta);
+    const back=document.createElement('button'); back.className='del'; back.textContent='↩'; back.title='put it back on the active list';
+    back.onclick=()=>{ delete arch[id]; delete done[id]; saveArch(); saveDone(); render(); };
+    li.appendChild(body); li.appendChild(back); ul.appendChild(li);
+  });
+  if(entries.length>60){ const e=document.createElement('div'); e.className='empty'; e.textContent='…and '+(entries.length-60)+' more, kept safe.'; ul.appendChild(e); }
+}
+const archBodyEl=document.getElementById('archBody'), archCaretEl=document.getElementById('archCaret');
+document.getElementById('archToggle').addEventListener('click',()=>{
+  const open=archBodyEl.style.display==='none';
+  archBodyEl.style.display=open?'block':'none'; archCaretEl.textContent=open?'▾':'▸';
+});
 
 function leadRow(it){
   const isDone=!!done[it.id];
@@ -613,7 +699,15 @@ function leadRow(it){
   li.className='item'+(isDone?' done':'');
   const cb=document.createElement('input');
   cb.type='checkbox'; cb.className='cbox'; cb.checked=isDone; cb.title='mark reviewed / applied';
-  cb.onchange=()=>{ if(cb.checked) done[it.id]=true; else delete done[it.id]; saveDone(); render(); };
+  cb.onchange=()=>{
+    if(cb.checked){
+      done[it.id]=true;
+      arch[it.id]={t:it.title+(it.org?(' · '+it.org):''), k:'lead', at:iso(new Date())}; saveArch();
+      li.classList.add('done'); saveDone(); setTimeout(render,900); return;
+    }
+    delete done[it.id]; if(arch[it.id]){ delete arch[it.id]; saveArch(); }
+    saveDone(); render();
+  };
   const body=document.createElement('div'); body.className='body';
   const txt=document.createElement('div'); txt.className='txt'; txt.textContent=it.title+(it.org?(' · '+it.org):'');
   const meta=document.createElement('div'); meta.className='meta';
@@ -696,7 +790,7 @@ function buildCat(type,label,mode,items){
   return d;
 }
 // Leads whose apply-by deadline already passed are hidden automatically.
-const liveLeads = () => LEAD_DATA.filter(it=>!it.deadline || parse(it.deadline)>=today);
+const liveLeads = () => LEAD_DATA.filter(it=>(!it.deadline || parse(it.deadline)>=today) && !arch[it.id]);
 function renderLeads(){
   const ll=document.getElementById('leadList'); ll.innerHTML='';
   const data=liveLeads();
@@ -771,6 +865,7 @@ async function loadState(){
       done=s.done||{}; custom=s.custom||[];
       if(s.apps){ apps=s.apps; localStorage.setItem(LS_APPS, JSON.stringify(apps)); }
       if(s.money){ money=s.money; localStorage.setItem(LS_MONEY, JSON.stringify(money)); }
+      if(s.arch){ arch=s.arch; localStorage.setItem(LS_ARCH, JSON.stringify(arch)); }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
       localStorage.setItem(LS_CUSTOM, JSON.stringify(custom));
       localStorage.setItem(LS_SAVEDAT, String(s.savedAt||0));
@@ -790,7 +885,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -822,7 +917,7 @@ async function fetchPlan(){
     if(!r.ok) return;
     const p=b64dec((await r.json()).content);
     if(!p||!p.guides||!p.dayDefs) return;
-    CLOCK=p.clock||CLOCK; PLAN_PHASES=p.phases||PLAN_PHASES; GUIDE_STEPS=p.guides;
+    CLOCKS=p.clocks||CLOCKS; PLAN_PHASES=p.phases||PLAN_PHASES; GUIDE_STEPS=p.guides;
     SPECIALS=p.specials||{}; DAY_DEFS=p.dayDefs; WEEK_TITLES=p.weekTitles||WEEK_TITLES;
     normalizeGuides();
     const w=document.getElementById('planWeeks'), g=document.getElementById('planGuides');
@@ -854,7 +949,7 @@ function render(){
   // mark custom ones deletable: re-render custom inline
   // (simpler: rebuild with deletable flag per item)
   const tl=document.getElementById('taskList'); tl.innerHTML='';
-  const visTasks=allTasks.filter(it=>!it.date||inView(it.date)).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
+  const visTasks=allTasks.filter(it=>(!it.date||inView(it.date))&&!arch[it.id]).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
   if(!visTasks.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='No to-dos for this view. Breathe easy. 🌿'; tl.appendChild(e);}
   else visTasks.forEach(it=>tl.appendChild(itemRow(it,'task', !!it.custom)));
 
@@ -905,6 +1000,8 @@ function render(){
   document.getElementById('progNum').textContent=completed+' / '+total+' done';
   document.getElementById('progLbl').textContent =
     (view==='today'?'Today':view==='week'?'This week':view==='month'?'This month':'All')+' · schedule progress';
+
+  renderArchive();
 }
 
 /* ---------- EVENTS ---------- */
@@ -931,9 +1028,11 @@ function applyLayout(){
    "schedule day" runs 11:00am to 11:00am. Source of truth:
    projects/business-plan-jul-aug/README.md */
 let PLAN_PHASES = [];
-// The clock: the invariant skeleton every day hangs on. [startMin, endMin, time, name, desc]
-// Blocks past midnight use 1440+ so the "schedule day" runs 11:00am to 11:00am.
-let CLOCK=[];
+// The clocks: hour-by-hour skeletons (weekday / Saturday / Sunday). Each block is
+// checkable inside every day card. {s,e} are minutes since midnight; past-midnight
+// blocks use 1440+ so the "schedule day" runs 11:00am to 11:00am. k = slot key that
+// day tasks attach to.
+let CLOCKS={wk:[],sat:[],sun:[]};
 function renderPlan(){
   const startD=parse('2026-07-13'), endD=parse('2026-09-06');
   // phase bar + week pill
@@ -950,18 +1049,19 @@ function renderPlan(){
   if(today<startD) pill.textContent='starts Mon Jul 13';
   else if(today>endD) pill.textContent='wrapped! time for the review';
   else pill.textContent='Week '+(Math.floor((today-startD)/604800000)+1)+' of 8 · SPRINT';
-  // the clock, with the current block highlighted (before 11am = still yesterday's clock)
+  // today's clock, with the current block highlighted (before 11am = still yesterday's clock)
   const now=new Date();
   let nowM=now.getHours()*60+now.getMinutes();
-  if(nowM<660) nowM+=1440;
+  const dref=new Date(now); if(now.getHours()<11){ nowM+=1440; dref.setDate(dref.getDate()-1); }
+  const variant=dref.getDay()===6?'sat':(dref.getDay()===0?'sun':'wk');
   const wrap=document.getElementById('planDays'); wrap.innerHTML='';
-  CLOCK.forEach(b=>{
+  (CLOCKS[variant]||[]).forEach(b=>{
     const r=document.createElement('div');
-    r.className='pd-row'+((nowM>=b[0]&&nowM<b[1])?' now-block':'');
-    r.innerHTML='<div class="pd-time">'+b[2]+'</div><div class="pd-name">'+b[3]+'</div><div class="pd-desc">'+b[4]+'</div>';
+    r.className='pd-row'+((nowM>=b.s&&nowM<b.e)?' now-block':'');
+    r.innerHTML='<div class="pd-time">'+b.t+'</div><div class="pd-name">'+b.n+'</div><div class="pd-desc">'+b.d+'</div>';
     wrap.appendChild(r);
   });
-  renderApps(); renderMoney(); buildWeeks(); buildGuides();
+  renderQuickBar(); renderApps(); renderMoney(); buildWeeks(); buildGuides();
 }
 
 /* ---- confetti (day check-offs, the 50-goal, money in) ---- */
@@ -1022,30 +1122,77 @@ function renderApps(){
 /* ---- money tracker (every dollar in, syncs across devices) ---- */
 const LS_MONEY='lupita-money-v1';
 let money=JSON.parse(localStorage.getItem(LS_MONEY)||'[]'); // [{d:'2026-07-15', amt:40, src:'commission'}]
+const fmt$=v=>(v<0?'-$':'$')+Math.abs(Math.round(v*100)/100).toLocaleString();
+const isIn=e=>(e.t||'in')==='in';
 function renderMoney(){
   const wkStart=appsWeekKey();
-  const wk=money.filter(e=>e.d>=wkStart).reduce((a,e)=>a+e.amt,0);
-  const all=money.reduce((a,e)=>a+e.amt,0);
-  const f=v=>'$'+(Math.round(v*100)/100).toLocaleString();
-  document.getElementById('moneyWeek').textContent=f(wk)+' this week';
-  document.getElementById('moneyAllTime').textContent=f(all)+' earned in total';
+  const wkIn=money.filter(e=>e.d>=wkStart&&isIn(e)).reduce((a,e)=>a+e.amt,0);
+  const wkOut=money.filter(e=>e.d>=wkStart&&!isIn(e)).reduce((a,e)=>a+e.amt,0);
+  const allNet=money.reduce((a,e)=>a+(isIn(e)?e.amt:-e.amt),0);
+  document.getElementById('moneyWeek').innerHTML=
+    'this week: <b style="color:var(--ok)">+'+fmt$(wkIn)+'</b> in · <b style="color:var(--urgent)">−'+fmt$(wkOut)+'</b> out · net <b style="color:'+((wkIn-wkOut)>=0?'var(--ok)':'var(--urgent)')+'">'+fmt$(wkIn-wkOut)+'</b>';
+  document.getElementById('moneyAllTime').textContent='net '+fmt$(allNet)+' since tracking';
+  // week-by-week budget
+  const bw=document.getElementById('budgetWeeks'); bw.innerHTML='';
+  const rows=[]; const s0=parse('2026-07-13');
+  const pre=money.filter(e=>e.d<iso(s0));
+  if(pre.length) rows.push(['before the sprint', pre]);
+  for(let n=1;n<=8;n++){
+    const f=new Date(s0); f.setDate(f.getDate()+(n-1)*7);
+    const t=new Date(f); t.setDate(t.getDate()+7);
+    const es=money.filter(e=>e.d>=iso(f)&&e.d<iso(t));
+    rows.push(['Week '+n+' · '+f.toLocaleDateString('en-US',{month:'short',day:'numeric'}), es, today>=f&&today<t]);
+  }
+  rows.forEach(([label,es,cur])=>{
+    const rIn=es.filter(isIn).reduce((a,e)=>a+e.amt,0);
+    const rOut=es.filter(e=>!isIn(e)).reduce((a,e)=>a+e.amt,0);
+    const net=rIn-rOut;
+    const r=document.createElement('div'); r.className='bw-row'+(cur?' bw-cur':'');
+    r.innerHTML='<span class="bw-lbl">'+label+(cur?' 🌸':'')+'</span>'
+      +'<span style="color:var(--ok)">+'+fmt$(rIn)+'</span>'
+      +'<span style="color:var(--urgent)">−'+fmt$(rOut)+'</span>'
+      +'<b style="color:'+(net>=0?'var(--ok)':'var(--urgent)')+'">'+fmt$(net)+'</b>';
+    bw.appendChild(r);
+  });
+  // recent entries with undo
   const rec=document.getElementById('moneyRecent'); rec.innerHTML='';
-  money.slice(-3).reverse().forEach(e=>{
+  money.slice(-4).reverse().forEach(e=>{
     const row=document.createElement('div');
-    const t=document.createElement('span'); t.textContent=e.d.slice(5).replace('-','/')+' · '+f(e.amt)+' · '+e.src;
+    const t=document.createElement('span');
+    t.textContent=e.d.slice(5).replace('-','/')+' · '+(isIn(e)?'+':'−')+fmt$(e.amt)+' · '+e.src;
+    t.style.color=isIn(e)?'var(--ok)':'var(--urgent)';
     const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove this entry';
     del.onclick=()=>{ money.splice(money.indexOf(e),1); localStorage.setItem(LS_MONEY,JSON.stringify(money)); pushStateSoon(); renderMoney(); };
     row.appendChild(t); row.appendChild(del); rec.appendChild(row);
   });
 }
-document.getElementById('moneyAdd').onclick=()=>{
-  const inp=document.getElementById('moneyAmt');
+function logMoney(kind){
+  const inp=document.getElementById(kind==='in'?'moneyAmt':'spendAmt');
   const amt=parseFloat(inp.value);
   if(!(amt>0)) { inp.focus(); return; }
-  money.push({d:iso(new Date()), amt, src:document.getElementById('moneySrc').value});
+  money.push({d:iso(new Date()), amt, src:document.getElementById(kind==='in'?'moneySrc':'spendSrc').value, t:kind});
   localStorage.setItem(LS_MONEY,JSON.stringify(money)); pushStateSoon();
-  inp.value=''; confetti(20); renderMoney();
-};
+  inp.value=''; if(kind==='in') confetti(20);
+  renderMoney();
+}
+document.getElementById('moneyAdd').onclick=()=>logMoney('in');
+document.getElementById('spendAdd').onclick=()=>logMoney('out');
+/* ---- quick actions bar ---- */
+const QUICK=[
+  ['📧 Gmail','https://mail.google.com'],
+  ['💬 Messenger','https://www.messenger.com'],
+  ['📸 IG inbox','https://www.instagram.com/direct/inbox/'],
+  ['💼 LinkedIn Jobs','https://www.linkedin.com/jobs/'],
+  ['🔍 Indeed','https://www.indeed.com/jobs?q=animator&l=Los+Angeles%2C+CA'],
+  ['🎬 EntCareers','https://www.entertainmentcareers.net/jcat/animation/'],
+  ['🎵 TikTok upload','https://www.tiktok.com/tiktokstudio/upload'],
+  ['▶️ YT Studio','https://studio.youtube.com'],
+  ['🤖 Claude','https://claude.ai/new'],
+];
+function renderQuickBar(){
+  const qb=document.getElementById('quickBar'); if(!qb||qb.dataset.built) return; qb.dataset.built='1';
+  QUICK.forEach(([label,u])=>{ const a=document.createElement('a'); a.href=u; a.target='_blank'; a.rel='noopener'; a.textContent=label; qb.appendChild(a); });
+}
 
 /* ---- Claude + research buttons ----
    🤖 copies a ready-made, task-specific prompt to the clipboard and opens claude.ai
@@ -1091,6 +1238,10 @@ function checklist(items,cntEl){
       ub.title='Open: '+it.url;
       ub.onclick=e=>{ e.stopPropagation(); window.open(it.url,'_blank'); };
       tbs.appendChild(ub); }
+    (it.links||[]).forEach(l=>{ const lb=document.createElement('button'); lb.className='tb'; lb.textContent=l.ic;
+      lb.title=l.tip;
+      lb.onclick=e=>{ e.stopPropagation(); window.open(l.u,'_blank'); };
+      tbs.appendChild(lb); });
     if(it.q){ const qb=document.createElement('button'); qb.className='tb'; qb.textContent='🔎';
       qb.title='Research on the web: '+it.q;
       qb.onclick=e=>{ e.stopPropagation(); window.open('https://www.google.com/search?q='+encodeURIComponent(it.q),'_blank'); };
@@ -1108,34 +1259,50 @@ let GUIDE_STEPS={};
 function normalizeGuides(){ Object.entries(GUIDE_STEPS).forEach(([k,g])=>g.steps.forEach((st,w)=>st.forEach((it,i)=>{ it.id='gp-'+k+'-w'+(w+1)+'-'+i; }))); }
 normalizeGuides();
 
-/* ---- recurring day tasks (jobs every weekday, content beats, messages) ---- */
+/* ---- recurring day tasks (jobs every weekday, content beats, messages) ----
+   slot = which clock block the task nests under. links = quick-open buttons. */
+const L={
+  linkedin:{ic:'💼',tip:'LinkedIn Jobs',u:'https://www.linkedin.com/jobs/'},
+  indeed:{ic:'🔍',tip:'Indeed (animator, LA)',u:'https://www.indeed.com/jobs?q=animator&l=Los+Angeles%2C+CA'},
+  entcar:{ic:'🎬',tip:'EntertainmentCareers animation jobs',u:'https://www.entertainmentcareers.net/jcat/animation/'},
+  gmail:{ic:'📧',tip:'Gmail',u:'https://mail.google.com'},
+  msgr:{ic:'💬',tip:'Facebook Messenger',u:'https://www.messenger.com'},
+  igdm:{ic:'📸',tip:'Instagram inbox',u:'https://www.instagram.com/direct/inbox/'},
+  tiktok:{ic:'🎵',tip:'TikTok upload',u:'https://www.tiktok.com/tiktokstudio/upload'},
+  ytstudio:{ic:'▶️',tip:'YouTube Studio',u:'https://studio.youtube.com'},
+};
 function recTasks(n,dk){
   const T=[]; const id=s=>'gp-w'+n+'-'+dk+'-'+s;
   if(dk!=='sat'&&dk!=='sun'){
-    T.push({id:id('fast'), txt:'8 fast applies (log them in the counter)',
+    T.push({id:id('fast'), slot:'fast', txt:'8 fast applies (log them in the counter)', links:[L.linkedin,L.indeed],
       ai:'Blitz 8 fast job applications with me right now: help me pick 8 from my current leads and for each one give me a 3-line tailored tweak for my cover letter generator.'});
-    T.push({id:id('deep'), txt:'2 deep applications: tailored letter, right resume, portfolio matched',
+    T.push({id:id('deep'), slot:'deep', txt:'2 deep applications: tailored letter, right resume, portfolio matched', links:[L.entcar],
       ai:'Do 2 deep job applications with me: I will paste the postings. Pick my best resume angle (Production, Animator, General, or Teaching), draft the tailored letter, and tell me exactly which portfolio pieces to link.'});
+    T.push({id:id('msgs'), slot:'msgs', txt:'Clear the inbox + DMs (30 min, Claude drafts the replies)', links:[L.gmail,L.msgr,L.igdm],
+      ai:'Triage my inbox and DMs with me: I will paste what came in, you sort by needs-reply / can-wait / ignore and draft the replies in my voice.'});
   }
   if(dk==='mon'){
-    T.push({id:id('trend'), txt:'20-min trend check: pick this week’s 3 video ideas',
+    T.push({id:id('trend'), slot:'setup', txt:'20-min trend check: pick this week’s 3 video ideas',
       ai:'Search the web for what is trending THIS week on art TikTok, Instagram Reels, and YouTube Shorts for animators and illustrators: sounds, formats, challenges. Then give me 5 concrete video ideas in my quirky-cute style I can film today, ranked.',
       q:'TikTok trending sounds art creators this week'});
-    T.push({id:id('film'), txt:'Film video #1 in tonight’s content block'});
+    T.push({id:id('film'), slot:'content', txt:'Film video #1', links:[L.tiktok]});
   }
-  if(dk==='tue') T.push({id:id('eng'), txt:'15 min engagement: reply to every comment + DM',
+  if(dk==='tue'){
+    T.push({id:id('edit'), slot:'content', txt:'Edit + post video #1 to TikTok, IG Reels, YT Shorts', links:[L.tiktok,L.ytstudio]});
+    T.push({id:id('eng'), slot:'content', txt:'15 min engagement: reply to every comment + DM', links:[L.igdm,L.tiktok],
       ai:'Draft short warm replies in my voice to the comments and DMs I paste. Batch them so I can copy-paste fast.'});
-  if(dk==='wed') T.push({id:id('film'), txt:'Film video #2 (timelapse tonight’s website/art work)'});
-  if(dk==='thu') T.push({id:id('wip'), txt:'Capture 30-60s of today’s portfolio work for content'});
-  if(dk==='fri'){
-    T.push({id:id('fup'), txt:'Follow-ups: nudge every application 7-10 days old',
-      ai:'Write my short friendly follow-up email template for job applications that are 7-10 days old, plus a version for client gigs I pitched.'});
-    T.push({id:id('post'), txt:'Post video #2 + schedule weekend content'});
   }
-  if(dk==='sat') T.push({id:id('batch'), txt:'Batch film video #3 + b-roll for next week'});
+  if(dk==='wed') T.push({id:id('film'), slot:'content', txt:'Film video #2 (timelapse tonight’s website/art work)'});
+  if(dk==='thu') T.push({id:id('wip'), slot:'content', txt:'Capture 30-60s of today’s portfolio work + edit video #2'});
+  if(dk==='fri'){
+    T.push({id:id('fup'), slot:'deep', txt:'Follow-ups: nudge every application 7-10 days old', links:[L.gmail],
+      ai:'Write my short friendly follow-up email template for job applications that are 7-10 days old, plus a version for client gigs I pitched.'});
+    T.push({id:id('post'), slot:'content', txt:'Post video #2 + schedule weekend content', links:[L.tiktok,L.ytstudio]});
+  }
+  if(dk==='sat') T.push({id:id('batch'), slot:'satfilm', txt:'Batch film video #3 + b-roll for next week'});
   if(dk==='sun'){
-    T.push({id:id('rest'), txt:'Actually rest. It is load-bearing.'});
-    T.push({id:id('sweep'), txt:'Optional 45 min at night: inbox sweep + peek at next week (only if it feels good)'});
+    T.push({id:id('rest'), slot:'rest', txt:'Actually rest. It is load-bearing.'});
+    T.push({id:id('sweep'), slot:'checkin', txt:'Optional 45 min at night: inbox sweep + peek at next week (only if it feels good)', links:[L.gmail]});
   }
   return T;
 }
@@ -1160,12 +1327,14 @@ function buildWeeks(){
     sum.innerHTML='<span class="caret">▸</span>Week '+n+(cur?' 🌸':'')+' <span class="sub">'+fmt(f)+' to '+fmt(t)+' · '+(WEEK_TITLES[n-1]||'')+'</span>';
     const cnt=document.createElement('span'); cnt.className='hrs'; sum.appendChild(cnt); det.appendChild(sum);
     const body=document.createElement('div'); body.className='pd-body';
-    const weekItems=[];
+    const weekIds=[];
     DAY_DEFS.forEach((dd,idx)=>{
       const tasks=[...recTasks(n,dd.dk)];
-      ((SPECIALS[n]||{})[dd.dk]||[]).forEach((sp,i)=>tasks.push({id:'gp-w'+n+'-'+dd.dk+'-sp'+i, ...sp}));
-      dd.proj.forEach(pk=>{ (GUIDE_STEPS[pk].steps[n-1]||[]).forEach(it=>tasks.push(it)); });
-      weekItems.push(...tasks);
+      ((SPECIALS[n]||{})[dd.dk]||[]).forEach((sp,i)=>{
+        const t=Object.assign({id:'gp-w'+n+'-'+dd.dk+'-sp'+i, slot:(dd.dk==='sat'?'satfilm':(dd.dk==='sun'?'checkin':'setup'))}, sp);
+        tasks.push(t);
+      });
+      dd.proj.forEach(pk=>{ (GUIDE_STEPS[pk].steps[n-1]||[]).forEach(it=>{ if(pk==='ugly'&&!it.slot) it.slot='ugly'; tasks.push(it); }); });
       const dDate=dayDate(n,idx), isToday=iso(dDate)===iso(today);
       const dDet=document.createElement('details'); dDet.className='plan-day'+(isToday?' today-day':'');
       if(isToday){ dDet.open=true; det.open=true; }
@@ -1182,16 +1351,42 @@ function buildWeeks(){
       dSum.appendChild(lbl);
       const dCnt=document.createElement('span'); dCnt.className='hrs'; dSum.appendChild(dCnt);
       dDet.appendChild(dSum);
+      // hour-by-hour body: every clock block is checkable, tasks nest under their block
       const dBody=document.createElement('div'); dBody.className='pd-body';
-      const an=document.createElement('div'); an.className='day-anchor'; an.textContent='⏰ '+dd.anchor; dBody.appendChild(an);
-      dBody.appendChild(checklist(tasks,dCnt));
+      const ck=CLOCKS[dd.clock]||CLOCKS.wk||[];
+      const dayIds=tasks.map(t=>t.id);
+      ck.forEach(b=>{
+        const bid='gpb-w'+n+'-'+dd.dk+'-'+b.k;
+        dayIds.push(bid);
+        dBody.appendChild(hourRow(b,bid));
+        const sub=tasks.filter(t=>(t.slot||'focus')===b.k);
+        if(sub.length){ const st=document.createElement('div'); st.className='blk-tasks'; st.appendChild(checklist(sub,null)); dBody.appendChild(st); }
+      });
+      const slots=new Set(ck.map(b=>b.k));
+      const rest=tasks.filter(t=>!slots.has(t.slot||'focus'));
+      if(rest.length){ const st=document.createElement('div'); st.className='blk-tasks'; st.appendChild(checklist(rest,null)); dBody.appendChild(st); }
+      const dUpd=()=>{ dCnt.textContent=dayIds.filter(id=>done[id]).length+' / '+dayIds.length; };
+      dayIds.forEach(id=>(gpReg[id]=gpReg[id]||[]).push(dUpd)); dUpd();
+      weekIds.push(...dayIds);
       dDet.appendChild(dBody); body.appendChild(dDet);
       dSync();
     });
-    const upd=()=>{ cnt.textContent=weekItems.filter(it=>done[it.id]).length+' / '+weekItems.length+' tasks'; };
-    weekItems.forEach(it=>(gpReg[it.id]=gpReg[it.id]||[]).push(upd)); upd();
+    const upd=()=>{ cnt.textContent=weekIds.filter(id=>done[id]).length+' / '+weekIds.length; };
+    weekIds.forEach(id=>(gpReg[id]=gpReg[id]||[]).push(upd)); upd();
     det.appendChild(body); wrap.appendChild(det);
   }
+}
+/* one checkable hour block row */
+function hourRow(b,bid){
+  const row=document.createElement('div'); row.className='pl-item blk';
+  const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox';
+  const t=document.createElement('div'); t.className='txt2';
+  t.innerHTML='<span class="pd-time blk-time">'+b.t+'</span><b>'+b.n+'</b> <span class="pd-desc">'+b.d+'</span>';
+  const sync=()=>{ cb.checked=!!done[bid]; row.classList.toggle('done',!!done[bid]); };
+  (gpReg[bid]=gpReg[bid]||[]).push(sync);
+  cb.onchange=()=>gpSet(bid,cb.checked);
+  row.onclick=e=>{ if(e.target!==cb) gpSet(bid,!done[bid]); };
+  row.appendChild(cb); row.appendChild(t); sync(); return row;
 }
 
 /* ---- project guides: the same tasks as the weeks, grouped per project ----
@@ -1241,7 +1436,7 @@ function addTask(){
 }
 document.getElementById('addBtn').onclick=addTask;
 document.getElementById('newTask').addEventListener('keydown',e=>{ if(e.key==='Enter') addTask(); });
-document.getElementById('resetBtn').onclick=()=>{ if(confirm('Uncheck everything? (your added to-dos stay)')){ done={}; saveDone(); render(); } };
+document.getElementById('resetBtn').onclick=()=>{ if(confirm('Uncheck everything and empty the archive? (your added to-dos stay)')){ done={}; arch={}; saveDone(); saveArch(); render(); } };
 
 // live leads: collapsible dropdown (collapsed by default so it doesn't clog the page)
 const LS_LEADOPEN='lupita-leads-open-v1';
