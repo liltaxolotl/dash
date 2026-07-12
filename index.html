@@ -517,6 +517,12 @@
     </div>
 
     <div class="card">
+      <h2>💌 Friends <span class="pill">10 min a day, zero guilt</span></h2>
+      <p class="cl-lead" style="margin-bottom:10px">Who's waiting on a reply, why, and ready-made openers (including the "sorry I vanished" one). One reply a day keeps friendships fed, and hangouts actually happen. 💗</p>
+      <button class="cl-btn" id="openFriends">💌 Open the friends page →</button>
+    </div>
+
+    <div class="card">
       <h2>⏰ The Clock <span class="pill">the fixed skeleton: meals, sleep, block times · current block highlighted</span></h2>
       <div id="planDays"></div>
     </div>
@@ -574,6 +580,45 @@
       <div class="cl-actions">
         <button class="cl-btn ghost" id="foodImportBtn">📥 Add these recipes</button>
         <span class="cl-status" id="foodImportStatus"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 💌 FRIENDS (opened from the Game Plan's friends button) -->
+  <section id="friendsPanel" style="display:none">
+    <div class="card">
+      <h2>💌 Friends &amp; Replies <button class="cl-btn ghost" id="friendsBack" style="margin-left:auto">← back to Game Plan</button></h2>
+      <p class="cl-lead" style="margin-bottom:0">The 10-minutes-a-day page. Everyone you mean to write back to lives here, with a reason and a ready-made way to start. House rules: one reply counts, a meme counts, the apology is one line max. They miss you, they are not grading you. 💗</p>
+    </div>
+
+    <div class="card">
+      <h2>🕰️ Waiting on a reply from me <span class="pill" id="friendCount"></span></h2>
+      <div class="note" style="margin:0 0 8px">Check someone off once you've replied (yes there's confetti). The 🤖 on each person copies a prompt about that exact reply and opens Claude to draft it with you.</div>
+      <ul class="list" id="friendList"></ul>
+      <div class="money-row" style="margin-top:12px">
+        <input id="frName" type="text" style="width:150px" placeholder="who?" maxlength="60">
+        <select id="frVibe">
+          <option value="sorry">🙏 owe an apology + reply</option>
+          <option value="hang">🗓️ want to make a hangout</option>
+          <option value="answer">💬 owe them an answer</option>
+          <option value="checkin">🌷 just want to check in</option>
+          <option value="congrats">🎉 congratulate / hype them</option>
+        </select>
+      </div>
+      <div class="add-row" style="margin-top:8px"><input id="frNote" type="text" placeholder="why / what you owe them (optional)..." maxlength="200"><button id="frAdd">Add</button></div>
+    </div>
+
+    <div class="card">
+      <h2>✍️ Openers <span class="pill">tap one to copy · tweak to taste</span></h2>
+      <div id="openerList"></div>
+    </div>
+
+    <div class="card">
+      <h2>🤖 Draft replies with Claude</h2>
+      <p class="cl-lead">The button copies your whole queue plus a ready-made prompt and opens Claude. It drafts every reply in your voice; you just paste, tweak, send. (In a Claude Code chat you can also paste the actual messages and ask directly.) ✨</p>
+      <div class="cl-actions" style="margin-top:0">
+        <button class="cl-btn" id="friendsAsk">🤖 Draft all my replies</button>
+        <span class="cl-status" id="friendsStatus"></span>
       </div>
     </div>
   </section>
@@ -960,13 +1005,14 @@ async function loadState(){
       if(s.money){ money=s.money; localStorage.setItem(LS_MONEY, JSON.stringify(money)); }
       if(s.arch){ arch=s.arch; localStorage.setItem(LS_ARCH, JSON.stringify(arch)); }
       if(s.food){ food=s.food; food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[]; localStorage.setItem(LS_FOOD, JSON.stringify(food)); }
+      if(s.friends){ friends=s.friends; friends.people=friends.people||[]; localStorage.setItem(LS_FRIENDS, JSON.stringify(friends)); }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
       localStorage.setItem(LS_CUSTOM, JSON.stringify(custom));
       localStorage.setItem(LS_SAVEDAT, String(s.savedAt||0));
       render();
       // refresh every game-plan checkbox/count + the counters
       Object.values(gpReg).forEach(fns=>fns.forEach(f=>f()));
-      renderApps(); renderMoney(); renderFood();
+      renderApps(); renderMoney(); renderFood(); renderFriends();
     }
   }catch(err){}
 }
@@ -979,7 +1025,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, food, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, food, friends, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -1114,16 +1160,17 @@ document.getElementById('tabs').addEventListener('click',e=>{
   else if(view==='plan') renderPlan();
   else render();
 });
-// swap between the schedule grid and the full-width panels (cover letters / game plan / food)
+// swap between the schedule grid and the full-width panels (cover letters / game plan / food / friends)
 function applyLayout(){
-  const isCover = view==='cover', isPlan = view==='plan', isFood = view==='food', isBudget = view==='budget';
-  const full = isCover||isPlan||isFood||isBudget;
+  const isCover = view==='cover', isPlan = view==='plan', isFood = view==='food', isBudget = view==='budget', isFriends = view==='friends';
+  const full = isCover||isPlan||isFood||isBudget||isFriends;
   document.querySelector('.grid').style.display = full ? 'none' : '';
   document.querySelector('.progress-card').style.display = full ? 'none' : '';
   document.getElementById('coverPanel').style.display = isCover ? 'block' : 'none';
   document.getElementById('planPanel').style.display = isPlan ? 'block' : 'none';
   document.getElementById('foodPanel').style.display = isFood ? 'flex' : 'none';
   document.getElementById('budgetPanel').style.display = isBudget ? 'flex' : 'none';
+  document.getElementById('friendsPanel').style.display = isFriends ? 'flex' : 'none';
 }
 
 /* ---------- 🗺️ GAME PLAN (8-week intensive, night-owl clock) ----------
@@ -1433,6 +1480,21 @@ function cleanTasks(n,dk){
   }
   return T;
 }
+/* ---- 💌 friends & replies, baked into every day card ----
+   10 minutes a day so nobody sits on read for weeks: weekdays it is the last
+   10 minutes of the Messages block, Saturday lives in the evening OFF block,
+   Sunday counts from the couch. Thursday adds the weekly hangout text. The
+   who-and-why queue + openers live on the 💌 Friends page. */
+function friendTasks(n,dk){
+  const id=s=>'gp-w'+n+'-'+dk+'-'+s; const T=[];
+  const slot = dk==='sat'?'off':(dk==='sun'?'rest':'msgs');
+  T.push({id:id('fr-daily'), slot, txt:'💌 10 min friend replies: open the Friends page, answer ONE person (a meme reply counts)', links:[L.msgr,L.igdm],
+    ai:'Help me reply to friends I have left on read. I will paste their messages or just describe them. For each one draft a short reply in my voice: warm, silly, sincere. If it has been a while, open with ONE light sorry line (no groveling, no long excuses), then actually respond to what they said. Keep each reply under 5 sentences and never use em dashes.'});
+  if(dk==='thu')
+    T.push({id:id('fr-hang'), slot:'msgs', txt:'🗓️ Weekly hangout text: pick ONE friend and propose a real plan (boba, walk, co-work, anything)',
+      ai:'Help me text a friend to set up a real hangout. I will tell you who and our vibe. Draft a short low-pressure message that proposes one specific activity and two concrete day options, in my voice: warm, silly, sincere. No em dashes.'});
+  return T;
+}
 /* ---- one-off real-life items pinned to specific days ---- */
 let SPECIALS={};
 let DAY_DEFS=[];
@@ -1456,7 +1518,7 @@ function buildWeeks(){
     const body=document.createElement('div'); body.className='pd-body';
     const weekIds=[];
     DAY_DEFS.forEach((dd,idx)=>{
-      const tasks=[...recTasks(n,dd.dk), ...cleanTasks(n,dd.dk)];
+      const tasks=[...recTasks(n,dd.dk), ...cleanTasks(n,dd.dk), ...friendTasks(n,dd.dk)];
       ((SPECIALS[n]||{})[dd.dk]||[]).forEach((sp,i)=>{
         const t=Object.assign({id:'gp-w'+n+'-'+dd.dk+'-sp'+i, slot:(dd.dk==='sat'?'satfilm':(dd.dk==='sun'?'checkin':'setup'))}, sp);
         tasks.push(t);
@@ -1560,6 +1622,14 @@ function buildGuides(){
   const cbody=document.createElement('div'); cbody.className='pd-body';
   cbody.innerHTML='<div class="pl-intro">The cadence, pre-placed in your days so you never have to decide: 🧹 <b>room</b> every other day (Mon, Wed, Fri, in the 11pm Flex block), 🍽️ <b>kitchen</b> every 3 days (Mon + Thu, while dinner cooks), 🚿 <b>bathroom</b> every 4 days (Tue + Sat), and one 🧽 <b>Saturday power hour</b>: floors, living room, quick fridge check. Sunday stays cleaning-free. Rules of the game: timer on, music on, done beats perfect, and on a crash day a 10-minute pickup counts as the whole task. The 🤖 button on any cleaning task turns Claude into your body double so you never clean alone.</div>';
   cdet.appendChild(cbody); wrap.appendChild(cdet);
+  // friends & replies: the daily 10-minute rhythm woven into the day cards
+  const fdet=document.createElement('details'); fdet.className='plan-day';
+  fdet.innerHTML='<summary><span class="caret">▸</span>💌 Friends &amp; replies <span class="sub">10 minutes a day · one reply counts</span></summary>';
+  const fbody=document.createElement('div'); fbody.className='pd-body';
+  fbody.innerHTML='<div class="pl-intro">The rhythm, already placed in your day cards: <b>10 minutes a day</b> for the humans you love. Weekdays it is the last stretch of the 10:30pm Messages block, Saturday it lives in the evening OFF block, Sunday a couch text counts double. <b>Thursday</b> adds the weekly hangout text: one friend, one concrete plan. House rules: one reply is a win, a meme reply counts, the apology is ONE line max (they missed you, they were not keeping score), and nobody ever gets guilt-tripped, including you. The 💌 Friends page keeps the who-and-why queue plus copy-paste openers so you never start from a blank bubble.</div>';
+  const fbtn=document.createElement('button'); fbtn.className='cl-btn'; fbtn.style.margin='4px 12px 12px'; fbtn.textContent='💌 Open the Friends page →';
+  fbtn.onclick=()=>{ view='friends'; applyLayout(); renderFriends(); };
+  fbody.appendChild(fbtn); fdet.appendChild(fbody); wrap.appendChild(fdet);
 }
 /* ==================== 🍜 FOOD PAGE ====================
    Fridge list + shopping list + easy recipes. Lives in localStorage and rides
@@ -1719,6 +1789,89 @@ document.getElementById('foodImportBtn').onclick=()=>{
   saveFood(); renderFood(); document.getElementById('foodImport').value='';
   setStatus('foodImportStatus',(nR||nB)?('Added '+nR+' recipe'+(nR===1?'':'s')+' and '+nB+' shopping item'+(nB===1?'':'s')+'. 🎉'):'Nothing new to add (those might already be on the page).',(nR||nB)?'ok':'err');
   if(nR) confetti(16);
+};
+
+/* ==================== 💌 FRIENDS PAGE ====================
+   The reply queue: who is waiting, why, and how to start. Lives in localStorage
+   and rides along in state.json so desktop and phone share one queue. The daily
+   10-minute task in the day cards points here. */
+const LS_FRIENDS='lupita-friends-v1';
+let friends=JSON.parse(localStorage.getItem(LS_FRIENDS)||'{}');
+friends.people=friends.people||[];
+const saveFriends=()=>{ localStorage.setItem(LS_FRIENDS, JSON.stringify(friends)); pushStateSoon(); };
+const VIBES={sorry:'🙏 owe an apology + reply', hang:'🗓️ make a hangout plan', answer:'💬 owe them an answer', checkin:'🌷 check in', congrats:'🎉 congratulate them'};
+// copy-paste starters: short, warm, one-line apologies ON PURPOSE
+const OPENERS=[
+ {icon:'🙏', name:'Sorry I vanished', txt:'AAA I am so sorry I disappeared, life got loud for a bit. I have been thinking of you though!! How are you, what did I miss?'},
+ {icon:'🌙', name:'Honest low battery', txt:'Hi!! Sorry for the slow reply, my social battery has been running on fumes lately. You never stopped mattering, I promise. Tell me everything.'},
+ {icon:'🗓️', name:'Make a hangout', txt:'I miss your face!! Are you free sometime next week? Boba or a walk or literally just existing in the same room, dealer\'s choice.'},
+ {icon:'💬', name:'The late answer', txt:'Okay replying SO late but the answer is: '},
+ {icon:'🌷', name:'Just checking in', txt:'Hi hi, no reason, you just crossed my mind and I wanted to say I hope your week is being kind to you 💕'},
+ {icon:'🎉', name:'Hype them up', txt:'WAIT this is amazing?? Congratulations!! I am so happy for you, tell me everything.'},
+ {icon:'🦖', name:'Saw this and thought of you', txt:'This made me think of you immediately: '},
+ {icon:'🔁', name:'Reschedule without spiraling', txt:'Hey, I am so sorry, I have to move our plan. Can we do next week instead? I really do want to see you, pick a day and I am there.'},
+];
+function friendPrompt(p){
+  const why=p.note?(' Context: '+p.note+'.'):'';
+  const vibe={sorry:'It has been a while and I feel bad about it, so start with ONE light apology line (no groveling), then a real warm message.',
+    hang:'The goal is a real hangout: propose one specific low-key activity and two concrete day options.',
+    answer:'I owe them an answer, help me actually give it, clearly and warmly.',
+    checkin:'Just a warm check-in, no agenda.',
+    congrats:'Something good happened for them, hype them up sincerely.'}[p.vibe]||'';
+  return 'Help me write a short message to my friend '+p.name+'.'+why+' '+vibe+' Write it in my voice: warm, silly, sincere, casual texting style. Keep it under 5 sentences, never use em dashes, and give me 2 versions to pick from.';
+}
+function renderFriends(){
+  const ul=document.getElementById('friendList'); if(!ul) return;
+  ul.innerHTML='';
+  document.getElementById('friendCount').textContent=friends.people.length?(friends.people.length+(friends.people.length===1?' person':' people')):'';
+  if(!friends.people.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Queue is empty. Either you are all caught up (!!) or add whoever has been sitting in the back of your head. 💌'; ul.appendChild(e); }
+  friends.people.forEach((p,i)=>{
+    const li=document.createElement('li'); li.className='item';
+    const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox'; cb.title='replied! clears them from the queue';
+    cb.onchange=()=>{ if(cb.checked){ friends.people.splice(i,1); saveFriends(); confetti(12); renderFriends(); } };
+    const body=document.createElement('div'); body.className='body';
+    const tx=document.createElement('div'); tx.className='txt'; tx.textContent=p.name; body.appendChild(tx);
+    const mt=document.createElement('div'); mt.className='meta'; mt.textContent=(VIBES[p.vibe]||'reply')+(p.note?(' · '+p.note):''); body.appendChild(mt);
+    const ai=document.createElement('button'); ai.className='del'; ai.textContent='🤖'; ai.title='copy a Claude prompt for this exact reply';
+    ai.onclick=async()=>{ const ok=await copyText(friendPrompt(p)); window.open('https://claude.ai/new','_blank','noopener');
+      setStatus('friendsStatus', ok?('Prompt for '+p.name+' copied! Paste (Ctrl+V) into the Claude tab. ✨'):'Opened Claude. Describe the reply you need.', ok?'ok':'err'); };
+    const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove without replying (also allowed)';
+    del.onclick=()=>{ friends.people.splice(i,1); saveFriends(); renderFriends(); };
+    li.appendChild(cb); li.appendChild(body); li.appendChild(ai); li.appendChild(del); ul.appendChild(li);
+  });
+  const ol=document.getElementById('openerList'); ol.innerHTML='';
+  OPENERS.forEach(o=>{
+    const row=document.createElement('div'); row.className='pl-item'; row.style.cursor='pointer'; row.title='tap to copy';
+    const t=document.createElement('div'); t.className='txt2';
+    t.innerHTML='<b>'+o.icon+' '+o.name+'</b> ';
+    const d=document.createElement('span'); d.className='pd-desc'; d.textContent=o.txt; t.appendChild(d);
+    row.appendChild(t);
+    row.onclick=async()=>{ const ok=await copyText(o.txt);
+      setStatus('friendsStatus', ok?('Copied the "'+o.name+'" opener! Tweak it and send. 💌'):'Could not copy, select the text manually.', ok?'ok':'err'); };
+    ol.appendChild(row);
+  });
+}
+function addFriend(){
+  const name=document.getElementById('frName').value.trim(); if(!name) return;
+  friends.people.push({id:'fr-'+Date.now(), name, vibe:document.getElementById('frVibe').value, note:document.getElementById('frNote').value.trim(), added:iso(new Date())});
+  document.getElementById('frName').value=''; document.getElementById('frNote').value='';
+  saveFriends(); renderFriends();
+}
+document.getElementById('frAdd').onclick=addFriend;
+['frName','frNote'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') addFriend(); }));
+document.getElementById('openFriends').onclick=()=>{ view='friends'; applyLayout(); renderFriends(); };
+document.getElementById('friendsBack').onclick=()=>{ view='plan'; applyLayout(); renderPlan(); };
+// 🤖 hand-off: copy the whole queue + a ready prompt, open Claude, paste replies back to the apps
+document.getElementById('friendsAsk').onclick=async()=>{
+  const q=friends.people.length
+    ? friends.people.map(p=>'- '+p.name+(p.note?(' ('+p.note+')'):'')+' -> '+(VIBES[p.vibe]||'reply')).join('\n')
+    : '(my queue is empty right now, I will describe who I owe replies to)';
+  const prompt='You are helping Lupita, a freelance animator, catch up on replies to friends she cares about a lot. Replying on time is just hard some seasons; be warm and zero-pressure about it. Hard rules: her texting voice is warm, silly, sincere; short beats long; if it has been a while, ONE light apology line max (no groveling); never use em dashes.\n\n'
+   +'PEOPLE I OWE REPLIES TO:\n'+q+'\n\n'
+   +'For each person, draft a short ready-to-send message (2 versions when it feels tricky). Ask me for their actual last message whenever that would make the reply better.';
+  const ok=await copyText(prompt);
+  window.open('https://claude.ai/new','_blank','noopener');
+  setStatus('friendsStatus', ok?'Copied! Paste (Ctrl+V) into the Claude tab and it will draft every reply with you. ✨':'Opened Claude. Describe who you owe replies to and it will draft them.', ok?'ok':'err');
 };
 
 function addTask(){
