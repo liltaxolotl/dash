@@ -184,7 +184,14 @@
   .cl-savednote{font-size:.74rem; color:var(--ok); margin-left:auto; font-weight:700}
 
   /* ---------- game plan panel ---------- */
-  #planPanel{max-width:980px; margin:0 auto}
+  #planPanel{flex-direction:column; gap:18px}
+  .plan-cols{display:grid; grid-template-columns:320px minmax(0,1fr); gap:18px; align-items:start}
+  .plan-side,.plan-main{display:flex; flex-direction:column; gap:18px; min-width:0}
+  @media(max-width:940px){.plan-cols{grid-template-columns:1fr}}
+  /* compact sidebar clock: descriptions only show on the current block */
+  #planDays .pd-row{grid-template-columns:92px 1fr; padding:6px 8px}
+  #planDays .pd-desc{display:none; grid-column:1/-1; padding-top:2px}
+  #planDays .pd-row.now-block .pd-desc{display:block}
   .phasebar{display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 16px}
   .phase{flex:1; min-width:150px; border:1px solid var(--line); border-radius:14px; padding:10px 12px; background:#fdfafe; font-size:.8rem; line-height:1.35}
   .phase b{display:block; font-size:.7rem; letter-spacing:.4px; text-transform:uppercase; color:var(--soft); margin-bottom:3px}
@@ -495,57 +502,66 @@
     <div class="card">
       <h2>🗺️ The 8-Week Game Plan <span class="pill" id="planWeekPill"></span></h2>
       <p class="cl-lead">Jul 13 to Sep 6 · 50 applications a week (8 fast + 2 deep per weekday) · one launch every 2 weeks. Full playbook: projects/business-plan-jul-aug. 💪</p>
-      <div class="phasebar" id="phaseBar"></div>
-      <div class="apps-track">
-        <div class="apps-head">💼 Applications this week <span class="streak" id="streakN"></span> <span class="apps-total" id="appsAllTime"></span></div>
-        <div class="apps-row">
-          <div class="apps-kind">⚡ Fast <b id="appsFastN">0</b>
-            <button class="apps-btn" id="appsFastPlus">+1</button><button class="apps-btn minus" id="appsFastMinus">−</button></div>
-          <div class="apps-kind">🎯 Deep <b id="appsDeepN">0</b>
-            <button class="apps-btn" id="appsDeepPlus">+1</button><button class="apps-btn minus" id="appsDeepMinus">−</button></div>
+      <div class="phasebar" id="phaseBar" style="margin-bottom:2px"></div>
+    </div>
+
+    <div class="plan-cols">
+      <!-- sidebar: counters, links, and the clock -->
+      <div class="plan-side">
+        <div class="card">
+          <h2>💼 This week</h2>
+          <div class="apps-track">
+            <div class="apps-head">💼 Applications <span class="streak" id="streakN"></span> <span class="apps-total" id="appsAllTime"></span></div>
+            <div class="apps-row">
+              <div class="apps-kind">⚡ Fast <b id="appsFastN">0</b>
+                <button class="apps-btn" id="appsFastPlus">+1</button><button class="apps-btn minus" id="appsFastMinus">−</button></div>
+              <div class="apps-kind">🎯 Deep <b id="appsDeepN">0</b>
+                <button class="apps-btn" id="appsDeepPlus">+1</button><button class="apps-btn minus" id="appsDeepMinus">−</button></div>
+            </div>
+            <div class="bar"><i id="appsBar"></i></div>
+            <div class="apps-sub" id="appsSub">0 / 50 this week</div>
+          </div>
+          <div class="apps-track" style="margin-top:10px">
+            <div class="apps-head">💵 Budget <span class="apps-total" id="moneyAllTime"></span></div>
+            <div class="apps-sub" id="moneyWeek"></div>
+            <button class="cl-btn ghost" id="openBudget" style="margin-top:9px">📒 Open the budget page →</button>
+          </div>
+          <div class="apps-track" style="margin-top:10px">
+            <div class="apps-head">⚡ Quick actions</div>
+            <div class="pl-links" id="quickBar" style="padding:0"></div>
+          </div>
         </div>
-        <div class="bar"><i id="appsBar"></i></div>
-        <div class="apps-sub" id="appsSub">0 / 50 this week</div>
+
+        <div class="card">
+          <h2>🍜 Food &amp; 💌 Friends <span class="pill">zero pressure</span></h2>
+          <p class="cl-lead" style="margin-bottom:10px">Easy meals from what's in your fridge, and the 10-minute reply queue with ready-made openers. Fed and connected, no guilt. 💗</p>
+          <div class="cl-actions" style="margin-top:0">
+            <button class="cl-btn ghost" id="openFood">🍳 Food page →</button>
+            <button class="cl-btn ghost" id="openFriends">💌 Friends page →</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>⏰ The Clock <span class="pill" id="clockNow"></span></h2>
+          <p class="cl-lead" style="margin-bottom:8px">The fixed skeleton: meals, sleep, block times. Current block highlighted.</p>
+          <div id="planDays"></div>
+        </div>
       </div>
-      <div class="apps-track" style="margin-top:10px">
-        <div class="apps-head">💵 Budget <span class="apps-total" id="moneyAllTime"></span></div>
-        <div class="apps-sub" id="moneyWeek"></div>
-        <button class="cl-btn ghost" id="openBudget" style="margin-top:9px">📒 Open the budget page →</button>
+
+      <!-- main: the weekly sprint, right up top -->
+      <div class="plan-main">
+        <div class="card">
+          <h2>🗓️ The 8-Week Sprint <span class="pill">check off days AND tasks · 🤖 Claude helps · 🔎 research</span></h2>
+          <p class="cl-lead" style="margin-bottom:6px">Jobs every weekday. Then each day has its own project: 💰 commissions Mon, 🎬 content Tue, 🌐 website Wed, 🎨 portfolio Thu, 🛍️🧑‍🏫 shop + tutoring Fri, 🎥 Ugly Dolls Sat. Every project grows week over week. The 🤖 button copies a ready-made prompt (and opens Claude) so you never start from a blank page.</p>
+          <div id="planWeeks"></div>
+        </div>
+
+        <div class="card">
+          <h2>📚 Project Guides <span class="pill">each project's full 8-week arc · same checkboxes as the weeks</span></h2>
+          <div id="planGuides"></div>
+          <p class="plan-note">🛟 <b>Crash-week minimum:</b> 1 application, 1 post, 1 message session, pay whatever bill is due. That still counts as a pass. Phases slide forward, no catch-up debt. And the 11pm Flex Block is the release valve: drop it guilt-free on heavy days and you still did 9 hours.</p>
+        </div>
       </div>
-
-      <div class="apps-track" style="margin-top:10px">
-        <div class="apps-head">⚡ Quick actions</div>
-        <div class="pl-links" id="quickBar" style="padding:0"></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>🍜 Food <span class="pill">easy meals, zero pressure</span></h2>
-      <p class="cl-lead" style="margin-bottom:10px">What's in your fridge, what you can make with it right now, and what to grab at the store. Fed is the goal, fancy is optional. 🧊</p>
-      <button class="cl-btn" id="openFood">🍳 Open the food page →</button>
-    </div>
-
-    <div class="card">
-      <h2>💌 Friends <span class="pill">10 min a day, zero guilt</span></h2>
-      <p class="cl-lead" style="margin-bottom:10px">Who's waiting on a reply, why, and ready-made openers (including the "sorry I vanished" one). One reply a day keeps friendships fed, and hangouts actually happen. 💗</p>
-      <button class="cl-btn" id="openFriends">💌 Open the friends page →</button>
-    </div>
-
-    <div class="card">
-      <h2>⏰ The Clock <span class="pill">the fixed skeleton: meals, sleep, block times · current block highlighted</span></h2>
-      <div id="planDays"></div>
-    </div>
-
-    <div class="card">
-      <h2>🗓️ The 8-Week Sprint <span class="pill">different every week · check off days AND tasks · 🤖 Claude helps · 🔎 research</span></h2>
-      <p class="cl-lead" style="margin-bottom:6px">Jobs every weekday. Then each day has its own project: 💰 commissions Mon, 🎬 content Tue, 🌐 website Wed, 🎨 portfolio Thu, 🛍️🧑‍🏫 shop + tutoring Fri, 🎥 Ugly Dolls Sat. Every project grows week over week. The 🤖 button copies a ready-made prompt (and opens Claude) so you never start from a blank page.</p>
-      <div id="planWeeks"></div>
-    </div>
-
-    <div class="card">
-      <h2>📚 Project Guides <span class="pill">each project's full 8-week arc in one place · same checkboxes as the weeks</span></h2>
-      <div id="planGuides"></div>
-      <p class="plan-note">🛟 <b>Crash-week minimum:</b> 1 application, 1 post, 1 message session, pay whatever bill is due. That still counts as a pass. Phases slide forward, no catch-up debt. And the 11pm Flex Block is the release valve: drop it guilt-free on heavy days and you still did 9 hours.</p>
     </div>
   </section>
 
@@ -1175,7 +1191,7 @@ function applyLayout(){
   document.querySelector('.grid').style.display = full ? 'none' : '';
   document.querySelector('.progress-card').style.display = full ? 'none' : '';
   document.getElementById('coverPanel').style.display = isCover ? 'block' : 'none';
-  document.getElementById('planPanel').style.display = isPlan ? 'block' : 'none';
+  document.getElementById('planPanel').style.display = isPlan ? 'flex' : 'none';
   document.getElementById('foodPanel').style.display = isFood ? 'flex' : 'none';
   document.getElementById('budgetPanel').style.display = isBudget ? 'flex' : 'none';
   document.getElementById('friendsPanel').style.display = isFriends ? 'flex' : 'none';
@@ -1219,6 +1235,8 @@ function renderPlan(){
     r.innerHTML='<div class="pd-time">'+b.t+'</div><div class="pd-name">'+b.n+'</div><div class="pd-desc">'+b.d+'</div>';
     wrap.appendChild(r);
   });
+  const curBlock=(CLOCKS[variant]||[]).find(b=>nowM>=b.s&&nowM<b.e);
+  document.getElementById('clockNow').textContent=curBlock?('now: '+curBlock.n):'free right now 🌈';
   renderQuickBar(); renderApps(); renderMoney(); buildWeeks(); buildGuides();
 }
 
