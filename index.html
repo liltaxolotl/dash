@@ -139,6 +139,109 @@
   footer{text-align:center; color:var(--soft); font-size:.8rem; margin-top:26px}
   .reset{background:none; border:1px solid var(--line); color:var(--soft); border-radius:99px; padding:6px 14px; cursor:pointer; font-size:.8rem}
   .reset:hover{border-color:var(--pink)}
+
+  /* ---------- cover letter panel ---------- */
+  #coverPanel{max-width:900px; margin:0 auto}
+  .cl-lead{color:var(--soft); font-size:.9rem; line-height:1.5; margin:0 0 14px}
+  .cl-field{margin:0 0 12px}
+  .cl-field label{display:block; font-size:.82rem; font-weight:700; color:var(--ink); margin-bottom:5px}
+  .cl-field .hint{font-weight:400; color:var(--soft); font-size:.78rem}
+  .cl-field input, .cl-field textarea, .cl-select{
+    width:100%; border:1px solid var(--line); border-radius:12px; padding:10px 12px;
+    font-size:.9rem; font-family:inherit; color:var(--ink); background:#fff;
+  }
+  .cl-field input:focus, .cl-field textarea:focus, .cl-select:focus{outline:none; border-color:var(--lav)}
+  .cl-field textarea{resize:vertical; line-height:1.5}
+  .cl-row{display:flex; gap:10px; flex-wrap:wrap}
+  .cl-row > .cl-field{flex:1; min-width:150px}
+  .cl-btn{border:none; cursor:pointer; border-radius:12px; padding:11px 18px; font-weight:700; font-size:.9rem;
+    color:#fff; background:linear-gradient(90deg,var(--pink-deep),var(--lav-deep)); transition:.15s}
+  .cl-btn:hover{transform:translateY(-1px)}
+  .cl-btn:disabled{opacity:.5; cursor:default; transform:none}
+  .cl-btn.ghost{background:#faf6ff; color:var(--lav-deep); border:1px solid var(--line)}
+  .cl-btn.ghost:hover{border-color:var(--lav); background:#f3ebff}
+  .cl-actions{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px}
+  .cl-status{font-size:.82rem; color:var(--soft); min-height:1.1em; margin-left:2px}
+  .cl-status.err{color:var(--urgent)}
+  .cl-status.ok{color:var(--ok)}
+  #clOutput{min-height:280px; font-size:.92rem}
+  details.cl-setup{border:1px solid var(--line); border-radius:14px; background:#fdfafe; margin-bottom:16px; overflow:hidden}
+  details.cl-setup>summary{cursor:pointer; list-style:none; padding:12px 14px; font-weight:800; font-size:.92rem;
+    display:flex; align-items:center; gap:8px; user-select:none}
+  details.cl-setup>summary::-webkit-details-marker{display:none}
+  details.cl-setup>summary:hover{background:#faf4fc}
+  details.cl-setup>summary .caret{font-size:.72em; color:var(--soft); transition:transform .15s}
+  details.cl-setup[open]>summary .caret{transform:rotate(90deg)}
+  details.cl-setup .cl-setup-body{padding:4px 14px 14px}
+  .cl-savednote{font-size:.74rem; color:var(--ok); margin-left:auto; font-weight:700}
+
+  /* ---------- game plan panel ---------- */
+  #planPanel{max-width:980px; margin:0 auto}
+  .phasebar{display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 16px}
+  .phase{flex:1; min-width:150px; border:1px solid var(--line); border-radius:14px; padding:10px 12px; background:#fdfafe; font-size:.8rem; line-height:1.35}
+  .phase b{display:block; font-size:.7rem; letter-spacing:.4px; text-transform:uppercase; color:var(--soft); margin-bottom:3px}
+  .phase.now{border-color:var(--pink); background:#fff0f7; box-shadow:var(--shadow)}
+  .phase.now b{color:var(--pink-deep)}
+  .phase.past{opacity:.55}
+  details.plan-day{border:1px solid var(--line); border-radius:16px; margin:10px 0; background:#fff; overflow:hidden; box-shadow:0 2px 8px rgba(180,140,200,.08)}
+  details.plan-day>summary{cursor:pointer; list-style:none; padding:13px 16px; font-weight:800; font-size:.95rem; display:flex; align-items:center; gap:10px; user-select:none; flex-wrap:wrap}
+  details.plan-day>summary::-webkit-details-marker{display:none}
+  details.plan-day>summary:hover{background:#faf4fc}
+  details.plan-day>summary .caret{font-size:.72em; color:var(--soft); transition:transform .15s}
+  details.plan-day[open]>summary .caret{transform:rotate(90deg)}
+  details.plan-day>summary .sub{font-weight:600; color:var(--soft); font-size:.78rem}
+  details.plan-day>summary .hrs{margin-left:auto; font-size:.7rem; font-weight:700; color:var(--soft); background:var(--line); padding:2px 9px; border-radius:99px; white-space:nowrap}
+  details.plan-day.today-day{border-color:var(--pink); box-shadow:var(--shadow)}
+  details.plan-day.today-day>summary{background:linear-gradient(90deg,#fff0f7,#f6f0ff)}
+  details.plan-day.today-day>summary .hrs{background:var(--urgent); color:#fff}
+  .pd-body{padding:2px 12px 12px}
+  .pd-row{display:grid; grid-template-columns:118px 170px 1fr; gap:10px; padding:8px 8px; border-bottom:1px dashed var(--line); font-size:.85rem; align-items:baseline}
+  .pd-row:last-child{border-bottom:none}
+  .pd-row.now-block{background:#fff0f7; border-radius:10px; border-bottom-color:transparent}
+  .pd-row.now-block .pd-time::after{content:" · now"; color:var(--urgent); font-weight:800}
+  .pd-time{font-weight:700; color:var(--lav-deep); white-space:nowrap; font-size:.79rem}
+  .pd-name{font-weight:700}
+  .pd-desc{color:var(--soft); line-height:1.45}
+  @media(max-width:640px){.pd-row{grid-template-columns:100px 1fr} .pd-desc{grid-column:1/-1; padding-left:2px; padding-top:2px}}
+  .plan-note{font-size:.84rem; color:var(--soft); line-height:1.55; margin:14px 2px 0; background:#fdfafe; border:1px solid var(--line); border-radius:14px; padding:12px 14px}
+  .apps-track{border:1px solid var(--line); border-radius:14px; padding:12px 14px; background:#fdfafe}
+  .apps-head{font-weight:800; font-size:.9rem; display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap}
+  .apps-total{margin-left:auto; font-size:.72rem; font-weight:700; color:var(--soft); background:var(--line); padding:2px 9px; border-radius:99px}
+  .apps-row{display:flex; flex-wrap:wrap; gap:16px; margin-bottom:10px}
+  .apps-kind{display:flex; align-items:center; gap:7px; font-size:.86rem; font-weight:600; color:var(--soft)}
+  .apps-kind b{color:var(--ink); font-size:1.05rem; min-width:1.2em; text-align:center}
+  .apps-btn{border:none; cursor:pointer; border-radius:9px; padding:4px 11px; font-weight:800; font-size:.8rem; color:#fff; background:linear-gradient(90deg,var(--pink-deep),var(--lav-deep))}
+  .apps-btn:hover{transform:translateY(-1px)}
+  .apps-btn.minus{background:var(--line); color:var(--soft); padding:4px 9px}
+  .apps-sub{margin-top:6px; font-size:.78rem; font-weight:700; color:var(--soft)}
+  .pl-item{display:flex; align-items:flex-start; gap:10px; padding:8px 6px; border-bottom:1px dashed var(--line); font-size:.87rem; line-height:1.4; cursor:pointer}
+  .pl-item:last-child{border-bottom:none}
+  .pl-item.done{opacity:.5}
+  .pl-item.done .txt2{text-decoration:line-through}
+  .pl-item .txt2{flex:1; min-width:170px}
+  .pl-item .tbs{display:flex; gap:5px; margin-left:auto; align-items:center}
+  .tb{border:1px solid var(--line); background:#faf6ff; border-radius:8px; cursor:pointer; font-size:.82rem; padding:3px 8px; line-height:1.2}
+  .tb:hover{border-color:var(--lav); background:#f3ebff; transform:translateY(-1px)}
+  .day-anchor{font-size:.74rem; font-weight:600; color:var(--soft); padding:4px 6px 8px; border-bottom:1px dashed var(--line)}
+  .day-theme{font-size:.68rem; font-weight:800; padding:2px 9px; border-radius:99px; background:#ece4ff; color:var(--lav-deep)}
+  details.plan-day details.plan-day{margin:8px 0; box-shadow:none; background:#fdfafe}
+  details.plan-day.day-done>summary{opacity:.55}
+  details.plan-day.day-done>summary .daylbl{text-decoration:line-through}
+  details.plan-day>summary .cbox{margin-top:0}
+  .wk-sub{font-size:.72rem; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:var(--lav-deep); margin:12px 4px 2px}
+  .streak{font-size:.78rem; font-weight:800; color:var(--pink-deep); background:#ffe3ef; padding:2px 10px; border-radius:99px}
+  .money-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .money-row input{width:92px; border:1px solid var(--line); border-radius:10px; padding:7px 10px; font-family:inherit; font-size:.9rem; color:var(--ink)}
+  .money-row input:focus{outline:none; border-color:var(--lav)}
+  .money-row select{width:auto; border:1px solid var(--line); border-radius:10px; padding:7px 10px; font-family:inherit; font-size:.86rem; color:var(--ink); background:#fff}
+  .money-recent{font-size:.76rem; color:var(--soft); margin-top:7px; display:flex; flex-direction:column; gap:2px}
+  .money-recent div{display:flex; align-items:center; gap:6px}
+  .confetti{position:fixed; top:-24px; z-index:999; pointer-events:none; animation:confall 1.7s ease-in forwards}
+  @keyframes confall{to{transform:translateY(106vh) rotate(560deg); opacity:0}}
+  .pl-intro{font-size:.83rem; color:var(--soft); line-height:1.55; padding:4px 6px 8px}
+  .pl-links{display:flex; flex-wrap:wrap; gap:6px; padding:8px 6px 4px}
+  .pl-links a{font-size:.8rem; color:var(--lav-deep); text-decoration:none; padding:5px 9px; background:#faf6ff; border:1px solid var(--line); border-radius:9px}
+  .pl-links a:hover{border-color:var(--lav); background:#f3ebff}
 </style>
 </head>
 <body>
@@ -164,6 +267,8 @@
     <button class="tab" data-view="week">📅 This Week</button>
     <button class="tab" data-view="month">🗓️ This Month</button>
     <button class="tab" data-view="all">✨ Everything</button>
+    <button class="tab" data-view="plan">🗺️ Game Plan</button>
+    <button class="tab" data-view="cover">✉️ Cover Letters</button>
   </div>
 
   <div class="grid">
@@ -236,6 +341,155 @@
     </div>
   </div>
 
+  <!-- ✉️ COVER LETTER GENERATOR (hidden until the Cover Letters tab is picked) -->
+  <section id="coverPanel" style="display:none">
+    <div class="card">
+      <h2>✉️ Cover Letter Generator</h2>
+      <p class="cl-lead">Paste a job description, hit generate, and your local AI (runs on your PC, no Claude Code tokens) writes a tailored letter. Set your resume once below and it reuses it every time. 🌸</p>
+
+      <details class="cl-setup" id="clSetup">
+        <summary><span class="caret">▸</span> Your base info (set once) <span class="cl-savednote" id="clSavedNote"></span></summary>
+        <div class="cl-setup-body">
+          <div class="cl-row">
+            <div class="cl-field">
+              <label>Your name <span class="hint">as you sign off</span></label>
+              <input id="clName" type="text" placeholder="Maria Lupita Roa">
+            </div>
+            <div class="cl-field">
+              <label>Contact line <span class="hint">email · site · phone</span></label>
+              <input id="clContact" type="text" placeholder="email · website">
+            </div>
+          </div>
+          <div class="cl-field">
+            <label>Resume to edit <span class="hint">you have 4; pick which to use for each job in the generate row below</span></label>
+            <select class="cl-select" id="clResumeType">
+              <option value="production">Production</option>
+              <option value="animator">Animator</option>
+              <option value="general">General</option>
+              <option value="teaching">Teaching</option>
+            </select>
+          </div>
+          <div class="cl-field">
+            <label>Resume text <span class="hint" id="clResumeHint">editing: Production</span></label>
+            <textarea id="clResume" rows="8" placeholder="Paste your resume here (experience, skills, education, tools)..."></textarea>
+          </div>
+          <div class="cl-field">
+            <label>LinkedIn / extra notes <span class="hint">optional: anything not on the resume</span></label>
+            <textarea id="clLinkedin" rows="3" placeholder="LinkedIn summary, links to work, extra context..."></textarea>
+          </div>
+          <div class="cl-field">
+            <label>Your cover letter template <span class="hint">optional: a letter you like, used as a style guide</span></label>
+            <textarea id="clTemplate" rows="5" placeholder="Paste a cover letter template or a past letter you liked. The AI follows its tone and structure..."></textarea>
+          </div>
+          <button class="cl-btn" id="clSaveBase">Save my base info</button>
+        </div>
+      </details>
+
+      <div class="cl-row">
+        <div class="cl-field">
+          <label>Job title</label>
+          <input id="clJobTitle" type="text" placeholder="Production Coordinator">
+        </div>
+        <div class="cl-field">
+          <label>Company</label>
+          <input id="clCompany" type="text" placeholder="Sony Pictures Animation">
+        </div>
+        <div class="cl-field">
+          <label>Hiring manager <span class="hint">optional</span></label>
+          <input id="clManager" type="text" placeholder="leave blank for 'Hiring Team'">
+        </div>
+      </div>
+      <div class="cl-field">
+        <label>Job description <span class="hint">paste the full posting</span></label>
+        <textarea id="clJobDesc" rows="8" placeholder="Paste the job description here..."></textarea>
+      </div>
+
+      <div class="cl-actions">
+        <button class="cl-btn" id="clGenerate">✨ Generate letter</button>
+        <div class="cl-field" style="margin:0; min-width:150px">
+          <select class="cl-select" id="clUseResume" title="which resume to use">
+            <option value="production">Production resume</option>
+            <option value="animator">Animator resume</option>
+            <option value="general">General resume</option>
+            <option value="teaching">Teaching resume</option>
+          </select>
+        </div>
+        <div class="cl-field" style="margin:0; min-width:170px">
+          <select class="cl-select" id="clModel" title="local model"></select>
+        </div>
+        <span class="cl-status" id="clStatus"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📝 Your letter <span class="pill">editable</span></h2>
+      <div class="cl-field" style="margin:0">
+        <textarea id="clOutput" rows="16" placeholder="Your generated cover letter shows up here. You can edit it freely before copying."></textarea>
+      </div>
+      <div class="cl-actions">
+        <button class="cl-btn ghost" id="clCopy">📋 Copy</button>
+        <button class="cl-btn ghost" id="clPdf">📄 Save as PDF</button>
+        <button class="cl-btn ghost" id="clDownload">⬇️ .txt</button>
+        <button class="cl-btn" id="clPolish">💎 Polish in Claude chat</button>
+        <span class="cl-status" id="clPolishStatus"></span>
+      </div>
+      <p class="cl-lead" style="margin-top:10px; margin-bottom:0">💡 "Polish in Claude chat" copies your letter plus a polish prompt to your clipboard and opens Claude in a new tab. Just paste (Ctrl+V) and send. It uses your normal Claude plan, so it's free and no API key needed. Then paste the improved version back here. ✨</p>
+    </div>
+  </section>
+
+  <!-- 🗺️ GAME PLAN (hidden until the Game Plan tab is picked) -->
+  <section id="planPanel" style="display:none">
+    <div class="card">
+      <h2>🗺️ The 8-Week Game Plan <span class="pill" id="planWeekPill"></span></h2>
+      <p class="cl-lead">Jul 13 to Sep 6 · 50 applications a week (8 fast + 2 deep per weekday) · one launch every 2 weeks. Full playbook: projects/business-plan-jul-aug. 💪</p>
+      <div class="phasebar" id="phaseBar"></div>
+      <div class="apps-track">
+        <div class="apps-head">💼 Applications this week <span class="streak" id="streakN"></span> <span class="apps-total" id="appsAllTime"></span></div>
+        <div class="apps-row">
+          <div class="apps-kind">⚡ Fast <b id="appsFastN">0</b>
+            <button class="apps-btn" id="appsFastPlus">+1</button><button class="apps-btn minus" id="appsFastMinus">−</button></div>
+          <div class="apps-kind">🎯 Deep <b id="appsDeepN">0</b>
+            <button class="apps-btn" id="appsDeepPlus">+1</button><button class="apps-btn minus" id="appsDeepMinus">−</button></div>
+        </div>
+        <div class="bar"><i id="appsBar"></i></div>
+        <div class="apps-sub" id="appsSub">0 / 50 this week</div>
+      </div>
+      <div class="apps-track" style="margin-top:10px">
+        <div class="apps-head">💵 Money in <span class="apps-total" id="moneyAllTime"></span></div>
+        <div class="money-row">
+          <input id="moneyAmt" type="number" min="0" step="0.01" placeholder="$ amount">
+          <select id="moneySrc">
+            <option value="commission">commission</option>
+            <option value="print">print</option>
+            <option value="tutoring">tutoring</option>
+            <option value="gig">gig</option>
+            <option value="other">other</option>
+          </select>
+          <button class="apps-btn" id="moneyAdd">+ log it</button>
+          <span class="apps-sub" id="moneyWeek" style="margin:0 0 0 auto"></span>
+        </div>
+        <div class="money-recent" id="moneyRecent"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>⏰ The Clock <span class="pill">the fixed skeleton: meals, sleep, block times · current block highlighted</span></h2>
+      <div id="planDays"></div>
+    </div>
+
+    <div class="card">
+      <h2>🗓️ The 8-Week Sprint <span class="pill">different every week · check off days AND tasks · 🤖 Claude helps · 🔎 research</span></h2>
+      <p class="cl-lead" style="margin-bottom:6px">Jobs every weekday. Then each day has its own project: 💰 commissions Mon, 🎬 content Tue, 🌐 website Wed, 🎨 portfolio Thu, 🛍️🧑‍🏫 shop + tutoring Fri, 🎥 Ugly Dolls Sat. Every project grows week over week. The 🤖 button copies a ready-made prompt (and opens Claude) so you never start from a blank page.</p>
+      <div id="planWeeks"></div>
+    </div>
+
+    <div class="card">
+      <h2>📚 Project Guides <span class="pill">each project's full 8-week arc in one place · same checkboxes as the weeks</span></h2>
+      <div id="planGuides"></div>
+      <p class="plan-note">🛟 <b>Crash-week minimum:</b> 1 application, 1 post, 1 message session, pay whatever bill is due. That still counts as a pass. Phases slide forward, no catch-up debt. And the 11pm Flex Block is the release valve: drop it guilt-free on heavy days and you still did 9 hours.</p>
+    </div>
+  </section>
+
   <footer>
     Made with care for Liltaxolotl 🌸 &nbsp;·&nbsp; check things off as you go, it remembers &nbsp;·&nbsp;
     <button class="reset" id="resetBtn">reset all checkmarks</button>
@@ -245,27 +499,19 @@
 <script>
 /* ---------- DATA (edit these arrays to keep your dashboard fresh) ---------- */
 // Dates are ISO (YYYY-MM-DD). "today" is computed from the real clock.
-const TASKS = [
-];
-const BILLS = [
-];
-const APPTS = [
-];
-const FOCUSES = [
-];
-const RHYTHM = [
-];
-const MILES = [
-];
+const TASKS = [];
+const BILLS = [];
+const APPTS = [];
+const FOCUSES = [];
+const RHYTHM = [];
+const MILES = [];
 // path = real project folder on this PC; the name becomes a clickable link that opens it.
-const PROJECTS = [
-];
+const PROJECTS = [];
 // Job & client leads. The lead-hunter agent prepends new finds here.
 // type: 'fulltime' | 'freelance' | 'opencall'.  link = direct post/application URL.
 // date = posted date (YYYY-MM-DD), deadline optional (YYYY-MM-DD or '').
 // Tick the checkbox once you've reviewed/applied; it remembers (shares the done store).
-const LEADS = [
-];
+const LEADS = [];
 
 /* ---------- LIVE LEADS FEED ----------
    The morning cloud agent refreshes leads.json in this private repo.
@@ -523,10 +769,15 @@ async function loadState(){
     const s=b64dec(j.content);
     if(s && (s.savedAt||0) > Number(localStorage.getItem(LS_SAVEDAT)||0)){
       done=s.done||{}; custom=s.custom||[];
+      if(s.apps){ apps=s.apps; localStorage.setItem(LS_APPS, JSON.stringify(apps)); }
+      if(s.money){ money=s.money; localStorage.setItem(LS_MONEY, JSON.stringify(money)); }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
       localStorage.setItem(LS_CUSTOM, JSON.stringify(custom));
       localStorage.setItem(LS_SAVEDAT, String(s.savedAt||0));
       render();
+      // refresh every game-plan checkbox/count + the counters
+      Object.values(gpReg).forEach(fns=>fns.forEach(f=>f()));
+      renderApps(); renderMoney();
     }
   }catch(err){}
 }
@@ -539,7 +790,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -552,12 +803,35 @@ async function pushState(){
     }
     if(res.ok){ stateSha=(await res.json()).content.sha; }
     else if(res.status===401||res.status===403){
-      setLeadStatus("Sync token can't save changes. Paste a token with read AND write access to fix cross-device sync.");
+      setLeadStatus('Sync token can\'t save changes. Paste a token with read AND write access to fix cross-device sync.');
     }
   }catch(err){}
 }
 // keep devices in step while the page stays open
 setInterval(()=>{ loadState(); }, 60000);
+
+/* ---------- REMOTE GAME PLAN ----------
+   The 8-week sprint data also lives in the private repo (game-plan.json) so the
+   public phone shell ships with zero personal plan data and loads it at runtime.
+   The desktop copy keeps its baked-in data as an offline fallback. */
+const PLAN_PATH='game-plan.json';
+async function fetchPlan(){
+  if(!getToken()) return;
+  try{
+    const r=await fetch(`https://api.github.com/repos/${LEAD_FEED.owner}/${LEAD_FEED.repo}/contents/${PLAN_PATH}?ref=${LEAD_FEED.branch}&t=${Date.now()}`,{headers:ghHdr(), cache:'no-store'});
+    if(!r.ok) return;
+    const p=b64dec((await r.json()).content);
+    if(!p||!p.guides||!p.dayDefs) return;
+    CLOCK=p.clock||CLOCK; PLAN_PHASES=p.phases||PLAN_PHASES; GUIDE_STEPS=p.guides;
+    SPECIALS=p.specials||{}; DAY_DEFS=p.dayDefs; WEEK_TITLES=p.weekTitles||WEEK_TITLES;
+    normalizeGuides();
+    const w=document.getElementById('planWeeks'), g=document.getElementById('planGuides');
+    w.innerHTML=''; delete w.dataset.built;
+    g.innerHTML=''; delete g.dataset.built;
+    Object.keys(gpReg).forEach(k=>delete gpReg[k]);
+    if(view==='plan') renderPlan();
+  }catch(err){}
+}
 
 function render(){
   // greeting
@@ -638,8 +912,327 @@ document.getElementById('tabs').addEventListener('click',e=>{
   const b=e.target.closest('.tab'); if(!b) return;
   view=b.dataset.view;
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===b));
-  render();
+  applyLayout();
+  if(view==='cover') loadModels(); // re-check the local AI each time the tab is opened
+  else if(view==='plan') renderPlan();
+  else render();
 });
+// swap between the schedule grid and the full-width panels (cover letters / game plan)
+function applyLayout(){
+  const isCover = view==='cover', isPlan = view==='plan';
+  document.querySelector('.grid').style.display = (isCover||isPlan) ? 'none' : '';
+  document.querySelector('.progress-card').style.display = (isCover||isPlan) ? 'none' : '';
+  document.getElementById('coverPanel').style.display = isCover ? 'block' : 'none';
+  document.getElementById('planPanel').style.display = isPlan ? 'block' : 'none';
+}
+
+/* ---------- 🗺️ GAME PLAN (8-week intensive, night-owl clock) ----------
+   Times are minutes since midnight; blocks past midnight use 1440+ so the
+   "schedule day" runs 11:00am to 11:00am. Source of truth:
+   projects/business-plan-jul-aug/README.md */
+let PLAN_PHASES = [];
+// The clock: the invariant skeleton every day hangs on. [startMin, endMin, time, name, desc]
+// Blocks past midnight use 1440+ so the "schedule day" runs 11:00am to 11:00am.
+let CLOCK=[];
+function renderPlan(){
+  const startD=parse('2026-07-13'), endD=parse('2026-09-06');
+  // phase bar + week pill
+  const pbEl=document.getElementById('phaseBar'); pbEl.innerHTML='';
+  PLAN_PHASES.forEach(p=>{
+    const f=parse(p.from), t=parse(p.to);
+    const div=document.createElement('div');
+    div.className='phase'+(today>=f&&today<=t?' now':(today>t?' past':''));
+    const fmt=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    div.innerHTML='<b>Phase '+p.n+' · '+fmt(f)+' to '+fmt(t)+'</b>'+p.label;
+    pbEl.appendChild(div);
+  });
+  const pill=document.getElementById('planWeekPill');
+  if(today<startD) pill.textContent='starts Mon Jul 13';
+  else if(today>endD) pill.textContent='wrapped! time for the review';
+  else pill.textContent='Week '+(Math.floor((today-startD)/604800000)+1)+' of 8 · SPRINT';
+  // the clock, with the current block highlighted (before 11am = still yesterday's clock)
+  const now=new Date();
+  let nowM=now.getHours()*60+now.getMinutes();
+  if(nowM<660) nowM+=1440;
+  const wrap=document.getElementById('planDays'); wrap.innerHTML='';
+  CLOCK.forEach(b=>{
+    const r=document.createElement('div');
+    r.className='pd-row'+((nowM>=b[0]&&nowM<b[1])?' now-block':'');
+    r.innerHTML='<div class="pd-time">'+b[2]+'</div><div class="pd-name">'+b[3]+'</div><div class="pd-desc">'+b[4]+'</div>';
+    wrap.appendChild(r);
+  });
+  renderApps(); renderMoney(); buildWeeks(); buildGuides();
+}
+
+/* ---- confetti (day check-offs, the 50-goal, money in) ---- */
+function confetti(n){
+  const em=['🎉','✨','🌸','💖','⭐','🎊'];
+  for(let i=0;i<(n||24);i++){
+    const s=document.createElement('span'); s.className='confetti';
+    s.textContent=em[Math.floor(Math.random()*em.length)];
+    s.style.left=(Math.random()*100)+'vw';
+    s.style.animationDelay=(Math.random()*0.45)+'s';
+    s.style.fontSize=(0.8+Math.random()*1.2)+'rem';
+    document.body.appendChild(s); setTimeout(()=>s.remove(),2400);
+  }
+}
+/* ---- day streak (consecutive checked-off day cards, 11am day boundary) ---- */
+function dayIdFor(d){
+  const diff=Math.round((d-parse('2026-07-13'))/86400000);
+  if(diff<0||diff>55) return null;
+  return 'gpd-w'+(Math.floor(diff/7)+1)+'-'+['mon','tue','wed','thu','fri','sat','sun'][diff%7];
+}
+function calcStreak(){
+  const now=new Date(); const d=new Date(now); d.setHours(0,0,0,0);
+  if(now.getHours()<11) d.setDate(d.getDate()-1);
+  let id=dayIdFor(d);
+  if(!(id&&done[id])) d.setDate(d.getDate()-1); // today not done yet? streak counts up to yesterday
+  let s=0;
+  for(;;){ id=dayIdFor(d); if(id&&done[id]){ s++; d.setDate(d.getDate()-1); } else break; }
+  return s;
+}
+/* ---- application counter (syncs across devices via state.json) ---- */
+const LS_APPS='lupita-apps-v1';
+let apps=JSON.parse(localStorage.getItem(LS_APPS)||'{}');
+function appsWeekKey(){ const d=new Date(today); const dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow); return iso(d); }
+function bumpApps(kind,delta){
+  const k=appsWeekKey(); const w=apps[k]=apps[k]||{fast:0,deep:0};
+  const before=(w.fast||0)+(w.deep||0);
+  w[kind]=Math.max(0,(w[kind]||0)+delta);
+  const after=(w.fast||0)+(w.deep||0);
+  if(before<50&&after>=50) confetti(44);
+  localStorage.setItem(LS_APPS,JSON.stringify(apps)); pushStateSoon(); renderApps();
+}
+function renderApps(){
+  const w=apps[appsWeekKey()]||{fast:0,deep:0};
+  const tot=(w.fast||0)+(w.deep||0);
+  let all=0; Object.values(apps).forEach(v=>{ all+=(v.fast||0)+(v.deep||0); });
+  document.getElementById('appsFastN').textContent=w.fast||0;
+  document.getElementById('appsDeepN').textContent=w.deep||0;
+  document.getElementById('appsBar').style.width=Math.min(100,Math.round(tot/50*100))+'%';
+  document.getElementById('appsSub').textContent=tot+' / 50 this week'+(tot>=50?' · GOAL HIT, go celebrate 🎉':'');
+  document.getElementById('appsAllTime').textContent=all+' sent in total';
+  const st=calcStreak();
+  document.getElementById('streakN').textContent = st>0 ? ('🔥 '+st+'-day streak') : '🔥 streak starts Monday';
+}
+['Fast','Deep'].forEach(k=>{
+  document.getElementById('apps'+k+'Plus').onclick=()=>bumpApps(k.toLowerCase(),1);
+  document.getElementById('apps'+k+'Minus').onclick=()=>bumpApps(k.toLowerCase(),-1);
+});
+/* ---- money tracker (every dollar in, syncs across devices) ---- */
+const LS_MONEY='lupita-money-v1';
+let money=JSON.parse(localStorage.getItem(LS_MONEY)||'[]'); // [{d:'2026-07-15', amt:40, src:'commission'}]
+function renderMoney(){
+  const wkStart=appsWeekKey();
+  const wk=money.filter(e=>e.d>=wkStart).reduce((a,e)=>a+e.amt,0);
+  const all=money.reduce((a,e)=>a+e.amt,0);
+  const f=v=>'$'+(Math.round(v*100)/100).toLocaleString();
+  document.getElementById('moneyWeek').textContent=f(wk)+' this week';
+  document.getElementById('moneyAllTime').textContent=f(all)+' earned in total';
+  const rec=document.getElementById('moneyRecent'); rec.innerHTML='';
+  money.slice(-3).reverse().forEach(e=>{
+    const row=document.createElement('div');
+    const t=document.createElement('span'); t.textContent=e.d.slice(5).replace('-','/')+' · '+f(e.amt)+' · '+e.src;
+    const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove this entry';
+    del.onclick=()=>{ money.splice(money.indexOf(e),1); localStorage.setItem(LS_MONEY,JSON.stringify(money)); pushStateSoon(); renderMoney(); };
+    row.appendChild(t); row.appendChild(del); rec.appendChild(row);
+  });
+}
+document.getElementById('moneyAdd').onclick=()=>{
+  const inp=document.getElementById('moneyAmt');
+  const amt=parseFloat(inp.value);
+  if(!(amt>0)) { inp.focus(); return; }
+  money.push({d:iso(new Date()), amt, src:document.getElementById('moneySrc').value});
+  localStorage.setItem(LS_MONEY,JSON.stringify(money)); pushStateSoon();
+  inp.value=''; confetti(20); renderMoney();
+};
+
+/* ---- Claude + research buttons ----
+   🤖 copies a ready-made, task-specific prompt to the clipboard and opens claude.ai
+   (unless the task is code:1, then paste it into Claude Code instead).
+   🔎 opens a prebuilt web search for the task. */
+const AI_PREFIX='You are helping Lupita: freelance animator and illustrator, brand Liltaxolotl (quirky, cute, warm, sincere). Hard rule: never use em dashes. She wants intense hand-holding: tiny concrete steps, do as much of the work for her as you can, and ask for anything you need up front. Task from her 8-week sprint dashboard: ';
+function copyPrompt(it,btn){
+  const p=AI_PREFIX+(it.ai||('"'+it.txt+'" . Walk me through this step by step right now, as concretely as possible, and produce as much of the deliverable as you can yourself.'));
+  const finish=()=>{
+    btn.textContent='✓'; setTimeout(()=>{btn.textContent='🤖';},1600);
+    if(!it.code) window.open('https://claude.ai/new','_blank');
+    else alert('Prompt copied! Paste it (Ctrl+V) into a Claude Code chat in your workspace: it needs your files.');
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(p).then(finish,finish);
+  else { window.prompt('Copy this prompt for Claude:',p); }
+}
+/* ---- shared checklist renderer ----
+   Checks live in the same done store as everything else, and a registry keeps
+   every copy of a task (week view + guide view) in sync. */
+const gpReg={};
+function gpSet(id,val){
+  if(val) done[id]=true; else delete done[id];
+  saveDone(); (gpReg[id]||[]).forEach(f=>f());
+  if(id.slice(0,4)==='gpd-'){ if(val) confetti(30); renderApps(); } // day checked: celebrate + refresh streak
+}
+function checklist(items,cntEl){
+  const box=document.createElement('div');
+  const update=()=>{ if(cntEl) cntEl.textContent=items.filter(it=>done[it.id]).length+' / '+items.length; };
+  items.forEach(it=>{
+    const row=document.createElement('div'); row.className='pl-item';
+    const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox';
+    const t=document.createElement('div'); t.className='txt2'; t.textContent=it.txt;
+    const sync=()=>{ cb.checked=!!done[it.id]; row.classList.toggle('done',!!done[it.id]); update(); };
+    (gpReg[it.id]=gpReg[it.id]||[]).push(sync);
+    cb.onchange=()=>gpSet(it.id,cb.checked);
+    row.onclick=e=>{ if(e.target===cb||e.target.closest('.tbs')) return; gpSet(it.id,!done[it.id]); };
+    const tbs=document.createElement('div'); tbs.className='tbs';
+    const ab=document.createElement('button'); ab.className='tb'; ab.textContent='🤖';
+    ab.title=it.code?'Copy a ready prompt, then paste into Claude Code (needs your files)':'Copy a ready prompt + open Claude to do this together';
+    ab.onclick=e=>{ e.stopPropagation(); copyPrompt(it,ab); };
+    tbs.appendChild(ab);
+    if(it.url){ const ub=document.createElement('button'); ub.className='tb'; ub.textContent='🔗';
+      ub.title='Open: '+it.url;
+      ub.onclick=e=>{ e.stopPropagation(); window.open(it.url,'_blank'); };
+      tbs.appendChild(ub); }
+    if(it.q){ const qb=document.createElement('button'); qb.className='tb'; qb.textContent='🔎';
+      qb.title='Research on the web: '+it.q;
+      qb.onclick=e=>{ e.stopPropagation(); window.open('https://www.google.com/search?q='+encodeURIComponent(it.q),'_blank'); };
+      tbs.appendChild(qb); }
+    row.appendChild(cb); row.appendChild(t); row.appendChild(tbs); box.appendChild(row);
+    sync();
+  });
+  update(); return box;
+}
+
+/* ---- the projects: every one advances EVERY week on its theme day ----
+   steps[w-1] = that project's tasks for week w. ai = custom Claude prompt,
+   q = web research query, code:1 = paste the prompt into Claude Code. */
+let GUIDE_STEPS={};
+function normalizeGuides(){ Object.entries(GUIDE_STEPS).forEach(([k,g])=>g.steps.forEach((st,w)=>st.forEach((it,i)=>{ it.id='gp-'+k+'-w'+(w+1)+'-'+i; }))); }
+normalizeGuides();
+
+/* ---- recurring day tasks (jobs every weekday, content beats, messages) ---- */
+function recTasks(n,dk){
+  const T=[]; const id=s=>'gp-w'+n+'-'+dk+'-'+s;
+  if(dk!=='sat'&&dk!=='sun'){
+    T.push({id:id('fast'), txt:'8 fast applies (log them in the counter)',
+      ai:'Blitz 8 fast job applications with me right now: help me pick 8 from my current leads and for each one give me a 3-line tailored tweak for my cover letter generator.'});
+    T.push({id:id('deep'), txt:'2 deep applications: tailored letter, right resume, portfolio matched',
+      ai:'Do 2 deep job applications with me: I will paste the postings. Pick my best resume angle (Production, Animator, General, or Teaching), draft the tailored letter, and tell me exactly which portfolio pieces to link.'});
+  }
+  if(dk==='mon'){
+    T.push({id:id('trend'), txt:'20-min trend check: pick this week’s 3 video ideas',
+      ai:'Search the web for what is trending THIS week on art TikTok, Instagram Reels, and YouTube Shorts for animators and illustrators: sounds, formats, challenges. Then give me 5 concrete video ideas in my quirky-cute style I can film today, ranked.',
+      q:'TikTok trending sounds art creators this week'});
+    T.push({id:id('film'), txt:'Film video #1 in tonight’s content block'});
+  }
+  if(dk==='tue') T.push({id:id('eng'), txt:'15 min engagement: reply to every comment + DM',
+      ai:'Draft short warm replies in my voice to the comments and DMs I paste. Batch them so I can copy-paste fast.'});
+  if(dk==='wed') T.push({id:id('film'), txt:'Film video #2 (timelapse tonight’s website/art work)'});
+  if(dk==='thu') T.push({id:id('wip'), txt:'Capture 30-60s of today’s portfolio work for content'});
+  if(dk==='fri'){
+    T.push({id:id('fup'), txt:'Follow-ups: nudge every application 7-10 days old',
+      ai:'Write my short friendly follow-up email template for job applications that are 7-10 days old, plus a version for client gigs I pitched.'});
+    T.push({id:id('post'), txt:'Post video #2 + schedule weekend content'});
+  }
+  if(dk==='sat') T.push({id:id('batch'), txt:'Batch film video #3 + b-roll for next week'});
+  if(dk==='sun'){
+    T.push({id:id('rest'), txt:'Actually rest. It is load-bearing.'});
+    T.push({id:id('sweep'), txt:'Optional 45 min at night: inbox sweep + peek at next week (only if it feels good)'});
+  }
+  return T;
+}
+/* ---- one-off real-life items pinned to specific days ---- */
+let SPECIALS={};
+let DAY_DEFS=[];
+let WEEK_TITLES=[];
+function dayDate(n,idx){ const d=parse('2026-07-13'); d.setDate(d.getDate()+(n-1)*7+idx); return d; }
+function buildWeeks(){
+  const wrap=document.getElementById('planWeeks');
+  if(wrap.dataset.built) return; wrap.dataset.built='1';
+  if(!DAY_DEFS.length||!Object.keys(GUIDE_STEPS).length){
+    const e=document.createElement('div'); e.className='empty';
+    e.textContent='Your sprint plan loads from the private feed: paste your GitHub token in the 💼 leads card, then tap ↻.';
+    wrap.appendChild(e); return;
+  }
+  const fmt=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  for(let n=1;n<=8;n++){
+    const f=dayDate(n,0), t=dayDate(n,6), cur=today>=f&&today<=t;
+    const det=document.createElement('details'); det.className='plan-day'+(cur?' today-day':''); if(cur) det.open=true;
+    const sum=document.createElement('summary');
+    sum.innerHTML='<span class="caret">▸</span>Week '+n+(cur?' 🌸':'')+' <span class="sub">'+fmt(f)+' to '+fmt(t)+' · '+(WEEK_TITLES[n-1]||'')+'</span>';
+    const cnt=document.createElement('span'); cnt.className='hrs'; sum.appendChild(cnt); det.appendChild(sum);
+    const body=document.createElement('div'); body.className='pd-body';
+    const weekItems=[];
+    DAY_DEFS.forEach((dd,idx)=>{
+      const tasks=[...recTasks(n,dd.dk)];
+      ((SPECIALS[n]||{})[dd.dk]||[]).forEach((sp,i)=>tasks.push({id:'gp-w'+n+'-'+dd.dk+'-sp'+i, ...sp}));
+      dd.proj.forEach(pk=>{ (GUIDE_STEPS[pk].steps[n-1]||[]).forEach(it=>tasks.push(it)); });
+      weekItems.push(...tasks);
+      const dDate=dayDate(n,idx), isToday=iso(dDate)===iso(today);
+      const dDet=document.createElement('details'); dDet.className='plan-day'+(isToday?' today-day':'');
+      if(isToday){ dDet.open=true; det.open=true; }
+      const dSum=document.createElement('summary');
+      const dayId='gpd-w'+n+'-'+dd.dk;
+      const dcb=document.createElement('input'); dcb.type='checkbox'; dcb.className='cbox'; dcb.title='check off the whole day';
+      dcb.onclick=e=>e.stopPropagation();
+      dcb.onchange=()=>gpSet(dayId,dcb.checked);
+      const dSync=()=>{ dcb.checked=!!done[dayId]; dDet.classList.toggle('day-done',!!done[dayId]); };
+      (gpReg[dayId]=gpReg[dayId]||[]).push(dSync);
+      dSum.appendChild(dcb);
+      const lbl=document.createElement('span'); lbl.className='daylbl';
+      lbl.innerHTML=' '+dd.icon+' '+dd.name+(isToday?' 🌸':'')+' <span class="day-theme">'+dd.theme+'</span> <span class="sub">'+fmt(dDate)+'</span>';
+      dSum.appendChild(lbl);
+      const dCnt=document.createElement('span'); dCnt.className='hrs'; dSum.appendChild(dCnt);
+      dDet.appendChild(dSum);
+      const dBody=document.createElement('div'); dBody.className='pd-body';
+      const an=document.createElement('div'); an.className='day-anchor'; an.textContent='⏰ '+dd.anchor; dBody.appendChild(an);
+      dBody.appendChild(checklist(tasks,dCnt));
+      dDet.appendChild(dBody); body.appendChild(dDet);
+      dSync();
+    });
+    const upd=()=>{ cnt.textContent=weekItems.filter(it=>done[it.id]).length+' / '+weekItems.length+' tasks'; };
+    weekItems.forEach(it=>(gpReg[it.id]=gpReg[it.id]||[]).push(upd)); upd();
+    det.appendChild(body); wrap.appendChild(det);
+  }
+}
+
+/* ---- project guides: the same tasks as the weeks, grouped per project ----
+   Same task objects and ids, so a checkbox ticked here is instantly ticked in
+   the week view too (and vice versa) via the gpReg registry. */
+function buildGuides(){
+  const wrap=document.getElementById('planGuides');
+  if(wrap.dataset.built) return; wrap.dataset.built='1';
+  if(!Object.keys(GUIDE_STEPS).length){
+    const e=document.createElement('div'); e.className='empty';
+    e.textContent='Guides load with your sprint plan once your token is saved. 🌸';
+    wrap.appendChild(e); return;
+  }
+  Object.values(GUIDE_STEPS).forEach(g=>{
+    const det=document.createElement('details'); det.className='plan-day';
+    const sum=document.createElement('summary');
+    sum.innerHTML='<span class="caret">▸</span>'+g.icon+' '+g.title+' <span class="sub">'+g.dayName+'s · the full 8-week arc</span>';
+    const cnt=document.createElement('span'); cnt.className='hrs'; sum.appendChild(cnt); det.appendChild(sum);
+    const body=document.createElement('div'); body.className='pd-body';
+    const allItems=[];
+    g.steps.forEach((st,i)=>{
+      if(!st.length) return;
+      const h=document.createElement('div'); h.className='wk-sub'; h.textContent='Week '+(i+1); body.appendChild(h);
+      body.appendChild(checklist(st,null)); allItems.push(...st);
+    });
+    const upd=()=>{ cnt.textContent=allItems.filter(it=>done[it.id]).length+' / '+allItems.length; };
+    allItems.forEach(it=>(gpReg[it.id]=gpReg[it.id]||[]).push(upd)); upd();
+    det.appendChild(body); wrap.appendChild(det);
+  });
+  // trend watch: links + the formats that keep working
+  const det=document.createElement('details'); det.className='plan-day';
+  det.innerHTML='<summary><span class="caret">▸</span>📈 Trend watch <span class="sub">Mondays · 20 minutes · then pick 3 video ideas</span></summary>';
+  const body=document.createElement('div'); body.className='pd-body';
+  body.innerHTML='<div class="pl-intro">Every Monday: 20 minutes here, pick this week’s 3 video ideas, done. Formats that keep working for artists: WIP timelapses over trending audio, "drawing my pet / myself as X", before-and-after art glow-ups, day-in-the-life of a freelance animator, redraw and style challenges, storytime over a speedpaint, ToonSquid and Procreate process tips, meme redraws in your style. The Monday task’s 🤖 button asks Claude to pull THIS week’s live trends for you. And watch your own numbers: every 2 weeks, double down on whichever of your posts popped.</div>'
+    +'<div class="pl-links">'
+    +'<a href="https://ads.tiktok.com/business/creativecenter/inspiration/popular/hashtag/pc/en" target="_blank" rel="noopener">🎵 TikTok Creative Center</a>'
+    +'<a href="https://www.youtube.com/feed/trending" target="_blank" rel="noopener">▶️ YouTube Trending</a>'
+    +'<a href="https://creators.instagram.com/" target="_blank" rel="noopener">📸 Instagram Creators</a>'
+    +'</div>';
+  det.appendChild(body); wrap.appendChild(det);
+}
 function addTask(){
   const inp=document.getElementById('newTask'); const v=inp.value.trim(); if(!v) return;
   const id='c-'+Date.now();
@@ -679,8 +1272,11 @@ document.getElementById('ghSave').onclick=saveToken;
 document.getElementById('ghToken').addEventListener('keydown',e=>{ if(e.key==='Enter') saveToken(); });
 document.getElementById('ghChange').onclick=()=>{ window._showTokenBox=true; render(); document.getElementById('ghToken').focus(); };
 
-// on-demand lead hunt: writes hunt-request.json; the home PC watches for it and
-// runs the lead-hunter, so credits only burn when Lupita actually asks for a hunt
+// on-demand lead hunt: writes hunt-request.json (the authoritative, token-gated
+// request), then pings the home PC over a private ntfy channel so the hunt starts
+// right away instead of waiting for a poll. The PC validates the ping against the
+// request file, so a stray ping without the file does nothing.
+const HUNT_PING_TOPIC='lupita-hunt-562xssrfjpcas614gsk8nhe9';
 async function requestHunt(){
   if(!getToken()){ setLeadOpen(true); setLeadStatus('Paste your token below first, then tap 🎯 again.'); render(); return; }
   setLeadStatus('Requesting a fresh hunt...');
@@ -690,19 +1286,330 @@ async function requestHunt(){
     const g=await fetch(url+`?ref=${LEAD_FEED.branch}&t=${Date.now()}`,{headers:ghHdr(), cache:'no-store'});
     if(g.ok) payload.sha=(await g.json()).sha;
     const res=await fetch(url,{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
-    if(res.ok) setLeadStatus('Hunt requested! 🎯 Fresh leads usually land in 15-20 min (home computer must be on). Tap ↻ in a bit.');
+    if(res.ok){
+      try{ await fetch('https://ntfy.sh/'+HUNT_PING_TOPIC,{method:'POST', body:'hunt'}); }catch(_){/* PC catches up on next wake if the ping fails */}
+      setLeadStatus('Hunt requested! 🎯 Your computer is on it — this list will refresh itself when fresh leads land (usually 5-15 min; home computer must be on).');
+      watchForFreshLeads();
+    }
     else if(res.status===401||res.status===403) setLeadStatus('Token can\'t write. Paste a read+write token to use the hunt button.');
     else setLeadStatus('Could not request the hunt right now. Try again in a minute.');
   }catch(err){ setLeadStatus('Could not request the hunt (offline?).'); }
 }
+// after a hunt is requested, quietly watch leads.json and auto-refresh when it changes
+let _huntWatch=null;
+async function watchForFreshLeads(){
+  if(_huntWatch){ clearInterval(_huntWatch); _huntWatch=null; }
+  const url=`https://api.github.com/repos/${LEAD_FEED.owner}/${LEAD_FEED.repo}/contents/${LEAD_FEED.path}`;
+  const snap=async()=>{ try{ const r=await fetch(url+`?ref=${LEAD_FEED.branch}&t=${Date.now()}`,{headers:ghHdr(), cache:'no-store'}); return r.ok?(await r.json()).sha:null; }catch(_){ return null; } };
+  const before=await snap(); const started=Date.now();
+  _huntWatch=setInterval(async()=>{
+    if(Date.now()-started>30*60*1000){ clearInterval(_huntWatch); _huntWatch=null; return; } // give up after 30 min
+    const now=await snap();
+    if(now && now!==before){
+      clearInterval(_huntWatch); _huntWatch=null;
+      await fetchLeads(); setLeadOpen(true);
+      setLeadStatus('Fresh leads just landed! 🎯');
+    }
+  },60000);
+}
 document.getElementById('leadHunt').onclick=(e)=>{ e.stopPropagation(); requestHunt(); };
 
+/* ==================== COVER LETTER GENERATOR ==================== */
+const OLLAMA_URL='http://localhost:11434';
+const CL_PROFILE='cover-profile-v2', CL_MODEL='cover-model-v1', CL_OUT='cover-output-v1';
+const $=id=>document.getElementById(id);
+const noEmDash=t=>(t||'').replace(/\s*—\s*/g,', ').replace(/\s*–\s*/g,', ');
+// normalize any closing (Warmly, Sincerely, Best, etc) on its own line to "Thank you,"
+const fixSignoff=t=>(t||'').replace(/^[ \t]*(warm(?:ly| regards)|sincerely|best(?: regards| wishes)?|kind regards|regards|cheers|respectfully)[ \t]*,?[ \t]*$/gim,'Thank you,');
+const cleanLetter=t=>fixSignoff(noEmDash(t));
+const RLABEL={production:'Production',animator:'Animator',general:'General',teaching:'Teaching'};
+
+// --- Lupita's real resumes + style, preloaded (she can edit + save over these) ---
+const RESUME_DEFAULTS={name:'',contact:'',linkedin:'',template:'',resumes:{production:'',animator:'',general:'',teaching:''}};
+
+let curType='production';
+const loadProfile=()=>JSON.parse(localStorage.getItem(CL_PROFILE)||'null');
+
+// --- load saved base info (merged over the real defaults) + last letter ---
+(function initCover(){
+  const saved=loadProfile()||{};
+  const p={
+    name: saved.name!=null ? saved.name : RESUME_DEFAULTS.name,
+    contact: saved.contact!=null ? saved.contact : RESUME_DEFAULTS.contact,
+    linkedin: saved.linkedin!=null ? saved.linkedin : RESUME_DEFAULTS.linkedin,
+    template: saved.template!=null ? saved.template : RESUME_DEFAULTS.template,
+    resumes: Object.assign({}, RESUME_DEFAULTS.resumes, saved.resumes||{}),
+    lastUse: saved.lastUse||'production'
+  };
+  localStorage.setItem(CL_PROFILE, JSON.stringify(p)); // persist merged so defaults stick
+  $('clName').value=p.name; $('clContact').value=p.contact;
+  $('clLinkedin').value=p.linkedin; $('clTemplate').value=p.template;
+  curType=p.lastUse;
+  $('clUseResume').value=curType; $('clResumeType').value=curType;
+  $('clResume').value=p.resumes[curType]||'';
+  $('clResumeHint').textContent='editing: '+RLABEL[curType];
+  $('clOutput').value=''; localStorage.removeItem(CL_OUT); // start each session with a blank letter, no stale one
+  $('clSavedNote').textContent='ready ✓';
+  loadModels();
+})();
+
+// starting a new job (typing/pasting a new job description) clears the previous letter
+$('clJobDesc').addEventListener('input',()=>{
+  if($('clOutput').value){
+    $('clOutput').value=''; localStorage.removeItem(CL_OUT);
+    setStatus('clStatus','New job, cleared the old letter. Hit Generate when ready. ✨','ok');
+  }
+});
+
+// keep the setup textarea in sync with whichever resume is selected
+function setResumeType(t){
+  const p=loadProfile()||{}; p.resumes=p.resumes||{};
+  p.resumes[curType]=$('clResume').value;          // stash edits to the one we're leaving
+  localStorage.setItem(CL_PROFILE, JSON.stringify(p));
+  curType=t;
+  $('clResume').value=(p.resumes&&p.resumes[t])||'';
+  $('clResumeHint').textContent='editing: '+RLABEL[t];
+  $('clUseResume').value=t; $('clResumeType').value=t;
+}
+$('clUseResume').onchange=e=>setResumeType(e.target.value);
+$('clResumeType').onchange=e=>setResumeType(e.target.value);
+
+function saveBase(){
+  const p=loadProfile()||{}; p.resumes=p.resumes||{};
+  p.name=$('clName').value.trim(); p.contact=$('clContact').value.trim();
+  p.linkedin=$('clLinkedin').value.trim(); p.template=$('clTemplate').value.trim();
+  p.resumes[curType]=$('clResume').value; p.lastUse=curType;
+  localStorage.setItem(CL_PROFILE, JSON.stringify(p));
+  $('clSavedNote').textContent='saved ✓';
+}
+$('clSaveBase').onclick=saveBase;
+$('clOutput').addEventListener('input',()=>localStorage.setItem(CL_OUT,$('clOutput').value));
+
+function setStatus(id,msg,cls){ const el=$(id); el.textContent=msg||''; el.className='cl-status'+(cls?(' '+cls):''); }
+
+// resume text for the currently-chosen "use" resume (live textarea if it's the one on screen)
+function useResumeText(){
+  const useType=$('clUseResume').value;
+  if(useType===curType) return $('clResume').value.trim();
+  const p=loadProfile()||{}; return ((p.resumes&&p.resumes[useType])||'').trim();
+}
+
+// shared clipboard helper (works on file:// too)
+async function copyText(t){
+  try{ await navigator.clipboard.writeText(t); return true; }
+  catch(e){
+    const ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    let ok=false; try{ ok=document.execCommand('copy'); }catch(_){}
+    document.body.removeChild(ta); return ok;
+  }
+}
+
+// --- populate local model dropdown ---
+async function loadModels(){
+  const sel=$('clModel');
+  try{
+    const r=await fetch(OLLAMA_URL+'/api/tags');
+    const data=await r.json();
+    const names=(data.models||[]).map(m=>m.name);
+    const prefer=['qwen2.5:7b','llama3.2:latest','qwen2.5:3b','llama3.2','qwen2.5:1.5b'];
+    const saved=localStorage.getItem(CL_MODEL);
+    const def=saved && names.includes(saved) ? saved : (prefer.find(n=>names.includes(n))||names[0]);
+    sel.innerHTML='';
+    names.forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; if(n===def)o.selected=true; sel.appendChild(o); });
+    sel.onchange=()=>localStorage.setItem(CL_MODEL, sel.value);
+    if(!names.length){ sel.innerHTML='<option>no models found</option>'; }
+    if($('clStatus').classList.contains('err')) setStatus('clStatus','Local AI ready. ✨','ok'); // clear a stale error
+  }catch(err){
+    sel.innerHTML='<option>Ollama not running</option>';
+    setStatus('clStatus','Cannot reach the local AI yet. Open the dashboard with the "Lupita Dashboard" shortcut, or wait a few seconds and click this tab again.','err');
+  }
+}
+
+// --- build the prompt from base info + job ---
+function buildMessages(){
+  const p=loadProfile()||{};
+  const title=$('clJobTitle').value.trim(), company=$('clCompany').value.trim();
+  const manager=$('clManager').value.trim()||'Hiring Team';
+  const jd=$('clJobDesc').value.trim();
+  const sys=`You are writing a cover letter for Lupita (Maria Lupita Roa), a USC-trained animator and production professional (brand: Liltaxolotl).
+
+YOUR GOAL: a SPECIFIC, tailored letter that maps HER real duties and results to THIS job's actual listed duties and requirements. Generic letters fail. Every claim must point to a concrete thing she really did.
+
+METHOD (do this before writing):
+1. Read the job description and pull out its key duties, responsibilities, and required skills/tools.
+2. For each important one, find the closest match in her resume and name it concretely: the ROLE and COMPANY plus the SPECIFIC task she did there. Name the ROLE and COMPANY plus the SPECIFIC task from her resume, and weave in real numbers when they exist.
+3. Group that mapped experience into 2 or 3 body paragraphs. Mirror how the STYLE EXAMPLE explicitly connects her duties to the role's needs.
+
+RULES:
+- Study and imitate the STYLE EXAMPLE's approach: warm, specific, confident, plain-spoken, concrete.
+- Do NOT use vague filler like "I believe my skills align well," "unique blend," "fast-paced environment," "I am confident that." Replace any such urge with a real, named example.
+- Open by naming the exact role and company and ONE genuine, specific reason it fits her.
+- Use ONLY her real background below. Never invent jobs, skills, tools, or facts.
+- NEVER use em dashes or en dashes. Use commas, colons, or shorter sentences.
+- 3 to 4 paragraphs, one page. Close with a short line of genuine interest, then "Thank you," on its own line, then "${p.name||'Maria Lupita Roa'}".
+
+CANDIDATE RESUME (her real experience, the ONLY source of facts):
+${useResumeText()||'(none provided)'}
+
+EXTRA CONTEXT / LINKEDIN:
+${p.linkedin||'(none)'}
+
+STYLE EXAMPLE (imitate this letter's structure and how it maps duties to the role, do NOT copy its company-specific content):
+${p.template||'(none)'}`;
+  const user=`Write Lupita's cover letter for this exact job. Map her real duties to the duties and requirements below, naming specific roles, companies, and tasks. No generic filler.
+
+JOB TITLE: ${title||'(see description)'}
+COMPANY: ${company||'(see description)'}
+ADDRESS THE LETTER TO: ${manager}
+
+JOB DESCRIPTION:
+${jd}
+
+Output only the finished letter, starting with the greeting and ending with her name.`;
+  return [{role:'system',content:sys},{role:'user',content:user}];
+}
+
+// --- generate with local Ollama (streaming) ---
+async function generate(){
+  if(!useResumeText()){ setStatus('clStatus','That resume is empty. Add it in "base info" first. 🌸','err'); $('clSetup').open=true; return; }
+  if(!$('clJobDesc').value.trim()){ setStatus('clStatus','Paste a job description first.','err'); return; }
+  const model=$('clModel').value;
+  const btn=$('clGenerate'); btn.disabled=true;
+  setStatus('clStatus','Writing your letter locally... (first run can take a bit while the model loads)');
+  $('clOutput').value='';
+  let out='';
+  try{
+    const res=await fetch(OLLAMA_URL+'/api/chat',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({model, messages:buildMessages(), stream:true, options:{temperature:0.6, num_ctx:8192}})});
+    if(!res.ok){ throw new Error('HTTP '+res.status); }
+    const reader=res.body.getReader(), dec=new TextDecoder(); let buf='';
+    while(true){
+      const {done,value}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true}); let i;
+      while((i=buf.indexOf('\n'))>=0){
+        const line=buf.slice(0,i).trim(); buf=buf.slice(i+1);
+        if(!line) continue;
+        let j; try{ j=JSON.parse(line); }catch(e){ continue; }
+        if(j.message && j.message.content){ out+=j.message.content; $('clOutput').value=noEmDash(out); }
+      }
+    }
+    $('clOutput').value=cleanLetter(out).trim();
+    localStorage.setItem(CL_OUT,$('clOutput').value);
+    setStatus('clStatus','Done. Edit freely, then copy or polish. ✨','ok');
+  }catch(err){
+    setStatus('clStatus','Could not reach your local AI. Make sure Ollama is running, then try again. ('+err.message+')','err');
+  }finally{ btn.disabled=false; }
+}
+$('clGenerate').onclick=generate;
+
+// --- polish: copy a ready prompt + letter and open Claude chat (uses her normal plan, free) ---
+async function polish(){
+  const letter=$('clOutput').value.trim();
+  if(!letter){ setStatus('clPolishStatus','Generate a letter first.','err'); return; }
+  const title=$('clJobTitle').value.trim(), company=$('clCompany').value.trim();
+  const prompt=`Please polish this cover letter for me. Keep it in my voice: warm, sincere, a little whimsical but polished and professional (friendly indie artist). Make it specific and genuine, no corporate buzzwords, no hype. Keep everything truthful, do not invent any facts. ABSOLUTELY NO em dashes or en dashes, use commas or colons instead. Keep it to about one page. Give me back only the improved letter.
+
+Job: ${title||'(unspecified)'} at ${company||'(unspecified)'}
+
+LETTER:
+${letter}`;
+  const ok=await copyText(prompt);
+  window.open('https://claude.ai/new','_blank','noopener');
+  setStatus('clPolishStatus', ok
+    ? 'Copied! Paste (Ctrl+V) into the Claude tab that opened, then paste the result back here. ✨'
+    : 'Opened Claude. Copy your letter above, paste it in, and ask Claude to polish it.', ok?'ok':'err');
+}
+$('clPolish').onclick=polish;
+
+// --- copy + download ---
+$('clCopy').onclick=async()=>{
+  const t=$('clOutput').value; if(!t) return;
+  const ok=await copyText(t);
+  setStatus('clStatus', ok?'Copied to clipboard. 📋':'Could not copy, select the text manually.', ok?'ok':'err');
+};
+$('clDownload').onclick=()=>{
+  const t=$('clOutput').value; if(!t) return;
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([cleanLetter(t)],{type:'text/plain'}));
+  a.download=letterFilename()+'.txt'; a.click(); URL.revokeObjectURL(a.href);
+};
+
+// --- styled PDF via the browser's print engine (pink/peach letterhead, based on Lupita's template) ---
+const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+// filename: CoverLetter_<Company>
+function letterFilename(){
+  const co=($('clCompany').value.trim()||'').replace(/[^a-z0-9]+/gi,'');
+  return 'CoverLetter_'+(co||'Company');
+}
+function makePdf(){
+  const letter=cleanLetter($('clOutput').value.trim());
+  if(!letter){ setStatus('clStatus','Generate a letter first.','err'); return; }
+  const p=loadProfile()||{};
+  const name=p.name||'Maria Lupita Roa';
+  const role=($('clJobTitle').value.trim()||'Animation · Illustration · Production').toUpperCase();
+  const parts=(p.contact||'').split('·').map(s=>s.trim()).filter(Boolean);
+  const contact=parts.map(s=>`<span class="ci">${esc(s)}</span>`).join('<span class="sep">·</span>');
+  const dateStr=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  const body=letter.split(/\n\s*\n/).map(blk=>{
+    const t=blk.trim(); if(!t) return '';
+    const isGreet=/^dear\b/i.test(t);
+    const lines=t.split('\n').map(ln=>{
+      const L=ln.trim();
+      return (L && L.toLowerCase()===name.toLowerCase()) ? '<strong>'+esc(ln)+'</strong>' : esc(ln);
+    }).join('<br>');
+    return `<p${isGreet?' class="greet"':''}>${lines}</p>`;
+  }).join('');
+  const fname=letterFilename();
+  const doc=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(fname)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@800&display=swap" rel="stylesheet">
+<style>
+  @page{ size:letter; margin:0; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{ font-family:'Segoe UI',Helvetica,Arial,sans-serif; color:#2c2c2c;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .page{ min-height:100vh; padding:52px 62px 60px;
+    background:
+      radial-gradient(90% 55% at 100% 0%, #d9edff 0%, rgba(217,237,255,0) 55%),
+      radial-gradient(85% 60% at 0% 100%, #ffdbe7 0%, rgba(255,219,231,0) 55%),
+      linear-gradient(135deg, #eef7f0 0%, #f6ecff 42%, #fff0f5 100%); }
+  .hdr{ border:2px solid #f0a35a; border-radius:0; text-align:center; padding:20px 20px 16px;
+    background:rgba(255,255,255,.28); }
+  .nm{ font-family:'Poppins','Arial Black','Segoe UI',sans-serif; font-weight:800; font-size:44px; letter-spacing:.5px; color:#1b1b1b; line-height:1.02; }
+  .role{ font-size:15px; letter-spacing:3px; color:#3a3a3a; margin-top:7px; }
+  .contact{ margin-top:14px; border:1px solid #f0a35a; border-radius:0; padding:10px 12px;
+    display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:6px; font-size:12.5px; background:rgba(255,255,255,.22); }
+  .contact .sep{ color:#d09a5e; margin:0 4px; }
+  .date{ text-align:right; color:#555; font-size:13px; margin:24px 0 26px; }
+  .letter p{ font-size:15px; line-height:1.6; margin:0 0 15px; }
+  .letter p.greet{ font-weight:700; }
+  .letter strong{ font-weight:700; }
+</style></head><body><div class="page">
+  <div class="hdr"><div class="nm">${esc(name)}</div><div class="role">${esc(role)}</div></div>
+  <div class="contact">${contact}</div>
+  <div class="date">${dateStr}</div>
+  <div class="letter">${body}</div>
+</div>
+<script>window.onload=function(){ setTimeout(function(){ window.print(); }, 500); };<\/script>
+</body></html>`;
+  const w=window.open('','_blank');
+  if(!w){ setStatus('clStatus','Allow pop-ups for this page, then hit Save as PDF again.','err'); return; }
+  w.document.write(doc); w.document.close();
+  setStatus('clStatus','Print view opened. Choose "Save as PDF"; it is named '+fname+'. 📄','ok');
+}
+$('clPdf').onclick=makePdf;
+
 render();
+applyLayout();
 fetchLeads();
 fetchData();
 loadState();
+fetchPlan();
 // pick up changes made on the other device when you come back to this one
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ loadState(); fetchData(); } });
+// hosted copy: pull the sprint plan as soon as a token gets saved
+document.getElementById('ghSave').addEventListener('click',()=>setTimeout(fetchPlan,400));
 </script>
 </body>
 </html>
