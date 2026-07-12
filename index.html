@@ -251,6 +251,21 @@
   .pl-links{display:flex; flex-wrap:wrap; gap:6px; padding:8px 6px 4px}
   .pl-links a{font-size:.8rem; color:var(--lav-deep); text-decoration:none; padding:5px 9px; background:#faf6ff; border:1px solid var(--line); border-radius:9px}
   .pl-links a:hover{border-color:var(--lav); background:#f3ebff}
+
+  /* ---------- 🍜 food page ---------- */
+  #foodPanel{max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:18px}
+  .chips{display:flex; flex-wrap:wrap; gap:7px; margin:4px 0 2px}
+  .chip{display:inline-flex; align-items:center; gap:6px; background:#faf6ff; border:1px solid var(--line); border-radius:99px; padding:5px 11px; font-size:.86rem}
+  .chip button{border:none; background:none; cursor:pointer; color:#cbb8cf; font-size:.85rem; padding:0; line-height:1}
+  .chip button:hover{color:var(--urgent)}
+  .rec-have{margin-left:auto; font-size:.7rem; font-weight:700; color:var(--soft); background:var(--line); padding:2px 9px; border-radius:99px; white-space:nowrap}
+  .rec-have.all{background:#e8f8f1; color:var(--ok)}
+  .ings{display:flex; flex-wrap:wrap; gap:6px; padding:6px 2px}
+  .ing{font-size:.78rem; padding:3px 10px; border-radius:99px; background:#e8f8f1; color:var(--ok); border:1px solid transparent}
+  .ing.miss{background:#fff2d9; color:#c79016; cursor:pointer; border:1px dashed #e8c477}
+  .ing.miss:hover{background:#ffe9bd}
+  .steps{margin:4px 0 8px; padding-left:22px; font-size:.86rem; line-height:1.55}
+  .steps li{margin:3px 0}
 </style>
 </head>
 <body>
@@ -476,44 +491,20 @@
       </div>
       <div class="apps-track" style="margin-top:10px">
         <div class="apps-head">💵 Budget <span class="apps-total" id="moneyAllTime"></span></div>
-        <div class="money-row">
-          <input id="moneyAmt" type="number" min="0" step="0.01" placeholder="$ in">
-          <select id="moneySrc">
-            <option value="commission">commission</option>
-            <option value="print">print</option>
-            <option value="tutoring">tutoring</option>
-            <option value="gig">gig</option>
-            <option value="other income">other income</option>
-          </select>
-          <button class="apps-btn" id="moneyAdd">+ money in</button>
-        </div>
-        <div class="money-row" style="margin-top:7px">
-          <input id="spendAmt" type="number" min="0" step="0.01" placeholder="$ out">
-          <select id="spendSrc">
-            <option value="rent">rent</option>
-            <option value="car insurance">car insurance</option>
-            <option value="credit card">credit card</option>
-            <option value="groceries">groceries</option>
-            <option value="eating out">eating out</option>
-            <option value="gas">gas</option>
-            <option value="art supplies">art supplies</option>
-            <option value="subscriptions">subscriptions</option>
-            <option value="other expense">other expense</option>
-          </select>
-          <button class="apps-btn spend" id="spendAdd">− money out</button>
-        </div>
-        <div class="apps-sub" id="moneyWeek" style="margin-top:8px"></div>
-        <details class="plan-day" style="margin-top:8px">
-          <summary><span class="caret">▸</span>📒 Week by week <span class="sub">income · spending · net</span></summary>
-          <div class="pd-body" id="budgetWeeks"></div>
-        </details>
-        <div class="money-recent" id="moneyRecent"></div>
+        <div class="apps-sub" id="moneyWeek"></div>
+        <button class="cl-btn ghost" id="openBudget" style="margin-top:9px">📒 Open the budget page →</button>
       </div>
 
       <div class="apps-track" style="margin-top:10px">
         <div class="apps-head">⚡ Quick actions</div>
         <div class="pl-links" id="quickBar" style="padding:0"></div>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>🍜 Food <span class="pill">easy meals, zero pressure</span></h2>
+      <p class="cl-lead" style="margin-bottom:10px">What's in your fridge, what you can make with it right now, and what to grab at the store. Fed is the goal, fancy is optional. 🧊</p>
+      <button class="cl-btn" id="openFood">🍳 Open the food page →</button>
     </div>
 
     <div class="card">
@@ -531,6 +522,50 @@
       <h2>📚 Project Guides <span class="pill">each project's full 8-week arc in one place · same checkboxes as the weeks</span></h2>
       <div id="planGuides"></div>
       <p class="plan-note">🛟 <b>Crash-week minimum:</b> 1 application, 1 post, 1 message session, pay whatever bill is due. That still counts as a pass. Phases slide forward, no catch-up debt. And the 11pm Flex Block is the release valve: drop it guilt-free on heavy days and you still did 9 hours.</p>
+    </div>
+  </section>
+
+  <!-- 🍜 FOOD (opened from the Game Plan's food button) -->
+  <section id="foodPanel" style="display:none">
+    <div class="card">
+      <h2>🍜 Food &amp; Easy Meals <button class="cl-btn ghost" id="foodBack" style="margin-left:auto">← back to Game Plan</button></h2>
+      <p class="cl-lead" style="margin-bottom:0">Tell this page what's in your fridge and it shows you what you can make right now, no deciding required. And on hard days: cereal counts, a quesadilla counts, a smoothie counts. Fed is the win. 💗</p>
+    </div>
+
+    <div class="card">
+      <h2>🧊 In my fridge this week <span class="pill" id="fridgeCount"></span></h2>
+      <div class="note" style="margin:0 0 8px">Add everything: eggs, tortillas, that half an onion. Basics like salt, pepper, oil, and butter are assumed. <button id="fridgeClear" class="reset" style="margin-left:6px">new week, start fresh</button></div>
+      <div class="chips" id="fridgeChips"></div>
+      <div class="add-row"><input id="fridgeNew" type="text" placeholder="add a food you have... (commas add several at once)" maxlength="200"><button id="fridgeAdd">Add</button></div>
+    </div>
+
+    <div class="card">
+      <h2>🛒 To buy <span class="pill" id="buyCount"></span></h2>
+      <div class="note" style="margin:0 0 8px">Check something off when you grab it and it hops straight into your fridge list. Tap any yellow missing ingredient below to add it here.</div>
+      <ul class="list" id="buyList"></ul>
+      <div class="add-row"><input id="buyNew" type="text" placeholder="add something to buy..." maxlength="200"><button id="buyAdd">Add</button></div>
+    </div>
+
+    <div class="card">
+      <h2>🍳 What can I make? <span class="pill">green = you have it · yellow = tap to add to the list</span></h2>
+      <div id="recipeList"></div>
+    </div>
+
+    <div class="card">
+      <h2>🤖 Get new recipes from Claude</h2>
+      <p class="cl-lead">The button copies your fridge list plus a ready-made prompt and opens Claude. Claude answers with easy recipes and a short healthy-staples shopping list; paste the whole reply below and it all lands on this page. (In a Claude Code chat you can also just ask, and Claude will add them for you.) ✨</p>
+      <div class="cl-actions" style="margin-top:0">
+        <button class="cl-btn" id="foodAsk">🤖 Ask Claude for recipe ideas</button>
+        <span class="cl-status" id="foodStatus"></span>
+      </div>
+      <div class="cl-field" style="margin-top:12px">
+        <label>Paste Claude's reply here</label>
+        <textarea id="foodImport" rows="5" placeholder="Paste Claude's whole reply (it ends with a recipe block this page understands)..."></textarea>
+      </div>
+      <div class="cl-actions">
+        <button class="cl-btn ghost" id="foodImportBtn">📥 Add these recipes</button>
+        <span class="cl-status" id="foodImportStatus"></span>
+      </div>
     </div>
   </section>
 
@@ -866,13 +901,14 @@ async function loadState(){
       if(s.apps){ apps=s.apps; localStorage.setItem(LS_APPS, JSON.stringify(apps)); }
       if(s.money){ money=s.money; localStorage.setItem(LS_MONEY, JSON.stringify(money)); }
       if(s.arch){ arch=s.arch; localStorage.setItem(LS_ARCH, JSON.stringify(arch)); }
+      if(s.food){ food=s.food; food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[]; localStorage.setItem(LS_FOOD, JSON.stringify(food)); }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
       localStorage.setItem(LS_CUSTOM, JSON.stringify(custom));
       localStorage.setItem(LS_SAVEDAT, String(s.savedAt||0));
       render();
       // refresh every game-plan checkbox/count + the counters
       Object.values(gpReg).forEach(fns=>fns.forEach(f=>f()));
-      renderApps(); renderMoney();
+      renderApps(); renderMoney(); renderFood();
     }
   }catch(err){}
 }
@@ -885,7 +921,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, food, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -1014,13 +1050,15 @@ document.getElementById('tabs').addEventListener('click',e=>{
   else if(view==='plan') renderPlan();
   else render();
 });
-// swap between the schedule grid and the full-width panels (cover letters / game plan)
+// swap between the schedule grid and the full-width panels (cover letters / game plan / food)
 function applyLayout(){
-  const isCover = view==='cover', isPlan = view==='plan';
-  document.querySelector('.grid').style.display = (isCover||isPlan) ? 'none' : '';
-  document.querySelector('.progress-card').style.display = (isCover||isPlan) ? 'none' : '';
+  const isCover = view==='cover', isPlan = view==='plan', isFood = view==='food';
+  const full = isCover||isPlan||isFood;
+  document.querySelector('.grid').style.display = full ? 'none' : '';
+  document.querySelector('.progress-card').style.display = full ? 'none' : '';
   document.getElementById('coverPanel').style.display = isCover ? 'block' : 'none';
   document.getElementById('planPanel').style.display = isPlan ? 'block' : 'none';
+  document.getElementById('foodPanel').style.display = isFood ? 'flex' : 'none';
 }
 
 /* ---------- 🗺️ GAME PLAN (8-week intensive, night-owl clock) ----------
@@ -1306,6 +1344,27 @@ function recTasks(n,dk){
   }
   return T;
 }
+/* ---- 🧼 cleaning rhythm, baked into every day card ----
+   room every other day (Mon/Wed/Fri, in the Flex block), kitchen every 3 days
+   (Mon + Thu, while dinner cooks), bathroom every 4 days (Tue + Sat), and one
+   Saturday deep-clean power hour (floors + living room + fridge check).
+   Sunday stays cleaning-free: it is the rest day. */
+function cleanTasks(n,dk){
+  const id=s=>'gp-w'+n+'-'+dk+'-'+s; const T=[];
+  if(dk==='mon'||dk==='wed'||dk==='fri')
+    T.push({id:id('cl-room'), slot:'flex', txt:'🧹 Room reset, 30-60 min: timer on, music or a show on, one zone at a time',
+      ai:'Be my cleaning body double for a 30-60 minute room reset. Break my room into 5-minute micro-zones (one surface at a time), keep me company between zones, and celebrate each one. Zero judgment about the mess, and when the timer ends we are DONE even if it is not all done.'});
+  if(dk==='mon'||dk==='thu')
+    T.push({id:id('cl-kitchen'), slot:'dinner', txt:'🍽️ Kitchen reset, 15-20 min: dishes + counters while dinner cooks'});
+  if(dk==='tue')
+    T.push({id:id('cl-bath'), slot:'flex', txt:'🚿 Bathroom wipe-down, 15-20 min: sink, toilet, mirror. Future you says thanks'});
+  if(dk==='sat'){
+    T.push({id:id('cl-bath'), slot:'lunch', txt:'🚿 Bathroom wipe-down, 15-20 min (round 2 of the week)'});
+    T.push({id:id('cl-deep'), slot:'off', txt:'🧽 Deep-clean power hour, 45-60 min: floors, living room reset, quick fridge toss-the-old-stuff check. Then the evening is ALL yours',
+      ai:'Be my deep-cleaning body double for one 45-60 minute power hour: floors, a living room reset, and a quick fridge check for anything old. Give me a fun ordered checklist in 10-minute chunks, keep me company through it, and when the timer ends we stop and celebrate no matter what.'});
+  }
+  return T;
+}
 /* ---- one-off real-life items pinned to specific days ---- */
 let SPECIALS={};
 let DAY_DEFS=[];
@@ -1329,7 +1388,7 @@ function buildWeeks(){
     const body=document.createElement('div'); body.className='pd-body';
     const weekIds=[];
     DAY_DEFS.forEach((dd,idx)=>{
-      const tasks=[...recTasks(n,dd.dk)];
+      const tasks=[...recTasks(n,dd.dk), ...cleanTasks(n,dd.dk)];
       ((SPECIALS[n]||{})[dd.dk]||[]).forEach((sp,i)=>{
         const t=Object.assign({id:'gp-w'+n+'-'+dd.dk+'-sp'+i, slot:(dd.dk==='sat'?'satfilm':(dd.dk==='sun'?'checkin':'setup'))}, sp);
         tasks.push(t);
@@ -1427,7 +1486,171 @@ function buildGuides(){
     +'<a href="https://creators.instagram.com/" target="_blank" rel="noopener">📸 Instagram Creators</a>'
     +'</div>';
   det.appendChild(body); wrap.appendChild(det);
+  // cleaning rhythm: the cadence that is already woven into the day cards
+  const cdet=document.createElement('details'); cdet.className='plan-day';
+  cdet.innerHTML='<summary><span class="caret">▸</span>🧼 Cleaning rhythm <span class="sub">already baked into your day cards · no thinking required</span></summary>';
+  const cbody=document.createElement('div'); cbody.className='pd-body';
+  cbody.innerHTML='<div class="pl-intro">The cadence, pre-placed in your days so you never have to decide: 🧹 <b>room</b> every other day (Mon, Wed, Fri, in the 11pm Flex block), 🍽️ <b>kitchen</b> every 3 days (Mon + Thu, while dinner cooks), 🚿 <b>bathroom</b> every 4 days (Tue + Sat), and one 🧽 <b>Saturday power hour</b>: floors, living room, quick fridge check. Sunday stays cleaning-free. Rules of the game: timer on, music on, done beats perfect, and on a crash day a 10-minute pickup counts as the whole task. The 🤖 button on any cleaning task turns Claude into your body double so you never clean alone.</div>';
+  cdet.appendChild(cbody); wrap.appendChild(cdet);
 }
+/* ==================== 🍜 FOOD PAGE ====================
+   Fridge list + shopping list + easy recipes. Lives in localStorage and rides
+   along in state.json, so desktop and phone share one fridge. Recipes marked
+   custom:true came from a Claude import and can be removed. */
+const LS_FOOD='lupita-food-v1';
+let food=JSON.parse(localStorage.getItem(LS_FOOD)||'{}');
+food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[];
+const saveFood=()=>{ localStorage.setItem(LS_FOOD, JSON.stringify(food)); pushStateSoon(); };
+// pantry staples assumed on hand, never counted as missing
+const STAPLES=['salt','pepper','oil','olive oil','butter','seasoning','garlic powder','onion powder','sugar','honey','hot sauce','mayo'];
+// starter recipes: cheap, few ingredients, low effort ON PURPOSE
+const BASE_RECIPES=[
+ {id:'f-yogurt', name:'Yogurt bowl', icon:'🥣', time:'2 min', effort:'zero', ings:['yogurt','granola','fruit'],
+  steps:['Yogurt in a bowl.','Granola and whatever fruit is around on top.','Honey if you have it. Done, that counts.']},
+ {id:'f-oats', name:'Overnight oats (future-you breakfast)', icon:'🌙', time:'3 min tonight', effort:'zero', ings:['oats','milk','peanut butter','banana'],
+  steps:['Half a cup of oats + enough milk to cover, in a jar or cup.','Spoonful of peanut butter, sliced banana, one stir.','Fridge overnight. Breakfast already exists when you wake up.']},
+ {id:'f-smoothie', name:'Fruit smoothie', icon:'🥤', time:'5 min', effort:'zero', ings:['frozen fruit','banana','milk'],
+  steps:['Blender: a big handful of frozen fruit, a banana, milk to cover.','Blend. Drink. That was a whole meal, be proud.']},
+ {id:'f-quesadilla', name:'Quesadilla', icon:'🫓', time:'7 min', effort:'low', ings:['tortillas','cheese'],
+  steps:['Tortilla in a dry pan on medium, cheese on one half.','Fold, flip once when golden, about 2 minutes a side.','Salsa or hot sauce if around. Beans inside turn it into dinner.']},
+ {id:'f-taco', name:'Black bean tacos', icon:'🌮', time:'10 min', effort:'low', ings:['tortillas','canned black beans','cheese','salsa'],
+  steps:['Beans in the microwave 90 seconds with a pinch of seasoning.','Warm the tortillas in a pan.','Beans + cheese + salsa. Three of these is a real dinner.']},
+ {id:'f-friedrice', name:'Egg fried rice', icon:'🍚', time:'10 min', effort:'low', ings:['rice','eggs','frozen vegetables','soy sauce'],
+  steps:['Rice into an oiled pan on medium-high, push it to one side.','Scramble 2 eggs on the empty side, then mix together.','Frozen veg straight in, splash of soy sauce, 3 more minutes.']},
+ {id:'f-ramen', name:'Upgraded ramen', icon:'🍜', time:'8 min', effort:'low', ings:['instant ramen','eggs','frozen vegetables'],
+  steps:['Cook the ramen like the packet says.','Crack an egg in for the last 2 minutes, drop in a handful of frozen veg.','Now it is a real meal instead of just noodles.']},
+ {id:'f-pasta', name:'Upgraded jar pasta', icon:'🍝', time:'15 min', effort:'low', ings:['pasta','pasta sauce','cheese'],
+  steps:['Boil the pasta. Warm the jar sauce in the same pot after draining.','Stir a little butter and garlic powder into the sauce (this is the whole upgrade).','Cheese on top. Canned tuna or frozen spinach in the sauce adds protein for free.']},
+ {id:'f-potato', name:'Microwave loaded potato', icon:'🥔', time:'12 min', effort:'low', ings:['potato','cheese','butter'],
+  steps:['Stab the potato a few times with a fork.','Microwave 5 minutes, flip, 4 more minutes.','Split it open: butter, cheese, salt. Beans or salsa on top if around.']},
+ {id:'f-tuna', name:'Tuna melt', icon:'🐟', time:'10 min', effort:'low', ings:['canned tuna','bread','cheese','mayo'],
+  steps:['Tuna + a spoon of mayo, mixed in the can if you want zero dishes.','Onto bread, cheese on top.','Toaster oven or a lidded pan until melty.']},
+ {id:'f-sheetpan', name:'Sheet pan chicken + veg', icon:'🍗', time:'30 min, mostly waiting', effort:'some', ings:['chicken thighs','frozen vegetables','olive oil'],
+  steps:['Oven to 425°F. Chicken + veg on a foil-lined pan (foil = no dishes).','Oil, salt, pepper, any seasoning you own. Toss with your hands.','25 minutes in the oven while you do literally anything else. Makes 2-3 meals.']},
+];
+const EFFORT_LBL={zero:'🛌 zero effort', low:'🥄 low effort', some:'🍳 some effort, big payoff'};
+function normFood(s){ return (s||'').toLowerCase().trim().replace(/s$/,''); }
+function haveIng(ing){
+  const n=normFood(ing);
+  if(STAPLES.some(st=>n===normFood(st)||n.includes(normFood(st)))) return true;
+  return food.fridge.some(f=>{ const fn=normFood(f); return fn.includes(n)||n.includes(fn); });
+}
+function recHave(r){ const missing=r.ings.filter(i=>!haveIng(i)); return {have:r.ings.length-missing.length, total:r.ings.length, missing}; }
+const allRecipes=()=>[...BASE_RECIPES, ...food.recipes];
+function recipeCard(r,h){
+  const det=document.createElement('details'); det.className='plan-day';
+  const sum=document.createElement('summary');
+  sum.innerHTML='<span class="caret">▸</span>'+(r.icon||'🍽️')+' '+r.name+' <span class="sub">'+(r.time||'')+' · '+(EFFORT_LBL[r.effort]||r.effort||'')+'</span>';
+  const pill=document.createElement('span'); pill.className='rec-have'+(h.missing.length?'':' all');
+  pill.textContent=h.missing.length?('have '+h.have+' / '+h.total):'have everything ✓';
+  sum.appendChild(pill); det.appendChild(sum);
+  const body=document.createElement('div'); body.className='pd-body';
+  const ings=document.createElement('div'); ings.className='ings';
+  r.ings.forEach(i=>{
+    const s=document.createElement('span'); const miss=h.missing.includes(i);
+    s.className='ing'+(miss?' miss':''); s.textContent=(miss?'+ ':'✓ ')+i;
+    if(miss){ s.title='tap to add to the shopping list';
+      s.onclick=()=>{ if(!food.buy.some(b=>normFood(b)===normFood(i))) food.buy.push(i); saveFood(); renderFood(); }; }
+    ings.appendChild(s);
+  });
+  body.appendChild(ings);
+  if((r.steps||[]).length){ const ol=document.createElement('ol'); ol.className='steps';
+    r.steps.forEach(st=>{ const li=document.createElement('li'); li.textContent=st; ol.appendChild(li); });
+    body.appendChild(ol); }
+  if(r.custom){ const del=document.createElement('button'); del.className='reset'; del.textContent='remove this recipe';
+    del.onclick=()=>{ food.recipes=food.recipes.filter(x=>x!==r); saveFood(); renderFood(); };
+    body.appendChild(del); }
+  det.appendChild(body); return det;
+}
+function renderFood(){
+  const fc=document.getElementById('fridgeChips'); if(!fc) return;
+  fc.innerHTML='';
+  document.getElementById('fridgeCount').textContent=food.fridge.length?(food.fridge.length+' items'):'';
+  if(!food.fridge.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Fridge list is empty. Add what you have and the recipes below light up. 🧊'; fc.appendChild(e); }
+  food.fridge.forEach((f,i)=>{
+    const c=document.createElement('span'); c.className='chip';
+    const t=document.createElement('span'); t.textContent=f;
+    const x=document.createElement('button'); x.textContent='✕'; x.title='used it up / remove';
+    x.onclick=()=>{ food.fridge.splice(i,1); saveFood(); renderFood(); };
+    c.appendChild(t); c.appendChild(x); fc.appendChild(c);
+  });
+  const bl=document.getElementById('buyList'); bl.innerHTML='';
+  document.getElementById('buyCount').textContent=food.buy.length?(food.buy.length+' to grab'):'';
+  if(!food.buy.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Nothing on the list. 🌿'; bl.appendChild(e); }
+  food.buy.forEach((b,i)=>{
+    const li=document.createElement('li'); li.className='item';
+    const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox'; cb.title='got it! moves into your fridge list';
+    cb.onchange=()=>{ if(cb.checked){ food.buy.splice(i,1);
+      if(!food.fridge.some(f=>normFood(f)===normFood(b))) food.fridge.push(b);
+      saveFood(); confetti(10); renderFood(); } };
+    const body=document.createElement('div'); body.className='body';
+    const tx=document.createElement('div'); tx.className='txt'; tx.textContent=b; body.appendChild(tx);
+    const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove';
+    del.onclick=()=>{ food.buy.splice(i,1); saveFood(); renderFood(); };
+    li.appendChild(cb); li.appendChild(body); li.appendChild(del); bl.appendChild(li);
+  });
+  const rl=document.getElementById('recipeList'); rl.innerHTML='';
+  const groups=[['✨ You can make these right now',[]],['🛒 Just missing a thing or two',[]],['📖 More ideas (for shopping week)',[]]];
+  allRecipes().forEach(r=>{ const h=recHave(r);
+    (h.missing.length===0?groups[0]:(h.missing.length<=2?groups[1]:groups[2]))[1].push([r,h]); });
+  groups.forEach(([label,items])=>{
+    if(!items.length) return;
+    const hd=document.createElement('div'); hd.className='wk-sub'; hd.textContent=label; rl.appendChild(hd);
+    items.forEach(([r,h])=>rl.appendChild(recipeCard(r,h)));
+  });
+}
+function addFoodFrom(inpId,arr){
+  const inp=document.getElementById(inpId);
+  inp.value.split(',').map(s=>s.trim()).filter(Boolean).forEach(v=>{
+    if(!arr.some(x=>normFood(x)===normFood(v))) arr.push(v); });
+  inp.value=''; saveFood(); renderFood();
+}
+document.getElementById('fridgeAdd').onclick=()=>addFoodFrom('fridgeNew',food.fridge);
+document.getElementById('fridgeNew').addEventListener('keydown',e=>{ if(e.key==='Enter') addFoodFrom('fridgeNew',food.fridge); });
+document.getElementById('buyAdd').onclick=()=>addFoodFrom('buyNew',food.buy);
+document.getElementById('buyNew').addEventListener('keydown',e=>{ if(e.key==='Enter') addFoodFrom('buyNew',food.buy); });
+document.getElementById('fridgeClear').onclick=()=>{ if(confirm('Clear the fridge list for a fresh week? (recipes and shopping list stay)')){ food.fridge=[]; saveFood(); renderFood(); } };
+document.getElementById('openFood').onclick=()=>{ view='food'; applyLayout(); renderFood(); };
+document.getElementById('foodBack').onclick=()=>{ view='plan'; applyLayout(); renderPlan(); };
+// 🤖 hand-off: copy fridge + a ready prompt, open Claude, paste the reply back below
+document.getElementById('foodAsk').onclick=async()=>{
+  const have=food.fridge.length?food.fridge.join(', '):'(my fridge list is empty, assume I have very little on hand)';
+  const known=allRecipes().map(r=>r.name).join(', ');
+  const prompt='You are helping Lupita, a freelance animator with very little energy for cooking some days, eat decently with minimal effort. Be warm and zero-pressure. Hard rule: never use em dashes.\n\n'
+   +'WHAT I HAVE THIS WEEK: '+have+'\n(Pantry staples like salt, pepper, oil, and butter are assumed.)\n\n'
+   +'Please give me:\n'
+   +'1. Four to six EASY recipes I can make mostly with what I have. Rules: 15 minutes or less of active effort (one 25-30 minute oven meal is allowed), few ingredients, few dishes, comforting but reasonably healthy. Skip anything too close to recipes I already have: '+known+'.\n'
+   +'2. A short shopping list, 8 to 12 cheap items, that unlocks those recipes and easy healthy eating for the rest of the week.\n\n'
+   +'IMPORTANT: end your reply with a single ```json code block in EXACTLY this shape so my dashboard can import it:\n'
+   +'{"recipes":[{"name":"...","icon":"🍚","time":"10 min","effort":"zero|low|some","ings":["item1","item2"],"steps":["step 1","step 2"]}],"buy":["item1","item2"]}';
+  const ok=await copyText(prompt);
+  window.open('https://claude.ai/new','_blank','noopener');
+  setStatus('foodStatus', ok?'Copied! Paste (Ctrl+V) into the Claude tab, send, then paste the whole reply below. ✨':'Opened Claude. Copy your fridge list over and ask for easy low-effort recipes.', ok?'ok':'err');
+};
+document.getElementById('foodImportBtn').onclick=()=>{
+  const raw=document.getElementById('foodImport').value;
+  let data=null;
+  const fence=raw.match(/```json\s*([\s\S]*?)```/i);
+  if(fence){ try{ data=JSON.parse(fence[1]); }catch(e){} }
+  if(!data){ const m=raw.match(/\{[\s\S]*\}/); if(m){ try{ data=JSON.parse(m[0]); }catch(e){} } }
+  if(!data){ const a=raw.match(/\[[\s\S]*\]/); if(a){ try{ data={recipes:JSON.parse(a[0])}; }catch(e){} } }
+  if(!data||(!Array.isArray(data.recipes)&&!Array.isArray(data.buy))){
+    setStatus('foodImportStatus','Hmm, no recipe block found. Paste the WHOLE reply, including the part that starts with ```json.','err'); return; }
+  let nR=0,nB=0;
+  (data.recipes||[]).forEach(r=>{
+    if(!r||!r.name||!Array.isArray(r.ings)) return;
+    if(allRecipes().some(x=>normFood(x.name)===normFood(r.name))) return;
+    food.recipes.push({id:'fc-'+Date.now()+'-'+(nR++), name:String(r.name), icon:r.icon||'🍽️', time:r.time?String(r.time):'',
+      effort:(['zero','low','some'].indexOf(r.effort)>=0)?r.effort:'low',
+      ings:r.ings.map(String), steps:(Array.isArray(r.steps)?r.steps:[]).map(String), custom:true});
+  });
+  (data.buy||[]).forEach(b=>{ const v=String(b).trim();
+    if(v&&!food.buy.some(x=>normFood(x)===normFood(v))&&!food.fridge.some(x=>normFood(x)===normFood(v))){ food.buy.push(v); nB++; } });
+  saveFood(); renderFood(); document.getElementById('foodImport').value='';
+  setStatus('foodImportStatus',(nR||nB)?('Added '+nR+' recipe'+(nR===1?'':'s')+' and '+nB+' shopping item'+(nB===1?'':'s')+'. 🎉'):'Nothing new to add (those might already be on the page).',(nR||nB)?'ok':'err');
+  if(nR) confetti(16);
+};
+
 function addTask(){
   const inp=document.getElementById('newTask'); const v=inp.value.trim(); if(!v) return;
   const id='c-'+Date.now();
@@ -1731,7 +1954,7 @@ $('clDownload').onclick=()=>{
 
 // --- styled PDF via the browser's print engine (pink/peach letterhead, based on Lupita's template) ---
 const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-// filename: CoverLetter_<Company>
+// filename: MariaRoa_CoverLetter_<Company>
 function letterFilename(){
   const co=($('clCompany').value.trim()||'').replace(/[^a-z0-9]+/gi,'');
   return 'CoverLetter_'+(co||'Company');
@@ -1797,6 +2020,7 @@ $('clPdf').onclick=makePdf;
 
 render();
 applyLayout();
+renderFood();
 fetchLeads();
 fetchData();
 loadState();
