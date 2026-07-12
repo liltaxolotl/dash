@@ -39,6 +39,12 @@
     background:linear-gradient(90deg,var(--pink),var(--lav)); transition:width .5s ease}
   .bar-num{margin-top:6px; font-weight:700; font-size:.95rem}
 
+  .spotify-btn{
+    border:none; cursor:pointer; padding:10px 18px; border-radius:99px; font-size:.92rem; font-weight:600;
+    background:linear-gradient(90deg,#1DB954,#17a74a); color:#fff; box-shadow:0 2px 8px rgba(29,185,84,.3); transition:.18s;
+  }
+  .spotify-btn:hover{transform:translateY(-1px); box-shadow:0 4px 12px rgba(29,185,84,.4)}
+
   .tabs{display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 20px}
   .tab{
     border:none; cursor:pointer; padding:10px 18px; border-radius:99px; font-size:.92rem; font-weight:600;
@@ -253,7 +259,7 @@
   .pl-links a:hover{border-color:var(--lav); background:#f3ebff}
 
   /* ---------- 🍜 food page ---------- */
-  #foodPanel{max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:18px}
+  #foodPanel,#budgetPanel{max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:18px}
   .chips{display:flex; flex-wrap:wrap; gap:7px; margin:4px 0 2px}
   .chip{display:inline-flex; align-items:center; gap:6px; background:#faf6ff; border:1px solid var(--line); border-radius:99px; padding:5px 11px; font-size:.86rem}
   .chip button{border:none; background:none; cursor:pointer; color:#cbb8cf; font-size:.85rem; padding:0; line-height:1}
@@ -279,10 +285,13 @@
         <p id="dateline"></p>
       </div>
     </div>
-    <div class="progress-card">
-      <div class="lbl" id="progLbl">Your schedule progress</div>
-      <div class="bar"><i id="progBar"></i></div>
-      <div class="bar-num" id="progNum">0 / 0 done</div>
+    <div style="display:flex; align-items:center; gap:14px">
+      <button class="spotify-btn" id="spotifyBtn" title="Open Spotify">🎧 Spotify</button>
+      <div class="progress-card">
+        <div class="lbl" id="progLbl">Your schedule progress</div>
+        <div class="bar"><i id="progBar"></i></div>
+        <div class="bar-num" id="progNum">0 / 0 done</div>
+      </div>
     </div>
   </header>
 
@@ -566,6 +575,55 @@
         <button class="cl-btn ghost" id="foodImportBtn">📥 Add these recipes</button>
         <span class="cl-status" id="foodImportStatus"></span>
       </div>
+    </div>
+  </section>
+
+  <!-- 💵 BUDGET (opened from the Game Plan's budget button) -->
+  <section id="budgetPanel" style="display:none">
+    <div class="card">
+      <h2>💵 Budget <span class="pill" id="bMoneyAllTime"></span> <button class="cl-btn ghost" id="budgetBack" style="margin-left:auto">← back to Game Plan</button></h2>
+      <p class="cl-lead" style="margin-bottom:0">Every dollar in and out, synced across your devices. Log it the moment it happens and future you always knows where things stand. 🌱</p>
+    </div>
+
+    <div class="card">
+      <h2>✏️ Log money <span class="pill">+ in gets confetti, obviously</span></h2>
+      <div class="money-row">
+        <input id="moneyAmt" type="number" min="0" step="0.01" placeholder="$ in">
+        <select id="moneySrc">
+          <option value="commission">commission</option>
+          <option value="print">print</option>
+          <option value="tutoring">tutoring</option>
+          <option value="gig">gig</option>
+          <option value="other income">other income</option>
+        </select>
+        <button class="apps-btn" id="moneyAdd">+ money in</button>
+      </div>
+      <div class="money-row" style="margin-top:7px">
+        <input id="spendAmt" type="number" min="0" step="0.01" placeholder="$ out">
+        <select id="spendSrc">
+          <option value="rent">rent</option>
+          <option value="car insurance">car insurance</option>
+          <option value="credit card">credit card</option>
+          <option value="groceries">groceries</option>
+          <option value="eating out">eating out</option>
+          <option value="gas">gas</option>
+          <option value="art supplies">art supplies</option>
+          <option value="subscriptions">subscriptions</option>
+          <option value="other expense">other expense</option>
+        </select>
+        <button class="apps-btn spend" id="spendAdd">− money out</button>
+      </div>
+      <div class="apps-sub" id="bMoneyWeek" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <h2>📒 Week by week <span class="pill">income · spending · net</span></h2>
+      <div id="budgetWeeks"></div>
+    </div>
+
+    <div class="card">
+      <h2>🧾 Recent entries <span class="pill">✕ removes a mistake</span></h2>
+      <div class="money-recent" id="moneyRecent" style="margin-top:2px"></div>
     </div>
   </section>
 
@@ -1041,6 +1099,12 @@ function render(){
 }
 
 /* ---------- EVENTS ---------- */
+// Spotify button: try the desktop app first; if it doesn't grab focus, fall back to the web player
+document.getElementById('spotifyBtn').addEventListener('click',()=>{
+  const t=setTimeout(()=>window.open('https://open.spotify.com','_blank'),1200);
+  window.addEventListener('blur',()=>clearTimeout(t),{once:true});
+  location.href='spotify:';
+});
 document.getElementById('tabs').addEventListener('click',e=>{
   const b=e.target.closest('.tab'); if(!b) return;
   view=b.dataset.view;
@@ -1052,13 +1116,14 @@ document.getElementById('tabs').addEventListener('click',e=>{
 });
 // swap between the schedule grid and the full-width panels (cover letters / game plan / food)
 function applyLayout(){
-  const isCover = view==='cover', isPlan = view==='plan', isFood = view==='food';
-  const full = isCover||isPlan||isFood;
+  const isCover = view==='cover', isPlan = view==='plan', isFood = view==='food', isBudget = view==='budget';
+  const full = isCover||isPlan||isFood||isBudget;
   document.querySelector('.grid').style.display = full ? 'none' : '';
   document.querySelector('.progress-card').style.display = full ? 'none' : '';
   document.getElementById('coverPanel').style.display = isCover ? 'block' : 'none';
   document.getElementById('planPanel').style.display = isPlan ? 'block' : 'none';
   document.getElementById('foodPanel').style.display = isFood ? 'flex' : 'none';
+  document.getElementById('budgetPanel').style.display = isBudget ? 'flex' : 'none';
 }
 
 /* ---------- 🗺️ GAME PLAN (8-week intensive, night-owl clock) ----------
@@ -1167,9 +1232,11 @@ function renderMoney(){
   const wkIn=money.filter(e=>e.d>=wkStart&&isIn(e)).reduce((a,e)=>a+e.amt,0);
   const wkOut=money.filter(e=>e.d>=wkStart&&!isIn(e)).reduce((a,e)=>a+e.amt,0);
   const allNet=money.reduce((a,e)=>a+(isIn(e)?e.amt:-e.amt),0);
-  document.getElementById('moneyWeek').innerHTML=
-    'this week: <b style="color:var(--ok)">+'+fmt$(wkIn)+'</b> in · <b style="color:var(--urgent)">−'+fmt$(wkOut)+'</b> out · net <b style="color:'+((wkIn-wkOut)>=0?'var(--ok)':'var(--urgent)')+'">'+fmt$(wkIn-wkOut)+'</b>';
+  const wkHtml='this week: <b style="color:var(--ok)">+'+fmt$(wkIn)+'</b> in · <b style="color:var(--urgent)">−'+fmt$(wkOut)+'</b> out · net <b style="color:'+((wkIn-wkOut)>=0?'var(--ok)':'var(--urgent)')+'">'+fmt$(wkIn-wkOut)+'</b>';
+  document.getElementById('moneyWeek').innerHTML=wkHtml;          // teaser on the Game Plan card
+  document.getElementById('bMoneyWeek').innerHTML=wkHtml;         // the budget page itself
   document.getElementById('moneyAllTime').textContent='net '+fmt$(allNet)+' since tracking';
+  document.getElementById('bMoneyAllTime').textContent='net '+fmt$(allNet)+' since tracking';
   // week-by-week budget
   const bw=document.getElementById('budgetWeeks'); bw.innerHTML='';
   const rows=[]; const s0=parse('2026-07-13');
@@ -1194,7 +1261,8 @@ function renderMoney(){
   });
   // recent entries with undo
   const rec=document.getElementById('moneyRecent'); rec.innerHTML='';
-  money.slice(-4).reverse().forEach(e=>{
+  if(!money.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Nothing logged yet. The first dollar of the rebuild goes right here. 🌸'; rec.appendChild(e); }
+  money.slice(-12).reverse().forEach(e=>{
     const row=document.createElement('div');
     const t=document.createElement('span');
     t.textContent=e.d.slice(5).replace('-','/')+' · '+(isIn(e)?'+':'−')+fmt$(e.amt)+' · '+e.src;
@@ -1612,6 +1680,8 @@ document.getElementById('buyNew').addEventListener('keydown',e=>{ if(e.key==='En
 document.getElementById('fridgeClear').onclick=()=>{ if(confirm('Clear the fridge list for a fresh week? (recipes and shopping list stay)')){ food.fridge=[]; saveFood(); renderFood(); } };
 document.getElementById('openFood').onclick=()=>{ view='food'; applyLayout(); renderFood(); };
 document.getElementById('foodBack').onclick=()=>{ view='plan'; applyLayout(); renderPlan(); };
+document.getElementById('openBudget').onclick=()=>{ view='budget'; applyLayout(); renderMoney(); };
+document.getElementById('budgetBack').onclick=()=>{ view='plan'; applyLayout(); renderPlan(); };
 // 🤖 hand-off: copy fridge + a ready prompt, open Claude, paste the reply back below
 document.getElementById('foodAsk').onclick=async()=>{
   const have=food.fridge.length?food.fridge.join(', '):'(my fridge list is empty, assume I have very little on hand)';
@@ -1954,7 +2024,7 @@ $('clDownload').onclick=()=>{
 
 // --- styled PDF via the browser's print engine (pink/peach letterhead, based on Lupita's template) ---
 const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-// filename: MariaRoa_CoverLetter_<Company>
+// filename: CoverLetter_<Company>
 function letterFilename(){
   const co=($('clCompany').value.trim()||'').replace(/[^a-z0-9]+/gi,'');
   return 'CoverLetter_'+(co||'Company');
