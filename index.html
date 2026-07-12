@@ -138,6 +138,8 @@
   .add-row{display:flex; gap:8px; margin-top:12px}
   .add-row input{flex:1; border:1px solid var(--line); border-radius:12px; padding:10px 12px; font-size:.9rem; font-family:inherit; color:var(--ink)}
   .add-row input:focus{outline:none; border-color:var(--lav)}
+  .add-row select{border:1px solid var(--line); border-radius:12px; padding:0 4px; font-family:inherit; font-size:.8rem; color:var(--ink); background:#fff; max-width:96px}
+  .add-row select:focus{outline:none; border-color:var(--lav)}
   .add-row button{border:none; cursor:pointer; border-radius:12px; padding:0 16px; font-weight:700; color:#fff;
     background:linear-gradient(90deg,var(--pink-deep),var(--lav-deep))}
   .del{margin-left:auto; border:none; background:none; cursor:pointer; color:#cbb8cf; font-size:1rem; padding:2px 6px}
@@ -311,9 +313,16 @@
         <h2>📌 To-Dos & Deadlines <span class="pill" id="taskCount"></span></h2>
         <ul class="list" id="taskList"></ul>
         <div class="add-row">
-          <input id="newTask" type="text" placeholder="Add your own to-do for today..." maxlength="120">
+          <input id="newTask" type="text" placeholder='Add anything... try "doctor appt Monday 3pm"' maxlength="120">
+          <select id="newKind" title="where to file it (✨ auto reads your words and picks for you)">
+            <option value="auto">✨ auto</option>
+            <option value="task">📌 to-do</option>
+            <option value="bill">💸 bill</option>
+            <option value="appt">🩺 appt</option>
+          </select>
           <button id="addBtn">Add</button>
         </div>
+        <div class="note" id="addHint" style="display:none; margin:6px 2px 0"></div>
       </div>
 
       <div class="card">
@@ -801,7 +810,7 @@ function fillList(el, items, kind, deletable){
   const vis=items.filter(it=>(!it.date || inView(it.date)) && !(archivable&&arch[it.id]))
     .sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
   if(!vis.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Nothing here for this view. 🌿'; el.appendChild(e); return; }
-  vis.forEach(it=>el.appendChild(itemRow(it,kind,deletable)));
+  vis.forEach(it=>el.appendChild(itemRow(it,kind,deletable||!!it.custom)));
 }
 
 /* ---------- 📦 ARCHIVE ---------- */
@@ -1083,18 +1092,17 @@ function render(){
   const baseAppts=D.appts||APPTS;
   const dAPPTS=[...baseAppts, ...EVENTS.filter(e=>!baseAppts.some(a=>a.id===e.id))];
 
-  // left lists (custom tasks merged in)
-  const allTasks=[...dTASKS, ...custom];
-  fillList(document.getElementById('taskList'), allTasks, 'task', false);
-  // mark custom ones deletable: re-render custom inline
-  // (simpler: rebuild with deletable flag per item)
+  // left lists (custom items merged into whichever card their kind says)
+  const allTasks=[...dTASKS, ...custom.filter(c=>!c.kind||c.kind==='task')];
+  const allBills=[...dBILLS, ...custom.filter(c=>c.kind==='bill')];
+  const allAppts=[...dAPPTS, ...custom.filter(c=>c.kind==='appt')];
   const tl=document.getElementById('taskList'); tl.innerHTML='';
   const visTasks=allTasks.filter(it=>(!it.date||inView(it.date))&&!arch[it.id]).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
   if(!visTasks.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='No to-dos for this view. Breathe easy. 🌿'; tl.appendChild(e);}
   else visTasks.forEach(it=>tl.appendChild(itemRow(it,'task', !!it.custom)));
 
-  fillList(document.getElementById('billList'), dBILLS, 'bill', false);
-  fillList(document.getElementById('apptList'), dAPPTS, 'appt', false);
+  fillList(document.getElementById('billList'), allBills, 'bill', false);
+  fillList(document.getElementById('apptList'), allAppts, 'appt', false);
 
   // counts
   document.getElementById('taskCount').textContent = visTasks.length+' shown';
@@ -1132,7 +1140,7 @@ function render(){
     r.appendChild(n); r.appendChild(s); pl.appendChild(r); });
 
   // progress (schedule items only: tasks+bills+appts in current view)
-  const sched=[...allTasks,...dBILLS,...dAPPTS].filter(it=>!it.date||inView(it.date));
+  const sched=[...allTasks,...allBills,...allAppts].filter(it=>!it.date||inView(it.date));
   const total=sched.length;
   const completed=sched.filter(it=>done[it.id]).length;
   const pct= total? Math.round(completed/total*100):0;
@@ -1874,14 +1882,74 @@ document.getElementById('friendsAsk').onclick=async()=>{
   setStatus('friendsStatus', ok?'Copied! Paste (Ctrl+V) into the Claude tab and it will draft every reply with you. ✨':'Opened Claude. Describe who you owe replies to and it will draft them.', ok?'ok':'err');
 };
 
+/* ---- smart add: reads what you type and files it under To-Dos, Bills, or
+   Appointments, with the date it spots ("Monday", "tomorrow", "7/15", "aug 3")
+   and a time ("3pm", "8:20 am"). The ✨ auto dropdown can be overridden. ---- */
+const APPT_WORDS=/\b(appt|appointment|apt|doctor|dr|doc|dentist|gyno|obgyn|checkup|check-up|therapy|therapist|psychiatrist|optometrist|dermatologist|physical|vet|salon|haircut|interview|meeting|consult|consultation)\b/i; // leakcheck-allow: generic parser keywords, not personal data
+const BILL_WORDS=/\b(pay|bill|bills|rent|insurance|invoice|payment|subscription|owe)\b/i; // leakcheck-allow: generic parser keywords
+function detectKind(text){
+  if(BILL_WORDS.test(text)) return 'bill';
+  if(APPT_WORDS.test(text)) return 'appt';
+  return 'task';
+}
+const WD_IDX={sun:0,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6};
+const MO_IDX={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function parseWhen(text){
+  const t=text.toLowerCase();
+  let date=null, time=null;
+  const tm=t.match(/\b(\d{1,2})(:(\d{2}))?\s*(am|pm)\b/);
+  if(tm) time=tm[1]+(tm[3]?':'+tm[3]:'')+' '+tm[4].toUpperCase();
+  const yr=today.getFullYear();
+  const mk=(y,m,d)=>{ let dt=new Date(y,m-1,d); dt.setHours(0,0,0,0);
+    // a date that already passed by 2+ months probably means next year
+    if((today-dt)/86400000>60){ dt=new Date(y+1,m-1,d); dt.setHours(0,0,0,0); }
+    return iso(dt); };
+  const md=t.match(/\b(\d{1,2})\/(\d{1,2})(\/(\d{2,4}))?\b/);
+  const mo=t.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\b/);
+  const wd=t.match(/\b(next\s+)?(sun|mon|tue|wed|thu|fri|sat)(day|nesday|sday|urday|rsday|uesday)?\b/);
+  if(md){ const y=md[4]?(md[4].length===2?2000+Number(md[4]):Number(md[4])):yr; date=mk(y,Number(md[1]),Number(md[2])); }
+  else if(mo){ date=mk(yr,MO_IDX[mo[1]],Number(mo[2])); }
+  else if(/\b(today|tonight)\b/.test(t)) date=iso(today);
+  else if(/\b(tomorrow|tmrw|tmr)\b/.test(t)){ const d=new Date(today); d.setDate(d.getDate()+1); date=iso(d); }
+  else if(wd){ let off=(WD_IDX[wd[2]]-today.getDay()+7)%7; if(off===0&&wd[1]) off=7;
+    const d=new Date(today); d.setDate(d.getDate()+off); date=iso(d); }
+  return {date,time};
+}
+const KIND_HOME={task:'📌 To-Dos', bill:'💸 Bills', appt:'🩺 Appointments'};
+let addHintTimer=null;
+function showAddHint(msg, sticky){
+  const h=document.getElementById('addHint');
+  clearTimeout(addHintTimer);
+  if(!msg){ h.style.display='none'; return; }
+  h.textContent=msg; h.style.display='block';
+  if(!sticky) addHintTimer=setTimeout(()=>{ h.style.display='none'; },6000);
+}
+function previewAdd(){
+  const v=document.getElementById('newTask').value.trim();
+  const sel=document.getElementById('newKind').value;
+  if(!v){ showAddHint(''); return; }
+  const kind=sel==='auto'?detectKind(v):sel;
+  const w=parseWhen(v);
+  showAddHint('will file under '+KIND_HOME[kind]+' · '+fmtWhen(w.date||iso(today))+(w.time?(' '+w.time):''), true);
+}
 function addTask(){
   const inp=document.getElementById('newTask'); const v=inp.value.trim(); if(!v) return;
-  const id='c-'+Date.now();
-  custom.push({id, text:v, date:iso(today), tag:'work', custom:true});
-  saveCustom(); inp.value=''; render();
+  const sel=document.getElementById('newKind');
+  const kind=sel.value==='auto'?detectKind(v):sel.value;
+  const w=parseWhen(v);
+  const it={id:'c-'+Date.now(), text:v, date:w.date||iso(today), kind, custom:true};
+  if(w.time) it.time=w.time;
+  if(kind==='task') it.tag='work';
+  custom.push(it);
+  saveCustom(); inp.value=''; sel.value='auto'; render();
+  let msg='Filed under '+KIND_HOME[kind]+' · '+fmtWhen(it.date)+(it.time?(' '+it.time):'')+' ✓';
+  if(!inView(it.date)) msg+=' (it\'s outside this tab\'s dates, peek at 📅 This Week or ✨ Everything)';
+  showAddHint(msg);
 }
 document.getElementById('addBtn').onclick=addTask;
 document.getElementById('newTask').addEventListener('keydown',e=>{ if(e.key==='Enter') addTask(); });
+document.getElementById('newTask').addEventListener('input',previewAdd);
+document.getElementById('newKind').addEventListener('change',previewAdd);
 document.getElementById('resetBtn').onclick=()=>{ if(confirm('Uncheck everything and empty the archive? (your added to-dos stay)')){ done={}; arch={}; saveDone(); saveArch(); render(); } };
 
 // live leads: collapsible dropdown (collapsed by default so it doesn't clog the page)
