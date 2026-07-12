@@ -752,8 +752,10 @@ const getToken = () => localStorage.getItem(LS_TOKEN) || '';
 const today = new Date(); today.setHours(0,0,0,0);
 const iso = d => d.toISOString().slice(0,10);
 const parse = s => { const [y,m,d]=s.split('-').map(Number); const dt=new Date(y,m-1,d); dt.setHours(0,0,0,0); return dt; };
-function weekRange(){ const s=new Date(today); const dow=(s.getDay()+6)%7; s.setDate(s.getDate()-dow); const e=new Date(s); e.setDate(s.getDate()+6); return [s,e]; }
-function monthRange(){ const s=new Date(today.getFullYear(),today.getMonth(),1); const e=new Date(today.getFullYear(),today.getMonth()+1,0); return [s,e]; }
+/* rolling windows: "This Week" = today + the next 6 days (so saying a plain
+   weekday always lands in it), "This Month" = the next 30 days */
+function weekRange(){ const s=new Date(today); const e=new Date(today); e.setDate(e.getDate()+6); return [s,e]; }
+function monthRange(){ const s=new Date(today); const e=new Date(today); e.setDate(e.getDate()+29); return [s,e]; }
 function inView(dateStr){
   if(view==='all') return true;
   const d=parse(dateStr);
@@ -1929,7 +1931,7 @@ function parseWhen(text){
   else if(mo){ date=mk(yr,MO_IDX[mo[1]],Number(mo[2])); }
   else if(/\b(today|tonight)\b/.test(t)) date=iso(today);
   else if(/\b(tomorrow|tmrw|tmr)\b/.test(t)){ const d=new Date(today); d.setDate(d.getDate()+1); date=iso(d); }
-  else if(wd){ let off=(WD_IDX[wd[2]]-today.getDay()+7)%7; if(off===0&&wd[1]) off=7;
+  else if(wd){ let off=(WD_IDX[wd[2]]-today.getDay()+7)%7; if(wd[1]) off+=7; // "next tuesday" = a week past the coming one, so it files ahead
     const d=new Date(today); d.setDate(d.getDate()+off); date=iso(d); }
   return {date,time};
 }
