@@ -300,7 +300,10 @@
   .tpop-row button{border:1px solid var(--line); background:#faf6ff; border-radius:99px; padding:4px 9px;
     font-family:inherit; font-size:.75rem; font-weight:700; color:var(--ink); cursor:pointer}
   .tpop-row button:hover{border-color:var(--pink-deep); background:#ffeaf3}
-  .tpop input{flex:1; min-width:110px; border:1px solid var(--line); border-radius:99px; padding:6px 11px;
+  .tpop-mer{display:flex; border:1px solid var(--line); border-radius:99px; overflow:hidden}
+  .tpop-row .tpop-mer button{border:none; border-radius:0; background:#faf6ff; padding:5px 9px; font-size:.7rem; font-weight:800; color:var(--soft)}
+  .tpop-row .tpop-mer button.on{background:var(--lav-deep); color:#fff}
+  .tpop input{flex:1; min-width:84px; border:1px solid var(--line); border-radius:99px; padding:6px 11px;
     font-family:inherit; font-size:.8rem; font-weight:700; color:var(--ink); background:#fff}
   .tpop input:focus{outline:none; border-color:var(--pink-deep)}
   .tpop .go{background:var(--pink-deep); border-color:var(--pink-deep); color:#fff}
@@ -926,6 +929,7 @@ const LS_BLOCKMODS = 'lupita-dash-blockmods-v1';
 const LS_MINE = 'lupita-dash-mine-v1';
 const LS_SOLO = 'lupita-dash-solo-v1';
 const LS_TMOVED = 'lupita-dash-tmoved-v1';
+const LS_BLOCKOFF = 'lupita-dash-blockoff-v1';
 let done = JSON.parse(localStorage.getItem(LS_DONE) || '{}');
 let custom = JSON.parse(localStorage.getItem(LS_CUSTOM) || '[]');
 let arch = JSON.parse(localStorage.getItem(LS_ARCH) || '{}');   // id -> {t:text, k:kind, at:'YYYY-MM-DD'}
@@ -955,6 +959,11 @@ let solo = JSON.parse(localStorage.getItem(LS_SOLO) || '{}');
 // step you didn't get to last night belongs on tomorrow, not in the past).
 // gp task id -> 'YYYY-MM-DD'. The plan itself is never rewritten.
 let tmoved = JSON.parse(localStorage.getItem(LS_TMOVED) || '{}');
+// blocks you took OFF one day's clock (🗑 on the block). 'w2-tue' -> ['dinner',...].
+// Per-day, like every other block edit: the weekly skeleton keeps the block, and
+// "↺ back to the usual blocks" puts it right back. Anything parked inside a
+// deleted block isn't deleted with it, it just goes back to having no set time.
+let blockOff = JSON.parse(localStorage.getItem(LS_BLOCKOFF) || '{}');
 let view = 'today';
 const saveDone = () => { localStorage.setItem(LS_DONE, JSON.stringify(done)); pushStateSoon(); };
 const saveCustom = () => { localStorage.setItem(LS_CUSTOM, JSON.stringify(custom)); pushStateSoon(); };
@@ -966,6 +975,7 @@ const saveBlockMods = () => { localStorage.setItem(LS_BLOCKMODS, JSON.stringify(
 const saveMine = () => { localStorage.setItem(LS_MINE, JSON.stringify(mine)); pushStateSoon(); };
 const saveSolo = () => { localStorage.setItem(LS_SOLO, JSON.stringify(solo)); pushStateSoon(); };
 const saveTmoved = () => { localStorage.setItem(LS_TMOVED, JSON.stringify(tmoved)); pushStateSoon(); };
+const saveBlockOff = () => { localStorage.setItem(LS_BLOCKOFF, JSON.stringify(blockOff)); pushStateSoon(); };
 const getToken = () => localStorage.getItem(LS_TOKEN) || '';
 
 /* ---------- DATE HELPERS ---------- */
@@ -1453,6 +1463,7 @@ async function loadState(){
       if(s.mine){ mine=s.mine; localStorage.setItem(LS_MINE, JSON.stringify(mine)); }
       if(s.solo){ solo=s.solo; localStorage.setItem(LS_SOLO, JSON.stringify(solo)); }
       if(s.tmoved){ tmoved=s.tmoved; localStorage.setItem(LS_TMOVED, JSON.stringify(tmoved)); }
+      if(s.blockOff){ blockOff=s.blockOff; localStorage.setItem(LS_BLOCKOFF, JSON.stringify(blockOff)); }
       if(s.mailDone){ mailDone=s.mailDone; localStorage.setItem(LS_MAILDONE, JSON.stringify(mailDone)); }
       if(s.mailStore){ mailStore=s.mailStore; localStorage.setItem(LS_MAILSTORE, JSON.stringify(mailStore)); loadMailFromStore(); }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
@@ -1476,7 +1487,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, blockMods, food, friends, mine, solo, tmoved, mailDone, mailStore, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, blockMods, blockOff, food, friends, mine, solo, tmoved, mailDone, mailStore, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -1649,6 +1660,9 @@ const DK_BY_DAY=['sun','mon','tue','wed','thu','fri','sat'];
 function clockFor(n,dk,def){
   const key=((CLOCK_OVERRIDES[n]||{})[dk])||def;
   let base=CLOCKS[key]||CLOCKS[def]||CLOCKS.wk||[];
+  // 🗑 blocks you took off THIS day are simply not on it
+  const off=blockOff['w'+n+'-'+dk];
+  if(off && off.length) base=base.filter(b=>!off.includes(b.k));
   // 🧱 your own blocks (a to-do promoted onto the clock) sit in the day right
   // alongside the plan's blocks, in clock order
   const solos=soloBlocksOn(planDayISO(n,dk));
@@ -1657,7 +1671,7 @@ function clockFor(n,dk,def){
   // Blocks whose times didn't change keep their hand-written labels ('All day',
   // 'moved →'); shifted ones get a freshly formatted range.
   const mods=blockMods['w'+n+'-'+dk];
-  if(!mods) return base;
+  if(!mods) return base.map(relabel);
   const byK={}; base.forEach(b=>byK[b.k]=b);
   const out=[];
   mods.forEach(m=>{
@@ -1670,7 +1684,18 @@ function clockFor(n,dk,def){
     const at=out.findIndex(x=>x.s>b.s);
     out.splice(at<0?out.length:at, 0, b);
   });
-  return out;
+  return out.map(relabel);
+}
+/* 🗑 take a block off ONE day (the cat knocked dinner over, the block has to go).
+   The weekly skeleton keeps it, every other day keeps it, and the day card grows
+   an "↺ back to the usual blocks" chip. Anything parked inside it is not deleted:
+   it just loses its set time and waits in the day's 📌 strip. */
+function hideBlock(n,dk,k){
+  const day='w'+n+'-'+dk;
+  blockOff[day]=[...(blockOff[day]||[]), k];
+  // the day's reshuffle (if it has one) shouldn't keep re-timing a block that's gone
+  if(blockMods[day]){ blockMods[day]=blockMods[day].filter(m=>m.k!==k); saveBlockMods(); }
+  saveBlockOff(); rebuildWeeks(); if(view==='plan') renderPlan();
 }
 /* ---- 🧱 A TO-DO AS ITS OWN BLOCK ----
    Therapy at 7 is not "part of the flex block", it's its own thing on the clock.
@@ -1741,8 +1766,15 @@ function syncSolo(mods){
    TAP it instead to type a new start time; then that block and everything after
    it slide by the same amount. Either way it's that ONE day only; the weekly
    skeleton is untouched and the day card grows an undo chip. */
-const fmtMins=m=>{ const h=Math.floor((m%1440)/60), mm=m%60; return (((h+11)%12)+1)+':'+String(mm).padStart(2,'0'); };
-const fmtRange=(s,e)=>fmtMins(s)+'-'+fmtMins(e);
+const merOf=m=>Math.floor((((m%1440)+1440)%1440)/60)>=12?'pm':'am';
+const fmtMins=(m,ap)=>{ const h=Math.floor((((m%1440)+1440)%1440)/60), mm=((m%60)+60)%60;
+  return (((h+11)%12)+1)+':'+String(mm).padStart(2,'0')+(ap?merOf(m):''); };
+// every block label says am/pm now, so 12:20 is never a guessing game. When both
+// ends are in the same half of the day it only needs saying once: '7:20-9:20pm'.
+const fmtRange=(s,e)=> merOf(s)===merOf(e) ? fmtMins(s)+'-'+fmtMins(e,1) : fmtMins(s,1)+'-'+fmtMins(e,1);
+// ...including the plan's own hand-written labels. Ones that aren't times at all
+// ('All day', 'moved →') are left exactly as the plan wrote them.
+const relabel=b => (/^\d/.test(b.t||'') && b.e>b.s) ? Object.assign({},b,{t:fmtRange(b.s,b.e)}) : b;
 // "12", "12:30", "9pm", "1:15 am", "13:40" -> minutes on the 11am-to-11am schedule
 // day (660..2100). A bare time with no am/pm picks whichever reading is CLOSEST
 // to where the block sits now ("12:20" on a 9:20pm block means 12:20am, not noon).
@@ -1759,6 +1791,9 @@ function parseBlockTime(str,near){
   if(near!==undefined) cands.sort((a,b)=>Math.abs(a-near)-Math.abs(b-near));
   return cands[0];
 }
+/* the AM/PM toggle folded into whatever got typed. Only the START needs it (the
+   end of a range is read off the start), and an am/pm typed by hand always wins. */
+const withMer=(v,mer)=> /(a|p)\.?m?\b/i.test(v) ? v : v.replace(/^\s*(\d{1,2}(?::\d{2})?)/, '$1'+mer);
 // the day's clock as it stands right now, reshuffles and 🧱 blocks and all
 function clockOf(n,dk){ return clockFor(n,dk,(DAY_DEFS.find(d=>d.dk===dk)||{}).clock||'wk'); }
 // one reshuffle, saved and redrawn (and a 🧱 block's move is also a time change
@@ -1830,18 +1865,30 @@ function openTimePop(anchor, n, dk, b){
   p.appendChild(nudge);
   const row=document.createElement('div'); row.className='tpop-row';
   const inp=document.createElement('input'); inp.type='text'; inp.value=fmtMins(b.s);
-  inp.setAttribute('aria-label','new time'); inp.placeholder='9pm  ·  7-8:30';
+  inp.setAttribute('aria-label','new time'); inp.placeholder='9:30  ·  7-8:30';
+  /* AM | PM, no more guessing. It starts on the half of the day the block is
+     already in, so '12' means what you'd expect. Type 'pm' into the box yourself
+     and the toggle just follows you. */
+  let mer=merOf(b.s);
+  const seg=document.createElement('div'); seg.className='tpop-mer';
+  const mb={};
+  const setMer=x=>{ mer=x; mb.am.classList.toggle('on',x==='am'); mb.pm.classList.toggle('on',x==='pm'); };
+  ['am','pm'].forEach(x=>{ const btn=document.createElement('button'); btn.textContent=x.toUpperCase();
+    btn.title=x==='am'?'morning / after midnight':'afternoon / evening';
+    btn.onclick=()=>setMer(x); mb[x]=btn; seg.appendChild(btn); });
+  setMer(mer);
+  inp.oninput=()=>{ const t=/(a|p)\.?m?\b/i.exec(inp.value); if(t) setMer(t[1].toLowerCase()+'m'); };
   const go=document.createElement('button'); go.className='go'; go.textContent='Set';
   const submit=()=>{
     const v=(inp.value||'').trim(); if(!v){ closeTimePop(); return; }
-    const msg=applyBlockTime(n,dk,b.k,v);
+    const msg=applyBlockTime(n,dk,b.k,withMer(v,mer));
     if(msg){ err.textContent=msg; err.style.display='block'; inp.focus(); inp.select(); return; }
     closeTimePop();
   };
   go.onclick=submit;
   inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); }
     if(e.key==='Escape'){ e.preventDefault(); closeTimePop(); } };
-  row.appendChild(inp); row.appendChild(go); p.appendChild(row);
+  row.appendChild(inp); row.appendChild(seg); row.appendChild(go); p.appendChild(row);
   const hint=document.createElement('div'); hint.className='tpop-s';
   hint.textContent='A start time slides the rest of the day along. A range (7-8:30) moves only this block.';
   p.appendChild(hint); p.appendChild(err);
@@ -2160,6 +2207,27 @@ function rebuildWeeks(){
   buildWeeks();
   wrap.querySelectorAll('details[data-key]').forEach(d=>{ d.open=open.has(d.dataset.key); });
 }
+/* ✏️ reword one of the plan's own tasks, right on the day card. The plan file is
+   never rewritten: your wording is an override (edits[id], same as a to-do's), and
+   clearing the box empty hands the plan's own words back. */
+function gpRename(it, el){
+  if(el.parentNode && el.parentNode.querySelector('.txt-edit')) return;
+  const inp=document.createElement('input');
+  inp.type='text'; inp.className='txt-edit'; inp.value=el.textContent; inp.maxLength=200;
+  let closed=false;
+  const finish=commit=>{
+    if(closed) return; closed=true;
+    if(!commit){ if(inp.parentNode) inp.parentNode.replaceChild(el, inp); return; }
+    const v=inp.value.trim();
+    if(!v || v===it.txt) delete edits[it.id]; else edits[it.id]=v;
+    saveEdits(); rebuildWeeks();
+  };
+  inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); finish(true); }
+    else if(e.key==='Escape'){ e.preventDefault(); finish(false); } };
+  inp.onblur=()=>finish(true);
+  inp.onclick=e=>e.stopPropagation();
+  el.parentNode.replaceChild(inp, el); inp.focus(); inp.select();
+}
 /* ctx (day cards only) = {dayISO, blocks, days}: what a 📌 to-do needs to know to
    be dragged into a time block, or tapped there with ⇅ when there's no mouse. */
 function checklist(items,cntEl,ctx){
@@ -2168,7 +2236,8 @@ function checklist(items,cntEl,ctx){
   items.forEach(it=>{
     const row=document.createElement('div'); row.className='pl-item';
     const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox';
-    const t=document.createElement('div'); t.className='txt2'; t.textContent=it.txt;
+    // your wording wins over the plan's, always (double-click the words to change it)
+    const t=document.createElement('div'); t.className='txt2'; t.textContent=edits[it.id]||it.txt;
     const sync=()=>{ cb.checked=!!done[it.id]; row.classList.toggle('done',!!done[it.id]); update(); };
     sync.el=row;
     (gpReg[it.id]=gpReg[it.id]||[]).push(sync);
@@ -2305,8 +2374,16 @@ function checklist(items,cntEl,ctx){
       if(away){ const s=document.createElement('span'); s.className='tmv';
         s.textContent='↪ from '+home.name; s.title='The plan had this on '+home.name+'. You moved it here.';
         t.appendChild(s); }
+      // ✏️ the plan's wording is a suggestion: double-click it and say it your way
+      t.title='double-click to reword this';
+      t.ondblclick=e=>{ e.stopPropagation(); gpRename(it,t); };
+      // drag it like anything else: onto another block (deep applies → fast applies),
+      // onto the 📌 strip for no set time, or onto another day's header
+      row.classList.add('ag-row'); row.draggable=true;
+      row.ondragstart=e=>{ e.dataTransfer.setData('text/plain', it.id); e.dataTransfer.effectAllowed='move'; row.classList.add('dragging'); };
+      row.ondragend=()=>row.classList.remove('dragging');
       const mv=document.createElement('button'); mv.className='tb'; mv.textContent='⇅';
-      mv.title='Move this to another day, or into a different time block';
+      mv.title='Move this to another day, or into a different time block (or just drag it)';
       tbs.insertBefore(mv, tbs.firstChild);
       const drw=document.createElement('div'); drw.className='ag-move'; drw.style.display='none';
       const chip=(label,title,on,fn)=>{ const b=document.createElement('button');
@@ -2468,16 +2545,33 @@ function myAddRow(dd, dISO, ck){
     .forEach(([v,l])=>{ const o=document.createElement('option'); o.value=v; o.textContent=l; rep.appendChild(o); });
   const blk=document.createElement('select'); blk.title='which time block (you can change it later with ⇅)';
   const o0=document.createElement('option'); o0.value=''; o0.textContent='no set time'; blk.appendChild(o0);
+  // 🧱 a brand new block of your own on this day's clock, not a to-do tucked inside
+  // someone else's block. It's an hour long to start with: drag its time to move it,
+  // tap the time to re-time it, 🗑 to take it off again.
+  const oB=document.createElement('option'); oB.value='__solo'; oB.textContent='🧱 a new block of its own'; blk.appendChild(oB);
   ck.forEach(b=>{ const o=document.createElement('option'); o.value=b.k; o.textContent=b.t+' '+b.n; blk.appendChild(o); });
+  const at=document.createElement('input'); at.type='time'; at.className='ag-date'; at.style.display='none';
+  at.title='what time does the block start? (blank = noon; it runs an hour until you drag the ends)';
+  blk.onchange=()=>{ const own=blk.value==='__solo';
+    at.style.display=own?'':'none';
+    // a block lives on ONE day's clock, so a block add is a one-off add
+    if(own) rep.value='once';
+    rep.disabled=own;
+  };
   const go=document.createElement('button'); go.className='tb my-go'; go.textContent='Add ✓';
   const add=()=>{
     const v=txt.value.trim(); if(!v){ txt.focus(); return; }
-    if(rep.value==='once'){
+    const own=blk.value==='__solo';
+    if(rep.value==='once' || own){
       // one-offs are real home-tab to-dos: they land in this day's 📌 strip and
       // can be dragged, pushed, and archived like anything else
       const it={id:'c-'+Date.now(), text:v, date:dISO, kind:'task', custom:true, tag:'life'};
+      if(own){
+        const s=timeToMins(to12(at.value)) ?? 720;   // no time given: park it at noon
+        it.time=minsTo12(s);
+        solo[it.id]={s, e:s+60}; saveSolo();
+      } else if(blk.value) slotted[it.id]=blk.value;
       custom.push(it);
-      if(blk.value) slotted[it.id]=blk.value;
       saveSlotted(); saveCustom(); render(); rebuildWeeks();
     } else {
       const todayISO=isoLocal(today);
@@ -2485,12 +2579,13 @@ function myAddRow(dd, dISO, ck){
         slot:blk.value||undefined, start:(dISO<todayISO?dISO:todayISO)});
       saveMine(); rebuildWeeks();
     }
+    txt.value='';
   };
   go.onclick=add;
   txt.addEventListener('keydown',e=>{ if(e.key==='Enter') add(); });
   open.onclick=()=>{ const on=form.style.display!=='flex';
     form.style.display=on?'flex':'none'; if(on) txt.focus(); };
-  form.appendChild(txt); form.appendChild(rep); form.appendChild(blk); form.appendChild(go);
+  form.appendChild(txt); form.appendChild(rep); form.appendChild(blk); form.appendChild(at); form.appendChild(go);
   wrap.appendChild(open); wrap.appendChild(form);
   return wrap;
 }
@@ -2615,6 +2710,26 @@ function gpSlot(id, k){
   if(k) slotted[id]=k; else slotted[id]='none';
   saveSlotted(); rebuildWeeks();
 }
+/* a sprint task DROPPED somewhere: day and block in one go, one redraw.
+   blockKey 'keep' = it landed on a day header, so whatever block it was in is
+   the block it stays in. */
+function gpPlace(id, dayISO, blockKey){
+  const home=(TASK_HOME[id]||{}).iso;
+  if(!dayISO || dayISO===home) delete tmoved[id]; else tmoved[id]=dayISO;
+  if(blockKey!=='keep'){ if(blockKey) slotted[id]=blockKey; else slotted[id]='none'; saveSlotted(); }
+  saveTmoved(); rebuildWeeks();
+}
+/* one drop, whatever got dragged. A 📌 to-do/bill/appt moves with agPlace, one of
+   the plan's own sprint tasks with gpPlace. Same gesture either way: onto a block
+   to say "this is when", onto the 📌 strip for no set time, onto a day header to
+   send it to that day. */
+function placeItem(id, dayISO, blockKey){
+  if(AGENDA_INDEX[id]) return agPlace(id, dayISO, blockKey==='keep' ? (slotted[id]||null) : blockKey);
+  if(TASK_HOME[id]) return gpPlace(id, dayISO, blockKey);
+}
+// what's allowed to be dragged onto a day at all (a 🌸 routine item repeats, so it
+// has no one day to be moved to: its ⇅ picks the block instead)
+const canDrag = id => !!(AGENDA_INDEX[id] || (TASK_HOME[id] && id.slice(0,6)!=='gp-my-'));
 function buildWeeks(){
   const wrap=document.getElementById('planWeeks');
   if(wrap.dataset.built) return; wrap.dataset.built='1';
@@ -2676,20 +2791,23 @@ function buildWeeks(){
       const agLoose=ag.filter(it=>!it.slot || !blockKeys.has(it.slot));
       const ctx={dayISO:dISO, blocks:ck.filter(b=>!b.solo), days:weekDays};
       dayIds.push(...agAll.map(t=>t.id));
-      dropZone(dSum, id=>agPlace(id, dISO, slotted[id]||null));   // drop on the day header: move it to this day
+      dropZone(dSum, id=>placeItem(id, dISO, 'keep'));   // drop on the day header: move it to this day, block and all
       if(agLoose.length){
         const strip=document.createElement('div'); strip.className='ag-strip';
         const hd=document.createElement('div'); hd.className='ag-head';
         hd.textContent='📌 Real life '+(isToday?'today':'this day')+', no set time yet';
         strip.appendChild(hd); strip.appendChild(checklist(agLoose,null,ctx));
-        dropZone(strip, id=>agPlace(id, dISO, null));             // drop back here: unset its block
+        dropZone(strip, id=>placeItem(id, dISO, null));           // drop back here: unset its block
         dBody.appendChild(strip);
       }
-      // one-tap undo for a day whose blocks got slid around
-      if(blockMods['w'+n+'-'+dd.dk]){
+      // one-tap undo for a day whose blocks got slid around, or had one taken off
+      const dayKey='w'+n+'-'+dd.dk;
+      if(blockMods[dayKey] || (blockOff[dayKey]||[]).length){
         const rb=document.createElement('button'); rb.className='blk-reset';
-        rb.textContent='↺ back to the usual times';
-        rb.onclick=e=>{ e.stopPropagation(); delete blockMods['w'+n+'-'+dd.dk]; saveBlockMods(); rebuildWeeks(); if(view==='plan') renderPlan(); };
+        rb.textContent=(blockOff[dayKey]||[]).length ? '↺ back to the usual blocks + times' : '↺ back to the usual times';
+        rb.title='Puts this day back exactly how the plan wrote it. Nothing else is touched.';
+        rb.onclick=e=>{ e.stopPropagation(); delete blockMods[dayKey]; delete blockOff[dayKey];
+          saveBlockMods(); saveBlockOff(); rebuildWeeks(); if(view==='plan') renderPlan(); };
         dBody.appendChild(rb);
       }
       ck.forEach(b=>{
@@ -2698,13 +2816,13 @@ function buildWeeks(){
         const bid=b.solo ? b.id : ('gpb-w'+n+'-'+dd.dk+'-'+b.k);
         if(!b.solo) dayIds.push(bid);
         const hr=hourRow(b,bid,{n:n, dk:dd.dk});
-        if(!b.solo) dropZone(hr, id=>agPlace(id, dISO, b.k));     // drop on a block: that's when you're doing it
+        if(!b.solo) dropZone(hr, id=>placeItem(id, dISO, b.k));   // drop on a block: that's when you're doing it
         dBody.appendChild(hr);
         if(b.solo) return;                                        // nothing nests inside your own block
         const sub=[...tasks.filter(t=>taskSlot(t)===b.k), ...agIn(b.k)];
         if(sub.length){ const st=document.createElement('div'); st.className='blk-tasks';
           st.appendChild(checklist(sub,null,ctx));
-          dropZone(st, id=>agPlace(id, dISO, b.k));
+          dropZone(st, id=>placeItem(id, dISO, b.k));
           dBody.appendChild(st); }
       });
       const rest=tasks.filter(t=>!blockKeys.has(taskSlot(t)));
@@ -2723,16 +2841,15 @@ function buildWeeks(){
     det.appendChild(body); wrap.appendChild(det);
   }
 }
-/* anywhere a 📌 to-do can be dropped: a time block, the day's no-set-time strip,
-   or another day's header. Only real schedule items count, so dragging a sprint
-   task around does nothing. */
+/* anywhere a task can be dropped: a time block, the day's no-set-time strip, or
+   another day's header. 📌 to-dos and the plan's own sprint tasks both count. */
 function dropZone(el, onDrop){
   el.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; el.classList.add('drop-on'); });
   el.addEventListener('dragleave', ()=>el.classList.remove('drop-on'));
   el.addEventListener('drop', e=>{
     e.preventDefault(); e.stopPropagation(); el.classList.remove('drop-on');
     const id=e.dataTransfer.getData('text/plain');
-    if(id && AGENDA_INDEX[id]) onDrop(id);
+    if(id && canDrag(id)) onDrop(id);
   });
 }
 /* one checkable hour block row. mv = {n, dk}: the time label is a handle, drag
@@ -2761,6 +2878,18 @@ function hourRow(b,bid,mv){
     back.title='Put this back in the list (it stops being its own block)';
     back.onclick=e=>{ e.stopPropagation(); agSolo(b.id); };
     tbs.appendChild(back); row.appendChild(tbs);
+  }
+  // 🗑 or take the plan's block off this one day. Nothing inside it is lost: those
+  // tasks just go back to having no set time, and ↺ brings the block back.
+  else if(mv){
+    const tbs=document.createElement('div'); tbs.className='tbs';
+    const del=document.createElement('button'); del.className='tb'; del.textContent='🗑';
+    del.title='Take this block off this day only (↺ puts it back)';
+    del.onclick=e=>{ e.stopPropagation();
+      if(confirm('Take "'+b.n+'" off this day?\n\nJust this one day, and nothing inside it is deleted: those to-dos go back to having no set time. The "↺ back to the usual blocks" chip puts it right back.'))
+        hideBlock(mv.n, mv.dk, b.k);
+    };
+    tbs.appendChild(del); row.appendChild(tbs);
   }
   sync(); return row;
 }
