@@ -438,15 +438,28 @@
         </h2>
         <div id="mailBody" style="display:none">
           <div class="note" id="mailStatus"></div>
-          <ul class="list" id="mailList"></ul>
-          <button id="mailScan" title="scan the last week of Gmail and draft replies for anything that needs one"
+
+          <div id="mailReplyWrap" style="display:none">
+            <div class="note" style="margin:.3rem 0 .1rem; font-weight:600; color:var(--lav-deep)">✍️ Needs a reply <span class="pill" id="mailReplyCount"></span></div>
+            <ul class="list" id="mailList"></ul>
+          </div>
+
+          <div id="mailActWrap" style="display:none">
+            <div class="note" style="margin:.5rem 0 .1rem; font-weight:600; color:var(--lav-deep)">⚡ Worth a look <span class="pill" id="mailActCount"></span></div>
+            <div class="note" style="margin:0 0 .2rem; font-size:.7rem">Bills, deadlines, job openings, anything with a date. No reply needed, just your eyes. ➕ sends one to your to-dos.</div>
+            <ul class="list" id="mailActList"></ul>
+          </div>
+
+          <button id="mailScan" title="scan the last week of Gmail: draft replies, and pull out bills, deadlines and job openings"
             style="width:100%; margin:.4rem 0; padding:.45rem; border:1px dashed var(--lav-deep); border-radius:8px; background:none; cursor:pointer; color:var(--lav-deep); font-size:.85rem">💌 Scan my inbox now</button>
-          <div class="note" style="font-size:.7rem">Drafts land here and in Gmail. Nothing sends until you hit send. Check one off once you've replied.</div>
+          <div class="note" style="font-size:.7rem">Drafts land here and in Gmail. Nothing sends until you hit send. Check things off as you handle them.</div>
+
           <div id="mailLogWrap" style="display:none; margin-top:.55rem; border-top:1px dashed var(--line, #eee); padding-top:.4rem">
             <div id="mailLogToggle" style="cursor:pointer; user-select:none; color:var(--lav-deep); font-size:.8rem">
               <span id="mailLogCaret" style="display:inline-block; width:.9em; font-size:.8em; color:var(--soft)">▸</span>
-              ✅ Replied <span class="pill" id="mailLogCount"></span>
+              📂 Archive <span class="pill" id="mailLogCount"></span>
             </div>
+            <div class="note" id="mailLogNote" style="display:none; font-size:.7rem; margin:.2rem 0">Everything you've handled, newest first. ✉️ opens the original email in Gmail, ↩ puts it back.</div>
             <ul class="list" id="mailLogList" style="display:none"></ul>
           </div>
         </div>
@@ -712,6 +725,7 @@
           <option value="hang">🗓️ want to make a hangout</option>
           <option value="answer">💬 owe them an answer</option>
           <option value="checkin">🌷 just want to check in</option>
+          <option value="catchup">💛 just want to catch up + talk</option>
           <option value="congrats">🎉 congratulate / hype them</option>
         </select>
       </div>
@@ -2348,7 +2362,7 @@ const LS_FRIENDS='lupita-friends-v1';
 let friends=JSON.parse(localStorage.getItem(LS_FRIENDS)||'{}');
 friends.people=friends.people||[];
 const saveFriends=()=>{ localStorage.setItem(LS_FRIENDS, JSON.stringify(friends)); pushStateSoon(); };
-const VIBES={sorry:'🙏 owe an apology + reply', hang:'🗓️ make a hangout plan', answer:'💬 owe them an answer', checkin:'🌷 check in', congrats:'🎉 congratulate them'};
+const VIBES={sorry:'🙏 owe an apology + reply', hang:'🗓️ make a hangout plan', answer:'💬 owe them an answer', checkin:'🌷 check in', catchup:'💛 catch up + talk as friends', congrats:'🎉 congratulate them'};
 // copy-paste starters: short, warm, one-line apologies ON PURPOSE
 const OPENERS=[
  {icon:'🙏', name:'Sorry I vanished', txt:'AAA I am so sorry I disappeared, life got loud for a bit. I have been thinking of you though!! How are you, what did I miss?'},
@@ -2356,6 +2370,7 @@ const OPENERS=[
  {icon:'🗓️', name:'Make a hangout', txt:'I miss your face!! Are you free sometime next week? Boba or a walk or literally just existing in the same room, dealer\'s choice.'},
  {icon:'💬', name:'The late answer', txt:'Okay replying SO late but the answer is: '},
  {icon:'🌷', name:'Just checking in', txt:'Hi hi, no reason, you just crossed my mind and I wanted to say I hope your week is being kind to you 💕'},
+ {icon:'💛', name:'I just want to catch up', txt:'Okay I miss you and I want an actual catch up, not just a like on a story. What has your life been like lately?? Give me the whole update, I want details.'},
  {icon:'🎉', name:'Hype them up', txt:'WAIT this is amazing?? Congratulations!! I am so happy for you, tell me everything.'},
  {icon:'🦖', name:'Saw this and thought of you', txt:'This made me think of you immediately: '},
  {icon:'🔁', name:'Reschedule without spiraling', txt:'Hey, I am so sorry, I have to move our plan. Can we do next week instead? I really do want to see you, pick a day and I am there.'},
@@ -2366,6 +2381,7 @@ function friendPrompt(p){
     hang:'The goal is a real hangout: propose one specific low-key activity and two concrete day options.',
     answer:'I owe them an answer, help me actually give it, clearly and warmly.',
     checkin:'Just a warm check-in, no agenda.',
+    catchup:'I miss them and just want to catch up and actually talk like friends. Ask a real question or two about their life so the conversation can keep going, and share a little about mine.',
     congrats:'Something good happened for them, hype them up sincerely.'}[p.vibe]||'';
   return 'Help me write a short message to my friend '+p.name+'.'+why+' '+vibe+' Write it in my voice: warm, silly, sincere, casual texting style. Keep it under 5 sentences, never use em dashes, and give me 2 versions to pick from.';
 }
@@ -2579,7 +2595,9 @@ document.getElementById('leadHunt').onclick=(e)=>{ e.stopPropagation(); requestH
    week of Gmail, drafts replies (saved as real Gmail drafts, never sent), and
    pushes mail.json here. This card renders mail.json. */
 const LS_MAILOPEN='lupita-dash-mailopen-v1';
-let MAIL_DATA=[], MAIL_UPDATED='';
+let MAIL_DATA=[];      // mail.json items:   threads that want a reply, each with a draft
+let MAIL_ACTIONS=[];   // mail.json actions: bills, deadlines, job openings. No reply, just a decision
+let MAIL_UPDATED='';
 
 /* ---- the replied record ----
    Checking an email off writes it to mailDone (keyed by Gmail thread id) and it
@@ -2609,16 +2627,36 @@ document.getElementById('mailToggle').addEventListener('click',e=>{
 });
 setMailOpen(localStorage.getItem(LS_MAILOPEN)==='1');
 function setMailStatus(msg){ const el=document.getElementById('mailStatus'); if(el) el.textContent=msg||''; }
-function markReplied(m){
-  mailDone[mailKey(m)]={from:m.from||'', subject:m.subject||'', at:iso(today), gist:m.gist||''};
+/* ---- checking something off ----
+   Both a drafted reply and a "worth a look" item land in the same archive, tagged
+   with how it left the list: 'replied' (she wrote back) or 'handled' (she read it,
+   paid it, applied, or decided it was nothing). */
+function markDone(m, how){
+  mailDone[mailKey(m)]={from:m.from||'', subject:m.subject||'', at:iso(today), gist:m.gist||'',
+                        threadId:m.threadId||'', how:how||'replied', cat:m.cat||''};
   saveMailDone(); renderMail(); updateMailStatus();
 }
 function unmarkReplied(key){ delete mailDone[key]; saveMailDone(); renderMail(); updateMailStatus(); }
+const gmailLink=t=>'https://mail.google.com/mail/u/0/#all/'+encodeURIComponent(t||'');
+
+/* ➕ send a "worth a look" email straight to the To-Dos card (same shape as a
+   typed-in custom item, so it files, moves and checks off like anything else) */
+const ACT_KIND={bill:'bill', appt:'appt'};
+function actionToTodo(a, btn){
+  const kind=ACT_KIND[a.cat]||'task';
+  const it={id:'c-'+Date.now(), text:(a.todo||a.subject||'From your inbox'), date:a.due||iso(today), kind, custom:true};
+  if(kind==='task') it.tag='work';
+  custom.push(it); saveCustom(); render(); rebuildWeeks();
+  if(btn){ btn.textContent='✅ on your list'; btn.disabled=true; }
+}
 function renderMail(){
   const ul=document.getElementById('mailList'); if(!ul) return;
   ul.innerHTML='';
   const open=MAIL_DATA.filter(m=>!mailRepliedTo(m));
-  document.getElementById('mailCount').textContent = open.length ? String(open.length) : '';
+  const openAct=MAIL_ACTIONS.filter(m=>!mailRepliedTo(m));
+  document.getElementById('mailCount').textContent = (open.length+openAct.length) ? String(open.length+openAct.length) : '';
+  document.getElementById('mailReplyWrap').style.display = open.length ? 'block' : 'none';
+  document.getElementById('mailReplyCount').textContent = open.length ? String(open.length) : '';
   open.forEach((m,i)=>{
     const li=document.createElement('li');
     li.style.cssText='display:block; padding:.45rem 0; border-bottom:1px dashed var(--line, #eee)';
@@ -2641,7 +2679,7 @@ function renderMail(){
     el.onclick=()=>{ const d=el.closest('li').querySelector('.mail-draft'); d.style.display = d.style.display==='none' ? 'block' : 'none'; };
   });
   ul.querySelectorAll('[data-mdone]').forEach(box=>{
-    box.onclick=e=>{ e.stopPropagation(); markReplied(open[Number(box.dataset.mdone)]); };
+    box.onclick=e=>{ e.stopPropagation(); markDone(open[Number(box.dataset.mdone)], 'replied'); };
   });
   ul.querySelectorAll('[data-mc]').forEach(btn=>{
     btn.onclick=async()=>{
@@ -2650,31 +2688,77 @@ function renderMail(){
       catch(_){ ta.select(); }
     };
   });
+  renderMailActions(openAct);
   renderMailLog();
 }
-/* the permanent record: everyone Lupita has replied to, newest first */
+
+/* ⚡ worth a look: bills, deadlines, job openings, money, scam warnings. No draft,
+   because none of these want a reply. They want a decision. */
+const CAT_ICON={bill:'💸', job:'💼', deadline:'⏰', money:'💵', appt:'🩺', scam:'⚠️', other:'✨'};
+function renderMailActions(openAct){
+  const wrap=document.getElementById('mailActWrap'), ul=document.getElementById('mailActList');
+  if(!wrap||!ul) return;
+  wrap.style.display = openAct.length ? 'block' : 'none';
+  document.getElementById('mailActCount').textContent = openAct.length ? String(openAct.length) : '';
+  ul.innerHTML='';
+  openAct.forEach((a,i)=>{
+    const li=document.createElement('li');
+    li.style.cssText='display:block; padding:.45rem 0; border-bottom:1px dashed var(--line, #eee)';
+    const due=a.due?`<span class="pill" style="margin-left:.3rem">${esc(fmtWhen(a.due))}</span>`:'';
+    li.innerHTML=
+      `<div style="display:flex; gap:.5rem; align-items:flex-start">`+
+      `<input type="checkbox" data-adone="${i}" title="handled, file it in the archive" style="margin-top:.25rem; flex:none; cursor:pointer">`+
+      `<div style="flex:1">`+
+      `<strong>${CAT_ICON[a.cat]||CAT_ICON.other} ${esc(a.subject||'(no subject)')}</strong>${due}<br>`+
+      `<span class="note">${esc(a.gist||'')}</span>`+
+      (a.todo?`<br><span class="note" style="color:var(--lav-deep)">→ ${esc(a.todo)}</span>`:'')+
+      (a.from?`<br><span class="note" style="font-size:.68rem">from ${esc(a.from)}</span>`:'')+
+      `<div style="display:flex; gap:.4rem; margin-top:.3rem">`+
+      `<button data-aadd="${i}" style="flex:1; padding:.25rem; border:1px dashed var(--lav-deep); border-radius:8px; background:none; cursor:pointer; color:var(--lav-deep); font-size:.72rem">➕ add to my to-dos</button>`+
+      (a.threadId?`<a href="${gmailLink(a.threadId)}" target="_blank" style="flex:1; text-align:center; padding:.25rem; border:1px dashed var(--lav-deep); border-radius:8px; color:var(--lav-deep); font-size:.72rem; text-decoration:none">✉️ Open in Gmail</a>`:'')+
+      (a.link?`<a href="${esc(a.link)}" target="_blank" style="flex:1; text-align:center; padding:.25rem; border:1px dashed var(--lav-deep); border-radius:8px; color:var(--lav-deep); font-size:.72rem; text-decoration:none">🔗 Apply / open</a>`:'')+
+      `</div></div></div>`;
+    ul.appendChild(li);
+  });
+  ul.querySelectorAll('[data-adone]').forEach(box=>{
+    box.onclick=e=>{ e.stopPropagation(); markDone(openAct[Number(box.dataset.adone)], 'handled'); };
+  });
+  ul.querySelectorAll('[data-aadd]').forEach(btn=>{
+    btn.onclick=e=>{ e.stopPropagation(); actionToTodo(openAct[Number(btn.dataset.aadd)], btn); };
+  });
+}
+/* 📂 THE ARCHIVE: every email Lupita has dealt with, newest first, replies and
+   worth-a-looks together. Each row keeps its Gmail link, so this is a real way
+   back into past mail, not just a tally. Nothing here was ever deleted or
+   archived inside Gmail: this is her own record of what she has already faced. */
 function renderMailLog(){
   const wrap=document.getElementById('mailLogWrap'), ul=document.getElementById('mailLogList');
   if(!wrap||!ul) return;
   const rows=Object.entries(mailDone).sort((a,b)=>(b[1].at||'').localeCompare(a[1].at||''));
   wrap.style.display = rows.length ? 'block' : 'none';
   document.getElementById('mailLogCount').textContent = rows.length ? String(rows.length) : '';
+  document.getElementById('mailLogNote').style.display = ul.style.display==='none' ? 'none' : 'block';
   ul.innerHTML='';
   rows.forEach(([key,r])=>{
+    const tag = r.how==='handled' ? 'handled' : 'replied';
+    const icon = r.how==='handled' ? (CAT_ICON[r.cat]||'✅') : '✅';
     const li=document.createElement('li');
-    li.style.cssText='display:flex; gap:.5rem; align-items:baseline; padding:.3rem 0; border-bottom:1px dashed var(--line, #eee)';
+    li.style.cssText='display:flex; gap:.4rem; align-items:baseline; padding:.3rem 0; border-bottom:1px dashed var(--line, #eee)';
     li.innerHTML=
-      `<div style="flex:1; font-size:.78rem">✅ <strong>${esc(r.from||'(no name)')}</strong>`+
+      `<div style="flex:1; font-size:.78rem">${icon} <strong>${esc(r.from||'(no sender)')}</strong>`+
       `<span style="color:var(--soft)"> · ${esc(r.subject||'')}</span><br>`+
-      `<span class="note" style="font-size:.7rem">replied ${r.at?esc(fmtWhen(r.at)):''}</span></div>`+
-      `<button data-mundo="${esc(key)}" title="put it back on the reply list" `+
-      `style="flex:none; border:none; background:none; cursor:pointer; color:var(--lav-deep); font-size:.72rem; text-decoration:underline">↩ undo</button>`;
+      `<span class="note" style="font-size:.7rem">${tag} ${r.at?esc(fmtWhen(r.at)):''}</span></div>`+
+      (r.threadId?`<a href="${gmailLink(r.threadId)}" target="_blank" title="open the original email" `+
+        `style="flex:none; color:var(--lav-deep); font-size:.72rem; text-decoration:none">✉️</a>`:'')+
+      `<button data-mundo="${esc(key)}" title="put it back on the list" `+
+      `style="flex:none; border:none; background:none; cursor:pointer; color:var(--lav-deep); font-size:.72rem; text-decoration:underline">↩</button>`;
     ul.appendChild(li);
   });
   ul.querySelectorAll('[data-mundo]').forEach(b=>{ b.onclick=()=>unmarkReplied(b.dataset.mundo); });
 }
 function setMailLogOpen(open){
   document.getElementById('mailLogList').style.display = open ? 'block' : 'none';
+  document.getElementById('mailLogNote').style.display = open ? 'block' : 'none';
   document.getElementById('mailLogCaret').textContent = open ? '▾' : '▸';
   localStorage.setItem(LS_MAILLOGOPEN, open ? '1' : '0');
 }
@@ -2685,10 +2769,14 @@ setMailLogOpen(localStorage.getItem(LS_MAILLOGOPEN)==='1');
 
 function updateMailStatus(){
   const open=MAIL_DATA.filter(m=>!mailRepliedTo(m)).length;
+  const act=MAIL_ACTIONS.filter(m=>!mailRepliedTo(m)).length;
   const when=MAIL_UPDATED?fmtWhen(MAIL_UPDATED.slice(0,10)):'recently';
-  if(open) setMailStatus('Scanned '+when+': '+open+' waiting on a reply. Tap one to see the draft, check it off once you\'ve sent it. 💛');
+  const bits=[];
+  if(open) bits.push(open+' waiting on a reply');
+  if(act) bits.push(act+' worth a look');
+  if(bits.length) setMailStatus('Scanned '+when+': '+bits.join(' · ')+'. Check things off as you go. 💛');
   else if(MAIL_UPDATED) setMailStatus(Object.keys(mailDone).length
-    ? 'All caught up as of the last scan, and everything you replied to is logged below. 🎉'
+    ? 'All caught up as of the last scan, and everything you handled is in the archive below. 🎉'
     : 'Inbox is all caught up as of the last scan! 🎉');
   else setMailStatus('');
 }
@@ -2696,7 +2784,7 @@ async function fetchMail(){
   if(!getToken()) return;
   const d=await fetchPrivate('mail.json');
   if(!d) return;
-  MAIL_DATA=d.items||[]; MAIL_UPDATED=d.updated||'';
+  MAIL_DATA=d.items||[]; MAIL_ACTIONS=d.actions||[]; MAIL_UPDATED=d.updated||'';
   updateMailStatus();
   renderMail();
 }
@@ -2730,8 +2818,8 @@ async function watchForFreshMail(){
     if(now && now!==before){
       clearInterval(_mailWatch); _mailWatch=null;
       await fetchMail(); setMailOpen(true);
-      const fresh=MAIL_DATA.filter(m=>!mailRepliedTo(m)).length;
-      setMailStatus('Fresh drafts just landed! 💌 '+(fresh?fresh+' waiting for your once-over.':'Nothing needed a reply, you are all caught up!'));
+      const fresh=MAIL_DATA.filter(m=>!mailRepliedTo(m)).length + MAIL_ACTIONS.filter(m=>!mailRepliedTo(m)).length;
+      setMailStatus('Fresh from your inbox! 💌 '+(fresh?fresh+' thing'+(fresh>1?'s':'')+' for your once-over below.':'Nothing needed you, you are all caught up!'));
     }
   },60000);
 }
