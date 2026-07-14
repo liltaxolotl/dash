@@ -323,6 +323,10 @@
 
   /* ---------- 🍜 food page ---------- */
   #foodPanel,#budgetPanel{max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:18px}
+  /* friends page: intro on top, then queue+archive left / openers+Claude right (stacks on phone) */
+  #friendsPanel{max-width:1150px; margin:0 auto; flex-direction:column; gap:18px}
+  .fr-cols{display:grid; grid-template-columns:1.05fr 1fr; gap:18px; align-items:start}
+  @media(max-width:860px){.fr-cols{grid-template-columns:1fr}}
   .chips{display:flex; flex-wrap:wrap; gap:7px; margin:4px 0 2px}
   .chip{display:inline-flex; align-items:center; gap:6px; background:#faf6ff; border:1px solid var(--line); border-radius:99px; padding:5px 11px; font-size:.86rem}
   .chip button{border:none; background:none; cursor:pointer; color:#cbb8cf; font-size:.85rem; padding:0; line-height:1}
@@ -717,6 +721,8 @@
       <p class="cl-lead" style="margin-bottom:0">The 10-minutes-a-day page. Everyone you mean to write back to lives here, with a reason and a ready-made way to start. House rules: one reply counts, a meme counts, the apology is one line max. They miss you, they are not grading you. 💗</p>
     </div>
 
+    <div class="fr-cols">
+    <div class="col">
     <div class="card">
       <h2>🕰️ Waiting on a reply from me <span class="pill" id="friendCount"></span></h2>
       <div class="note" style="margin:0 0 8px">Check someone off once you've replied (yes there's confetti). The 🤖 on each person copies a prompt about that exact reply and opens Claude to draft it with you.</div>
@@ -745,12 +751,9 @@
         <ul class="list" id="frLogList"></ul>
       </div>
     </div>
-
-    <div class="card">
-      <h2>✍️ Openers <span class="pill">tap one to copy · tweak to taste</span></h2>
-      <div id="openerList"></div>
     </div>
 
+    <div class="col">
     <div class="card">
       <h2>🤖 Draft replies with Claude</h2>
       <p class="cl-lead">The button copies your whole queue plus a ready-made prompt and opens Claude. It drafts every reply in your voice; you just paste, tweak, send. (In a Claude Code chat you can also paste the actual messages and ask directly.) ✨</p>
@@ -758,6 +761,13 @@
         <button class="cl-btn" id="friendsAsk">🤖 Draft all my replies</button>
         <span class="cl-status" id="friendsStatus"></span>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>✍️ Openers <span class="pill">tap one to copy · tweak to taste</span></h2>
+      <div id="openerList"></div>
+    </div>
+    </div>
     </div>
   </section>
 
@@ -3209,19 +3219,18 @@ function makePdf(){
   html,body{ margin:0; padding:0; }
   body{ font-family:'Segoe UI',Helvetica,Arial,sans-serif; color:#2c2c2c;
     -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .page{ min-height:100vh; padding:52px 62px 60px;
+  .page{ min-height:100vh; padding:40px 62px 60px;
     background:
       radial-gradient(90% 55% at 100% 0%, #d9edff 0%, rgba(217,237,255,0) 55%),
       radial-gradient(85% 60% at 0% 100%, #ffdbe7 0%, rgba(255,219,231,0) 55%),
       linear-gradient(135deg, #eef7f0 0%, #f6ecff 42%, #fff0f5 100%); }
-  .hdr{ border:2px solid #f0a35a; border-radius:0; text-align:center; padding:20px 20px 16px;
-    background:rgba(255,255,255,.28); }
+  .hdr{ text-align:center; padding:0; }
   .nm{ font-family:'Poppins','Arial Black','Segoe UI',sans-serif; font-weight:800; font-size:44px; letter-spacing:.5px; color:#1b1b1b; line-height:1.02; }
-  .role{ font-size:15px; letter-spacing:3px; color:#3a3a3a; margin-top:7px; }
-  .contact{ margin-top:14px; border:1px solid #f0a35a; border-radius:0; padding:10px 12px;
-    display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:6px; font-size:12.5px; background:rgba(255,255,255,.22); }
+  .role{ font-size:15px; letter-spacing:3px; color:#3a3a3a; margin-top:5px; }
+  .contact{ margin-top:8px; padding:0;
+    display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:6px; font-size:12.5px; }
   .contact .sep{ color:#d09a5e; margin:0 4px; }
-  .date{ text-align:right; color:#555; font-size:13px; margin:24px 0 26px; }
+  .date{ text-align:right; color:#555; font-size:13px; margin:12px 0 12px; }
   .letter p{ font-size:15px; line-height:1.6; margin:0 0 15px; }
   .letter p.greet{ font-weight:700; }
   .letter strong{ font-weight:700; }
