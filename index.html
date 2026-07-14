@@ -454,13 +454,16 @@
             style="width:100%; margin:.4rem 0; padding:.45rem; border:1px dashed var(--lav-deep); border-radius:8px; background:none; cursor:pointer; color:var(--lav-deep); font-size:.85rem">💌 Scan my inbox now</button>
           <div class="note" style="font-size:.7rem">Drafts land here and in Gmail. Nothing sends until you hit send. Check things off as you handle them.</div>
 
-          <div id="mailLogWrap" style="display:none; margin-top:.55rem; border-top:1px dashed var(--line, #eee); padding-top:.4rem">
+          <div id="mailLogWrap" style="margin-top:.55rem; border-top:1px dashed var(--line, #eee); padding-top:.4rem">
             <div id="mailLogToggle" style="cursor:pointer; user-select:none; color:var(--lav-deep); font-size:.8rem">
               <span id="mailLogCaret" style="display:inline-block; width:.9em; font-size:.8em; color:var(--soft)">▸</span>
               📂 Archive <span class="pill" id="mailLogCount"></span>
             </div>
-            <div class="note" id="mailLogNote" style="display:none; font-size:.7rem; margin:.2rem 0">Everything you've handled, newest first. ✉️ opens the original email in Gmail, ↩ puts it back.</div>
-            <ul class="list" id="mailLogList" style="display:none"></ul>
+            <div id="mailLogPanel" style="display:none">
+              <div class="note" id="mailLogNote" style="font-size:.7rem; margin:.2rem 0">Every email you've dealt with, newest first. ✉️ reopens the original in Gmail, ↩ puts it back on the list.</div>
+              <div id="mailLogFilters" style="display:flex; gap:.3rem; flex-wrap:wrap; margin:.3rem 0"></div>
+              <ul class="list" id="mailLogList"></ul>
+            </div>
           </div>
         </div>
       </div>
@@ -730,6 +733,17 @@
         </select>
       </div>
       <div class="add-row" style="margin-top:8px"><input id="frNote" type="text" placeholder="why / what you owe them (optional)..." maxlength="200"><button id="frAdd">Add</button></div>
+    </div>
+
+    <div class="card">
+      <h2 id="frLogToggle" style="cursor:pointer; user-select:none">
+        <span id="frLogCaret" style="display:inline-block; width:.9em; font-size:.8em; color:var(--soft)">▸</span>
+        📖 Replied &amp; archived <span class="pill" id="frLogCount"></span>
+      </h2>
+      <div id="frLogBody" style="display:none">
+        <div class="note" style="margin:0 0 8px">Proof you did the thing. Everyone you've written back to, newest first, with the day you did it. ↩ puts someone back in the queue if they've written again.</div>
+        <ul class="list" id="frLogList"></ul>
+      </div>
     </div>
 
     <div class="card">
@@ -1343,8 +1357,9 @@ async function loadState(){
       if(s.edits){ edits=s.edits; localStorage.setItem(LS_EDITS, JSON.stringify(edits)); }
       if(s.slotted){ slotted=s.slotted; localStorage.setItem(LS_SLOT, JSON.stringify(slotted)); }
       if(s.food){ food=s.food; food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[]; localStorage.setItem(LS_FOOD, JSON.stringify(food)); }
-      if(s.friends){ friends=s.friends; friends.people=friends.people||[]; localStorage.setItem(LS_FRIENDS, JSON.stringify(friends)); }
+      if(s.friends){ friends=s.friends; friends.people=friends.people||[]; friends.log=friends.log||[]; localStorage.setItem(LS_FRIENDS, JSON.stringify(friends)); }
       if(s.mailDone){ mailDone=s.mailDone; localStorage.setItem(LS_MAILDONE, JSON.stringify(mailDone)); }
+      if(s.mailStore){ mailStore=s.mailStore; localStorage.setItem(LS_MAILSTORE, JSON.stringify(mailStore)); loadMailFromStore(); }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
       localStorage.setItem(LS_CUSTOM, JSON.stringify(custom));
       localStorage.setItem(LS_SAVEDAT, String(s.savedAt||0));
@@ -1365,7 +1380,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, food, friends, mailDone, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, food, friends, mailDone, mailStore, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -2361,6 +2376,10 @@ document.getElementById('foodImportBtn').onclick=()=>{
 const LS_FRIENDS='lupita-friends-v1';
 let friends=JSON.parse(localStorage.getItem(LS_FRIENDS)||'{}');
 friends.people=friends.people||[];
+/* friends.log: everyone she has actually written back to, newest first. Checking a
+   person off moves them here instead of deleting them, so the page keeps a record of
+   who she replied to and on what day. ✕ still removes without logging (also allowed). */
+friends.log=friends.log||[];
 const saveFriends=()=>{ localStorage.setItem(LS_FRIENDS, JSON.stringify(friends)); pushStateSoon(); };
 const VIBES={sorry:'🙏 owe an apology + reply', hang:'🗓️ make a hangout plan', answer:'💬 owe them an answer', checkin:'🌷 check in', catchup:'💛 catch up + talk as friends', congrats:'🎉 congratulate them'};
 // copy-paste starters: short, warm, one-line apologies ON PURPOSE
@@ -2392,8 +2411,10 @@ function renderFriends(){
   if(!friends.people.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Queue is empty. Either you are all caught up (!!) or add whoever has been sitting in the back of your head. 💌'; ul.appendChild(e); }
   friends.people.forEach((p,i)=>{
     const li=document.createElement('li'); li.className='item';
-    const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox'; cb.title='replied! clears them from the queue';
-    cb.onchange=()=>{ if(cb.checked){ friends.people.splice(i,1); saveFriends(); confetti(12); renderFriends(); } };
+    const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox'; cb.title='replied! files them in the archive below';
+    cb.onchange=()=>{ if(cb.checked){
+      friends.log.unshift(Object.assign({}, p, {at:iso(today)}));   // keep the record, don't just delete them
+      friends.people.splice(i,1); saveFriends(); confetti(12); renderFriends(); } };
     const body=document.createElement('div'); body.className='body';
     const tx=document.createElement('div'); tx.className='txt'; tx.textContent=p.name; body.appendChild(tx);
     const mt=document.createElement('div'); mt.className='meta'; mt.textContent=(VIBES[p.vibe]||'reply')+(p.note?(' · '+p.note):''); body.appendChild(mt);
@@ -2415,7 +2436,52 @@ function renderFriends(){
       setStatus('friendsStatus', ok?('Copied the "'+o.name+'" opener! Tweak it and send. 💌'):'Could not copy, select the text manually.', ok?'ok':'err'); };
     ol.appendChild(row);
   });
+  renderFriendLog();
 }
+/* 📖 the record: who she replied to and when. Newest first, grouped by day so a good
+   week actually looks like a good week. */
+function renderFriendLog(){
+  const ul=document.getElementById('frLogList'); if(!ul) return;
+  ul.innerHTML='';
+  document.getElementById('frLogCount').textContent = friends.log.length ? String(friends.log.length) : '';
+  if(!friends.log.length){
+    const e=document.createElement('div'); e.className='empty';
+    e.textContent='Nothing archived yet. Check someone off up there and they land here, with the date. 💌';
+    ul.appendChild(e); return;
+  }
+  let lastDay='';
+  friends.log.forEach((p,i)=>{
+    if(p.at!==lastDay){
+      lastDay=p.at;
+      const h=document.createElement('div'); h.className='note';
+      h.style.cssText='margin:.5rem 0 .15rem; font-weight:600; color:var(--lav-deep)';
+      h.textContent=fmtWhen(p.at);
+      ul.appendChild(h);
+    }
+    const li=document.createElement('li'); li.className='item';
+    const body=document.createElement('div'); body.className='body';
+    const tx=document.createElement('div'); tx.className='txt'; tx.textContent='✅ '+p.name; body.appendChild(tx);
+    const mt=document.createElement('div'); mt.className='meta';
+    mt.textContent=(VIBES[p.vibe]||'replied')+(p.note?(' · '+p.note):''); body.appendChild(mt);
+    const back=document.createElement('button'); back.className='del'; back.textContent='↩'; back.title='they wrote again, put them back in the queue';
+    back.onclick=()=>{ const [row]=friends.log.splice(i,1);
+      friends.people.push({id:'fr-'+Date.now(), name:row.name, vibe:row.vibe, note:row.note||'', added:iso(today)});
+      saveFriends(); renderFriends(); };
+    const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove from the archive for good';
+    del.onclick=()=>{ friends.log.splice(i,1); saveFriends(); renderFriendLog(); };
+    li.appendChild(body); li.appendChild(back); li.appendChild(del); ul.appendChild(li);
+  });
+}
+const LS_FRLOGOPEN='lupita-dash-frlogopen-v1';
+function setFrLogOpen(open){
+  document.getElementById('frLogBody').style.display = open ? 'block' : 'none';
+  document.getElementById('frLogCaret').textContent = open ? '▾' : '▸';
+  localStorage.setItem(LS_FRLOGOPEN, open ? '1' : '0');
+}
+document.getElementById('frLogToggle').addEventListener('click',()=>{
+  setFrLogOpen(document.getElementById('frLogBody').style.display==='none');
+});
+setFrLogOpen(localStorage.getItem(LS_FRLOGOPEN)==='1');
 function addFriend(){
   const name=document.getElementById('frName').value.trim(); if(!name) return;
   friends.people.push({id:'fr-'+Date.now(), name, vibe:document.getElementById('frVibe').value, note:document.getElementById('frNote').value.trim(), added:iso(new Date())});
@@ -2595,9 +2661,37 @@ document.getElementById('leadHunt').onclick=(e)=>{ e.stopPropagation(); requestH
    week of Gmail, drafts replies (saved as real Gmail drafts, never sent), and
    pushes mail.json here. This card renders mail.json. */
 const LS_MAILOPEN='lupita-dash-mailopen-v1';
-let MAIL_DATA=[];      // mail.json items:   threads that want a reply, each with a draft
-let MAIL_ACTIONS=[];   // mail.json actions: bills, deadlines, job openings. No reply, just a decision
+let MAIL_DATA=[];      // threads that want a reply, each with a draft
+let MAIL_ACTIONS=[];   // bills, deadlines, job openings. No reply, just a decision
 let MAIL_UPDATED='';
+
+/* ---- the store: why nothing disappears any more ----
+   mail.json is rebuilt from scratch on every scan, so an email that ages out of the
+   7-day window (or falls past the scan's cap) used to silently vanish from this card
+   even if Lupita never replied. That is how the UGC and Voyage LA emails went missing.
+   So the dashboard no longer renders mail.json directly: it MERGES each scan into a
+   store that persists in state.json. An email leaves this card exactly one way, when
+   she says so (✅ replied, ✅ handled, or 🗑️ not important). Scans can only ever add.  */
+const LS_MAILSTORE='lupita-mail-store-v1';
+let mailStore=JSON.parse(localStorage.getItem(LS_MAILSTORE)||'{}');  // key -> {kind:'reply'|'action', ...item}
+const saveMailStore=()=>{ localStorage.setItem(LS_MAILSTORE, JSON.stringify(mailStore)); pushStateSoon(); };
+function mergeMail(items, actions){
+  const add=(arr,kind)=>(arr||[]).forEach(m=>{
+    const k=mailKey(m), prev=mailStore[k]||{};
+    // newest scan wins on content, but keep the day we first saw it
+    mailStore[k]=Object.assign({}, prev, m, {kind, seen:prev.seen||m.date||iso(today)});
+  });
+  add(items,'reply'); add(actions,'action');
+  saveMailStore();
+  loadMailFromStore();
+}
+function loadMailFromStore(){
+  const all=Object.values(mailStore);
+  const byDate=(a,b)=>String(b.date||b.seen||'').localeCompare(String(a.date||a.seen||''));
+  MAIL_DATA=all.filter(m=>m.kind==='reply').sort(byDate);
+  MAIL_ACTIONS=all.filter(m=>m.kind==='action').sort(byDate);
+}
+loadMailFromStore();
 
 /* ---- the replied record ----
    Checking an email off writes it to mailDone (keyed by Gmail thread id) and it
@@ -2628,9 +2722,11 @@ document.getElementById('mailToggle').addEventListener('click',e=>{
 setMailOpen(localStorage.getItem(LS_MAILOPEN)==='1');
 function setMailStatus(msg){ const el=document.getElementById('mailStatus'); if(el) el.textContent=msg||''; }
 /* ---- checking something off ----
-   Both a drafted reply and a "worth a look" item land in the same archive, tagged
-   with how it left the list: 'replied' (she wrote back) or 'handled' (she read it,
-   paid it, applied, or decided it was nothing). */
+   Everything lands in the same archive, tagged with how it left the list:
+     replied  ✅ she wrote back            (the drafted replies)
+     handled  ✅ she paid/applied/read it  (the worth-a-looks)
+     skipped  🗑️ not important, no reply   (the delete button)
+   Nothing is ever deleted from Gmail: this is her own record, and ↩ undoes any of it. */
 function markDone(m, how){
   mailDone[mailKey(m)]={from:m.from||'', subject:m.subject||'', at:iso(today), gist:m.gist||'',
                         threadId:m.threadId||'', how:how||'replied', cat:m.cat||''};
@@ -2666,7 +2762,8 @@ function renderMail(){
       `<input type="checkbox" data-mdone="${i}" title="I replied to this one" style="margin-top:.25rem; flex:none; cursor:pointer">`+
       `<div style="cursor:pointer; flex:1" data-mi="${i}">`+
       `<strong>${esc(m.from)}</strong> <span style="color:var(--soft)">· ${esc(m.subject)}</span><br>`+
-      `<span class="note">${esc(m.gist)}</span></div></div>`+
+      `<span class="note">${esc(m.gist)}</span></div>`+
+      `<button data-mskip="${i}" title="not important, I'm not replying to this" style="flex:none; border:none; background:none; cursor:pointer; color:var(--soft); font-size:.8rem">🗑️</button></div>`+
       `<div class="mail-draft" style="display:none; margin-top:.35rem">`+
       `<textarea data-md="${i}" style="width:100%; min-height:7rem; font:inherit; font-size:.8rem; padding:.4rem; border:1px solid var(--lav-deep); border-radius:8px; background:none; color:inherit">${esc(m.draft)}</textarea>`+
       `<div style="display:flex; gap:.4rem; margin-top:.25rem">`+
@@ -2680,6 +2777,9 @@ function renderMail(){
   });
   ul.querySelectorAll('[data-mdone]').forEach(box=>{
     box.onclick=e=>{ e.stopPropagation(); markDone(open[Number(box.dataset.mdone)], 'replied'); };
+  });
+  ul.querySelectorAll('[data-mskip]').forEach(btn=>{
+    btn.onclick=e=>{ e.stopPropagation(); markDone(open[Number(btn.dataset.mskip)], 'skipped'); };
   });
   ul.querySelectorAll('[data-mc]').forEach(btn=>{
     btn.onclick=async()=>{
@@ -2717,11 +2817,15 @@ function renderMailActions(openAct){
       `<button data-aadd="${i}" style="flex:1; padding:.25rem; border:1px dashed var(--lav-deep); border-radius:8px; background:none; cursor:pointer; color:var(--lav-deep); font-size:.72rem">➕ add to my to-dos</button>`+
       (a.threadId?`<a href="${gmailLink(a.threadId)}" target="_blank" style="flex:1; text-align:center; padding:.25rem; border:1px dashed var(--lav-deep); border-radius:8px; color:var(--lav-deep); font-size:.72rem; text-decoration:none">✉️ Open in Gmail</a>`:'')+
       (a.link?`<a href="${esc(a.link)}" target="_blank" style="flex:1; text-align:center; padding:.25rem; border:1px dashed var(--lav-deep); border-radius:8px; color:var(--lav-deep); font-size:.72rem; text-decoration:none">🔗 Apply / open</a>`:'')+
-      `</div></div></div>`;
+      `</div></div>`+
+      `<button data-askip="${i}" title="not important, get it off my list" style="flex:none; border:none; background:none; cursor:pointer; color:var(--soft); font-size:.8rem">🗑️</button></div>`;
     ul.appendChild(li);
   });
   ul.querySelectorAll('[data-adone]').forEach(box=>{
     box.onclick=e=>{ e.stopPropagation(); markDone(openAct[Number(box.dataset.adone)], 'handled'); };
+  });
+  ul.querySelectorAll('[data-askip]').forEach(btn=>{
+    btn.onclick=e=>{ e.stopPropagation(); markDone(openAct[Number(btn.dataset.askip)], 'skipped'); };
   });
   ul.querySelectorAll('[data-aadd]').forEach(btn=>{
     btn.onclick=e=>{ e.stopPropagation(); actionToTodo(openAct[Number(btn.dataset.aadd)], btn); };
@@ -2731,24 +2835,48 @@ function renderMailActions(openAct){
    worth-a-looks together. Each row keeps its Gmail link, so this is a real way
    back into past mail, not just a tally. Nothing here was ever deleted or
    archived inside Gmail: this is her own record of what she has already faced. */
+const LOG_TAG={replied:{ic:'✅', label:'replied'}, handled:{ic:'✅', label:'handled'}, skipped:{ic:'🗑️', label:'not important'}};
+const LOG_FILTERS=[['all','Everything'],['replied','✅ Replied'],['handled','⚡ Handled'],['skipped','🗑️ Deleted']];
+let mailLogFilter='all';
 function renderMailLog(){
-  const wrap=document.getElementById('mailLogWrap'), ul=document.getElementById('mailLogList');
-  if(!wrap||!ul) return;
-  const rows=Object.entries(mailDone).sort((a,b)=>(b[1].at||'').localeCompare(a[1].at||''));
-  wrap.style.display = rows.length ? 'block' : 'none';
-  document.getElementById('mailLogCount').textContent = rows.length ? String(rows.length) : '';
-  document.getElementById('mailLogNote').style.display = ul.style.display==='none' ? 'none' : 'block';
+  const ul=document.getElementById('mailLogList'); if(!ul) return;
+  const all=Object.entries(mailDone).sort((a,b)=>(b[1].at||'').localeCompare(a[1].at||''));
+  document.getElementById('mailLogCount').textContent = all.length ? String(all.length) : '';
+
+  // filter chips: only offer a bucket that actually has something in it
+  const fw=document.getElementById('mailLogFilters'); fw.innerHTML='';
+  LOG_FILTERS.forEach(([k,label])=>{
+    const n = k==='all' ? all.length : all.filter(([,r])=>(r.how||'replied')===k).length;
+    if(k!=='all' && !n) return;
+    const b=document.createElement('button');
+    const on = mailLogFilter===k;
+    b.textContent = label+(n?' '+n:'');
+    b.style.cssText='padding:.15rem .45rem; border-radius:999px; cursor:pointer; font-size:.68rem; '+
+      'border:1px solid var(--lav-deep); background:'+(on?'var(--lav-deep)':'none')+'; color:'+(on?'#fff':'var(--lav-deep)');
+    b.onclick=()=>{ mailLogFilter=k; renderMailLog(); };
+    fw.appendChild(b);
+  });
+
+  const rows = mailLogFilter==='all' ? all : all.filter(([,r])=>(r.how||'replied')===mailLogFilter);
   ul.innerHTML='';
+  if(!rows.length){
+    const e=document.createElement('div'); e.className='empty'; e.style.fontSize='.75rem';
+    e.textContent = all.length
+      ? 'Nothing in this bucket yet.'
+      : 'Nothing archived yet. Every email you reply to, handle, or delete gets filed here with the date, and stays reopenable in Gmail. 📬';
+    ul.appendChild(e); return;
+  }
   rows.forEach(([key,r])=>{
-    const tag = r.how==='handled' ? 'handled' : 'replied';
-    const icon = r.how==='handled' ? (CAT_ICON[r.cat]||'✅') : '✅';
+    const how=r.how||'replied', tag=LOG_TAG[how]||LOG_TAG.replied;
+    const icon = how==='handled' ? (CAT_ICON[r.cat]||'✅') : tag.ic;
     const li=document.createElement('li');
-    li.style.cssText='display:flex; gap:.4rem; align-items:baseline; padding:.3rem 0; border-bottom:1px dashed var(--line, #eee)';
+    li.style.cssText='display:flex; gap:.4rem; align-items:baseline; padding:.3rem 0; border-bottom:1px dashed var(--line, #eee)'+
+      (how==='skipped'?'; opacity:.65':'');
     li.innerHTML=
       `<div style="flex:1; font-size:.78rem">${icon} <strong>${esc(r.from||'(no sender)')}</strong>`+
       `<span style="color:var(--soft)"> · ${esc(r.subject||'')}</span><br>`+
-      `<span class="note" style="font-size:.7rem">${tag} ${r.at?esc(fmtWhen(r.at)):''}</span></div>`+
-      (r.threadId?`<a href="${gmailLink(r.threadId)}" target="_blank" title="open the original email" `+
+      `<span class="note" style="font-size:.7rem">${tag.label} ${r.at?esc(fmtWhen(r.at)):''}</span></div>`+
+      (r.threadId?`<a href="${gmailLink(r.threadId)}" target="_blank" title="open the original email in Gmail" `+
         `style="flex:none; color:var(--lav-deep); font-size:.72rem; text-decoration:none">✉️</a>`:'')+
       `<button data-mundo="${esc(key)}" title="put it back on the list" `+
       `style="flex:none; border:none; background:none; cursor:pointer; color:var(--lav-deep); font-size:.72rem; text-decoration:underline">↩</button>`;
@@ -2757,13 +2885,12 @@ function renderMailLog(){
   ul.querySelectorAll('[data-mundo]').forEach(b=>{ b.onclick=()=>unmarkReplied(b.dataset.mundo); });
 }
 function setMailLogOpen(open){
-  document.getElementById('mailLogList').style.display = open ? 'block' : 'none';
-  document.getElementById('mailLogNote').style.display = open ? 'block' : 'none';
+  document.getElementById('mailLogPanel').style.display = open ? 'block' : 'none';
   document.getElementById('mailLogCaret').textContent = open ? '▾' : '▸';
   localStorage.setItem(LS_MAILLOGOPEN, open ? '1' : '0');
 }
 document.getElementById('mailLogToggle').addEventListener('click',()=>{
-  setMailLogOpen(document.getElementById('mailLogList').style.display==='none');
+  setMailLogOpen(document.getElementById('mailLogPanel').style.display==='none');
 });
 setMailLogOpen(localStorage.getItem(LS_MAILLOGOPEN)==='1');
 
@@ -2784,7 +2911,8 @@ async function fetchMail(){
   if(!getToken()) return;
   const d=await fetchPrivate('mail.json');
   if(!d) return;
-  MAIL_DATA=d.items||[]; MAIL_ACTIONS=d.actions||[]; MAIL_UPDATED=d.updated||'';
+  MAIL_UPDATED=d.updated||'';
+  mergeMail(d.items, d.actions);   // merge, never replace: a scan can only add to the list
   updateMailStatus();
   renderMail();
 }
