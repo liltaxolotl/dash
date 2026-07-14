@@ -91,6 +91,7 @@
   .tag.appt{background:#ece4ff; color:var(--lav-deep)}
   .tag.today{background:var(--urgent); color:#fff}
   .tag.over{background:#ff4d6d; color:#fff}
+  .tag.soon{background:var(--line); color:var(--soft)}
   .tag.fulltime{background:#ece4ff; color:var(--lav-deep)}
   .tag.freelance{background:#ffe3ef; color:var(--pink-deep)}
   .tag.opencall{background:#e8f8f1; color:var(--ok)}
@@ -122,6 +123,14 @@
   .rolehdr.fitstretch{color:#c79016}
   .tag.generic{background:#eef0f4; color:#6b7280}
   .tag.flag{background:#ffe1e6; color:#d23b5b}
+  .tag.remotework{background:#e0f2fe; color:#0369a1}
+  .tag.remote{background:#dcfce7; color:#15803d}
+  /* remote-only filter chip */
+  .chiprow{display:flex; gap:6px; align-items:center; margin:2px 0 8px}
+  .chip{border:1px solid var(--line); background:#fff; color:var(--soft); cursor:pointer;
+    border-radius:99px; padding:4px 11px; font-size:.75rem; font-weight:700}
+  .chip:hover{border-color:var(--lav)}
+  .chip.on{background:#dcfce7; border-color:#86e0ac; color:#15803d}
 
   .focus-row{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px dashed var(--line)}
   .focus-row:last-child{border-bottom:none}
@@ -162,6 +171,12 @@
   .rs-lbl{font-size:.76rem; color:var(--soft); font-weight:700}
   .rs-was{font-size:.74rem; color:var(--soft); font-style:italic; width:100%}
   .tag.moved{background:#f3ebff; color:var(--lav-deep)}
+  .tag.pushed{background:#ece4ff; color:var(--lav-deep)}
+  /* ✏️ double-click to reword */
+  .txt{cursor:text}
+  .txt-edit{width:100%; box-sizing:border-box; font-family:inherit; font-size:.94rem; line-height:1.35;
+    color:var(--ink); background:#fff; border:1px solid var(--lav); border-radius:9px; padding:4px 8px}
+  .txt-edit:focus{outline:none; box-shadow:0 0 0 3px #f3ebff}
   footer{text-align:center; color:var(--soft); font-size:.8rem; margin-top:26px}
   .reset{background:none; border:1px solid var(--line); color:var(--soft); border-radius:99px; padding:6px 14px; cursor:pointer; font-size:.8rem}
   .reset:hover{border-color:var(--pink)}
@@ -267,6 +282,7 @@
   /* grab a to-do and drop it into a time block (⇅ does the same by tap) */
   .ag-row{cursor:grab}
   .ag-row:active{cursor:grabbing}
+  .ag-row.ag-fixed, .ag-row.ag-fixed:active{cursor:default}   /* bills + appts: block yes, drag no */
   .ag-row.dragging{opacity:.45}
   .drop-on{outline:2px dashed var(--pink-deep); outline-offset:2px; background:#fff2f8}
   .ag-move{margin:0 0 8px 26px; padding:8px; border:1px dashed var(--pink-deep); border-radius:10px; background:#fff7fb;
@@ -276,6 +292,10 @@
   .ag-move button:hover{border-color:var(--pink-deep); background:#ffeaf3}
   .ag-move button.on{border-color:var(--pink-deep); background:#ffdcea}
   .ag-move .rs-lbl{width:100%}
+  .ag-move .ag-date{border:1px solid var(--line); border-radius:99px; padding:4px 9px; font-size:.76rem;
+    font-family:inherit; font-weight:700; color:var(--ink); background:#fff; cursor:pointer}
+  .ag-move .ag-date:hover{border-color:var(--pink-deep); background:#ffeaf3}
+  .ag-move .ag-date:focus{outline:none; border-color:var(--pink-deep)}
   .day-theme{font-size:.68rem; font-weight:800; padding:2px 9px; border-radius:99px; background:#ece4ff; color:var(--lav-deep)}
   details.plan-day details.plan-day{margin:8px 0; box-shadow:none; background:#fdfafe}
   details.plan-day.day-done>summary{opacity:.55}
@@ -352,6 +372,7 @@
     <div class="col">
       <div class="card">
         <h2>📌 To-Dos & Deadlines <span class="pill" id="taskCount"></span></h2>
+        <div class="note" style="margin:0 0 8px">📅 pushes something to a new day, and it still shows on today's list until it's done. Double-click the words to reword anything. ✏️</div>
         <ul class="list" id="taskList"></ul>
         <div class="add-row">
           <input id="newTask" type="text" placeholder='Add anything... try "doctor appt Monday 3pm"' maxlength="120">
@@ -368,11 +389,13 @@
 
       <div class="card">
         <h2>💸 Bills</h2>
+        <div class="note" style="margin:0 0 8px">Standing reminder: bills stay here every day, in every view, until you check them off. 📅 pushes one to a new due date and it still shows up today, so it can't slip away. 💛</div>
         <ul class="list" id="billList"></ul>
       </div>
 
       <div class="card">
         <h2>🩺 Appointments</h2>
+        <div class="note" style="margin:0 0 8px">Same deal: appointments show every day, so nothing sneaks up on you. Rescheduled? 📅 moves it to the new day (and it keeps showing today until it's done). Double-click any line to reword it.</div>
         <ul class="list" id="apptList"></ul>
       </div>
     </div>
@@ -388,6 +411,10 @@
         </h2>
         <div id="leadBody" style="display:none">
           <div class="note" id="leadStatus"></div>
+          <div class="chiprow">
+            <button id="leadRemoteOnly" class="chip" title="show only work-from-home leads">🏠 Remote only</button>
+            <span class="note" id="remoteNote" style="margin:0; font-size:.72rem"></span>
+          </div>
           <ul class="list" id="leadList"></ul>
           <button id="leadHunt" title="ask the lead hunter to search for brand-new leads"
             style="width:100%; margin:.4rem 0; padding:.45rem; border:1px dashed var(--lav-deep); border-radius:8px; background:none; cursor:pointer; color:var(--lav-deep); font-size:.85rem">🎯 Hunt new leads now</button>
@@ -603,7 +630,7 @@
         <div class="card">
           <h2>🗓️ The 8-Week Sprint <span class="pill">check off days AND tasks · 🤖 Claude helps · 🔎 research</span></h2>
           <p class="cl-lead" style="margin-bottom:6px">Jobs every weekday. Then each day has its own project: 💰 commissions Mon, 🎬 content Tue, 🌐 website Wed, 🎨 portfolio Thu, 🛍️🧑‍🏫 shop + tutoring Fri, 🎥 Ugly Dolls Sat. Every project grows week over week. The 🤖 button copies a ready-made prompt (and opens Claude) so you never start from a blank page.</p>
-          <p class="cl-lead" style="margin-bottom:6px">📌 Your real life shows up here on its own: any to-do, bill, or appointment you add on the 🌸 Today tab lands in a pink strip at the top of its day. <b>Drag it onto a time block</b> to decide when you're actually doing it, drag it between blocks to shuffle it, or drop it on another day's header to move it there. On your phone, tap <b>⇅</b> for the same thing. Tick it here or on the Today tab, it stays in step either way.</p>
+          <p class="cl-lead" style="margin-bottom:6px">📌 Your real life shows up here on its own: any to-do, bill, or appointment you add on the 🌸 Today tab lands in a pink strip at the top of its day. Tap <b>⇅</b> on anything in the strip to give it a time block, so bills and appointments get real time set aside during your work day too. To-dos can also change days: jump them with the day chips, or hit <b>📅</b> to open a calendar and send one to <i>any</i> day in the sprint, no dragging across weeks (dragging still works if you like it). 💸 Bills and 🩺 appointments keep their real date: you can block time for them, they just never slide to another day. Tick anything here or on the Today tab, it stays in step either way.</p>
           <div id="planWeeks"></div>
         </div>
 
@@ -766,8 +793,10 @@ const MILES = [];
 // path = real project folder on this PC; the name becomes a clickable link that opens it.
 const PROJECTS = [];
 // Job & client leads. The lead-hunter agent prepends new finds here.
-// type: 'fulltime' | 'freelance' | 'opencall'.  link = direct post/application URL.
+// type: 'fulltime' | 'freelance' | 'opencall' | 'client' | 'remotework'.  link = direct post/application URL.
 // date = posted date (YYYY-MM-DD), deadline optional (YYYY-MM-DD or '').
+// remote:true = work-from-home. The 🏠 Remote only chip filters to these (titles saying
+// "remote" count too). 'remotework' entries are evergreen platform signups, always remote.
 // Tick the checkbox once you've reviewed/applied; it remembers (shares the done store).
 const LEADS = [];
 
@@ -791,11 +820,14 @@ const LS_CUSTOM = 'lupita-dash-custom-v1';
 const LS_TOKEN = 'lupita-gh-token-v1';
 const LS_ARCH = 'lupita-archive-v1';
 const LS_MOVED = 'lupita-dash-moved-v1';
+const LS_EDITS = 'lupita-dash-edits-v1';
 const LS_SLOT = 'lupita-dash-slot-v1';
 let done = JSON.parse(localStorage.getItem(LS_DONE) || '{}');
 let custom = JSON.parse(localStorage.getItem(LS_CUSTOM) || '[]');
 let arch = JSON.parse(localStorage.getItem(LS_ARCH) || '{}');   // id -> {t:text, k:kind, at:'YYYY-MM-DD'}
 let moved = JSON.parse(localStorage.getItem(LS_MOVED) || '{}'); // id -> {d:'YYYY-MM-DD', t:'8:20 AM'} date overrides
+// id -> your own wording for an item (double-click any to-do, bill or appt to reword it)
+let edits = JSON.parse(localStorage.getItem(LS_EDITS) || '{}');
 // which clock block a to-do has been parked in on its Game Plan day card.
 // id -> block key ('flex', 'msgs', ...). No entry = it just sits in the day's
 // 📌 strip with no set time, which is a perfectly fine place to live.
@@ -805,6 +837,7 @@ const saveDone = () => { localStorage.setItem(LS_DONE, JSON.stringify(done)); pu
 const saveCustom = () => { localStorage.setItem(LS_CUSTOM, JSON.stringify(custom)); pushStateSoon(); };
 const saveArch = () => { localStorage.setItem(LS_ARCH, JSON.stringify(arch)); pushStateSoon(); };
 const saveMoved = () => { localStorage.setItem(LS_MOVED, JSON.stringify(moved)); pushStateSoon(); };
+const saveEdits = () => { localStorage.setItem(LS_EDITS, JSON.stringify(edits)); pushStateSoon(); };
 const saveSlotted = () => { localStorage.setItem(LS_SLOT, JSON.stringify(slotted)); pushStateSoon(); };
 const getToken = () => localStorage.getItem(LS_TOKEN) || '';
 
@@ -836,6 +869,17 @@ function fmtWhen(dateStr){
 }
 function status(dateStr){ const d=parse(dateStr); const diff=Math.round((d-today)/86400000);
   if(diff<0) return 'over'; if(diff===0) return 'today'; return ''; }
+const daysAway = dateStr => Math.round((parse(dateStr)-today)/86400000);
+
+/* ---------- WHAT MOVES AND WHAT DOESN'T ----------
+   Everything on the schedule (to-dos, bills, appointments) can be pushed to
+   another day: life happens, you wake up late, the day gets away from you. What
+   a push does NOT do is make something vanish. Bills and appts are ALWAYS_ON
+   (they sit on every list, every day, until they're checked off), and anything
+   that was due today or earlier and got pushed forward stays on today's list too,
+   labeled with its new day. So the new due date is real, and you still see it. */
+const MOVABLE = kind => kind==='task' || kind==='bill' || kind==='appt';
+const ALWAYS_ON = kind => kind==='bill' || kind==='appt';
 
 /* ---------- 📅 MOVING THINGS TO ANOTHER DAY ----------
    Nothing gets rewritten in the data files: a move is just an override kept in
@@ -863,6 +907,24 @@ function withMove(it){
     orig: {date: it.date, time: it.time},
   });
 }
+/* layer your own wording on top (keeps the original text as baseText, so retyping
+   the original wording, or clearing the box, quietly drops the override) */
+function withEdit(it){
+  const t=edits[it.id];
+  if(!t || t===it.text) return it;
+  return Object.assign({}, it, {text:t, baseText:it.text, edited:true});
+}
+const layerOn = it => withEdit(withMove(it));
+
+/* ---------- 🫧 PUSHED, NOT GONE ----------
+   Something that was due today (or was already overdue) and got pushed to a later
+   day keeps showing on today's list until it's actually done. The due date really
+   is the new day, it just refuses to disappear off today's screen in the meantime. */
+function pushedFwd(it){
+  if(!it.moved || !it.date || !it.orig || !it.orig.date) return false;
+  return parse(it.orig.date)<=today && parse(it.date)>today;
+}
+const onRadar = it => pushedFwd(it) && !done[it.id] && !arch[it.id];
 
 /* ---------- ONE SOURCE OF TRUTH FOR THE SCHEDULE ----------
    Every dated to-do, bill, and appointment: the private feed's copy when it's
@@ -873,10 +935,11 @@ function scheduleLists(){
   const D=REMOTE||{};
   const baseAppts=D.appts||APPTS;
   const withEvents=[...baseAppts, ...EVENTS.filter(e=>!baseAppts.some(a=>a.id===e.id))];
+  // day-moves and rewordings are layered on here, once, for all three lists
   return {
-    task:[...(D.tasks||TASKS), ...custom.filter(c=>!c.kind||c.kind==='task')].map(withMove),
-    bill:[...(D.bills||BILLS), ...custom.filter(c=>c.kind==='bill')].map(withMove),
-    appt:[...withEvents,        ...custom.filter(c=>c.kind==='appt')].map(withMove),
+    task:[...(D.tasks||TASKS), ...custom.filter(c=>!c.kind||c.kind==='task')].map(layerOn),
+    bill:[...(D.bills||BILLS), ...custom.filter(c=>c.kind==='bill')].map(layerOn),
+    appt:[...withEvents,        ...custom.filter(c=>c.kind==='appt')].map(layerOn),
   };
 }
 
@@ -906,26 +969,45 @@ function itemRow(it, kind, deletable){
   };
   const body=document.createElement('div'); body.className='body';
   const txt=document.createElement('div'); txt.className='txt'; txt.textContent=it.text;
+  // ✏️ double-click (or double-tap) the words to reword them
+  if(kind==='task'||kind==='bill'||kind==='appt'){
+    txt.title='double-click to reword this';
+    txt.ondblclick=()=>startRename(it, txt);
+  }
   const meta=document.createElement('div'); meta.className='meta';
   if(it.date){
     const w=document.createElement('span'); w.className='when'; w.textContent=fmtWhen(it.date)+(it.time?(' · '+it.time):'');
     meta.appendChild(w);
     if(st==='over'&&!isDone){ const t=document.createElement('span'); t.className='tag over'; t.textContent='overdue'; meta.appendChild(t); }
     else if(st==='today'){ const t=document.createElement('span'); t.className='tag today'; t.textContent='due today'; meta.appendChild(t); }
+    else if(ALWAYS_ON(kind) && !isDone){
+      // standing reminder: how long you actually have
+      const n=daysAway(it.date);
+      const t=document.createElement('span'); t.className='tag soon';
+      t.textContent='in '+n+' day'+(n===1?'':'s'); meta.appendChild(t);
+    }
   }
   if(it.tag){ const t=document.createElement('span'); t.className='tag '+it.tag; t.textContent=(it.tag==='work'?'creative':'life'); meta.appendChild(t); }
   if(kind==='bill'){ const t=document.createElement('span'); t.className='tag bill'; t.textContent='bill'; meta.appendChild(t); }
   if(kind==='appt'){ const t=document.createElement('span'); t.className='tag appt'; t.textContent='appt'; meta.appendChild(t); }
-  if(it.moved){ const t=document.createElement('span'); t.className='tag moved'; t.textContent='moved'; meta.appendChild(t); }
+  if(it.moved){
+    const push=pushedFwd(it);
+    const t=document.createElement('span'); t.className='tag '+(push?'pushed':'moved');
+    t.textContent = push ? ('pushed · still on today') : 'moved';
+    t.title = push ? ('Due '+fmtWhen(it.date)+' now, but it stays on today\'s list so it can\'t slip away.')
+                   : 'moved to a different day';
+    meta.appendChild(t);
+  }
   body.appendChild(txt); if(meta.childNodes.length) body.appendChild(meta);
   if(it.note){ const n=document.createElement('div'); n.className='note'; n.textContent=it.note; body.appendChild(n); }
   if(it.links && it.links.length){ const ll=document.createElement('div'); ll.className='links';
     it.links.forEach(L=>{ const a=document.createElement('a'); a.href=L.url; a.textContent=L.label;
       if(!/^tel:/.test(L.url)){ a.target='_blank'; a.rel='noopener'; } ll.appendChild(a); });
     body.appendChild(ll); }
-  if(kind==='task'||kind==='bill'||kind==='appt') body.appendChild(reschedPanel(it, kind, li));
+  // 📅 to-dos, bills and appts can all be pushed to another day
+  if(MOVABLE(kind)) body.appendChild(reschedPanel(it, kind, li));
   li.appendChild(cb); li.appendChild(body);
-  if(kind==='task'||kind==='bill'||kind==='appt'){
+  if(MOVABLE(kind)){
     const snz=document.createElement('button');
     snz.className='snz'+(it.moved?' on':''); snz.textContent='📅'; snz.title='move this to another day';
     snz.onclick=()=>{ const p=li.querySelector('.resched');
@@ -934,9 +1016,41 @@ function itemRow(it, kind, deletable){
   }
   if(deletable){ const del=document.createElement('button'); del.className='del'; del.textContent='✕';
     del.title='remove'; del.onclick=()=>{ custom=custom.filter(c=>c.id!==it.id); delete done[it.id]; delete moved[it.id];
-      saveCustom(); saveDone(); saveMoved(); render(); rebuildWeeks(); };
+      delete edits[it.id];
+      saveCustom(); saveDone(); saveMoved(); saveEdits(); render(); rebuildWeeks(); };
     li.appendChild(del); }
   return li;
+}
+
+/* ---------- ✏️ REWORDING AN ITEM ----------
+   Double-click the words (or tap ✏️ reword in the 📅 drawer) and type. Enter or
+   clicking away saves, Escape backs out. Like a day-move, this is an override kept
+   in `edits` (id -> your wording), layered on at render time, so the data files are
+   never rewritten and the original wording is always one tap away. Items you added
+   yourself are just edited in place. */
+function startRename(it, txt){
+  if(txt.parentNode && txt.parentNode.querySelector('.txt-edit')) return;
+  const inp=document.createElement('input');
+  inp.type='text'; inp.className='txt-edit'; inp.value=it.text; inp.maxLength=200;
+  let closed=false;
+  const finish=commit=>{
+    if(closed) return; closed=true;
+    if(!commit){ if(inp.parentNode) inp.parentNode.replaceChild(txt, inp); return; }
+    const v=inp.value.trim();
+    const base=it.baseText||it.text;             // the wording the data file / feed uses
+    const mine=custom.find(c=>c.id===it.id);     // something Lupita added herself: edit it in place
+    if(v && mine){ mine.text=v; delete edits[it.id]; saveCustom(); }
+    else if(!v || v===base) delete edits[it.id]; // empty or back to the original: drop the override
+    else edits[it.id]=v;
+    saveEdits(); render(); rebuildWeeks();
+  };
+  inp.onkeydown=e=>{
+    if(e.key==='Enter'){ e.preventDefault(); finish(true); }
+    else if(e.key==='Escape'){ e.preventDefault(); finish(false); }
+  };
+  inp.onblur=()=>finish(true);
+  txt.parentNode.replaceChild(inp, txt);
+  inp.focus(); inp.select();
 }
 
 /* the little "move to another day" drawer under an item (hidden until 📅 is tapped) */
@@ -961,6 +1075,12 @@ function reschedPanel(it, kind, li){
     tp.onchange=()=>{ moved[it.id]=Object.assign({}, moved[it.id], {t:to12(tp.value)}); saveMoved(); render(); rebuildWeeks(); };
     p.appendChild(tp);
   }
+  // ✏️ same drawer, second job: change the wording (double-clicking the text does this too)
+  chip('✏️ reword','change the wording of this one', ()=>{
+    const t=li.querySelector('.txt'); if(t) startRename(it, t);
+  });
+  if(it.edited) chip('↺ original wording','put the wording from your files back', ()=>{
+    delete edits[it.id]; saveEdits(); render(); rebuildWeeks(); });
   if(it.moved){
     chip('↺ put it back','undo the move, back to the original day', ()=>{ delete moved[it.id]; saveMoved(); render(); rebuildWeeks(); });
     const was=document.createElement('span'); was.className='rs-was';
@@ -974,7 +1094,9 @@ function reschedPanel(it, kind, li){
 function fillList(el, items, kind, deletable){
   el.innerHTML='';
   const archivable=(kind==='task'||kind==='bill'||kind==='appt');
-  const vis=items.filter(it=>(!it.date || inView(it.date)) && !(archivable&&arch[it.id]))
+  // bills + appts ignore the Today/Week/Month filter: they stay up every day until done.
+  // anything pushed forward from today stays visible too (onRadar), new date and all.
+  const vis=items.filter(it=>(ALWAYS_ON(kind) || !it.date || inView(it.date) || onRadar(it)) && !(archivable&&arch[it.id]))
     .sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
   if(!vis.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Nothing here for this view. 🌿'; el.appendChild(e); return; }
   vis.forEach(it=>el.appendChild(itemRow(it,kind,deletable||!!it.custom)));
@@ -1025,8 +1147,9 @@ function leadRow(it){
   const body=document.createElement('div'); body.className='body';
   const txt=document.createElement('div'); txt.className='txt'; txt.textContent=it.title+(it.org?(' · '+it.org):'');
   const meta=document.createElement('div'); meta.className='meta';
-  const typeLbl={fulltime:'production / full-time', freelance:'freelance', opencall:'open call', client:'client', generic:'general role'};
+  const typeLbl={fulltime:'production / full-time', freelance:'freelance', opencall:'open call', client:'client', generic:'general role', remotework:'remote platform'};
   if(it.type){ const t=document.createElement('span'); t.className='tag '+it.type; t.textContent=typeLbl[it.type]||it.type; meta.appendChild(t); }
+  if(isRemote(it) && it.type!=='remotework'){ const r=document.createElement('span'); r.className='tag remote'; r.textContent='🏠 remote'; meta.appendChild(r); }
   if(it.flag){ const f=document.createElement('span'); f.className='tag flag'; f.textContent=it.flag; meta.appendChild(f); }
   if(it.source){ const s=document.createElement('span'); s.className='tag src'; s.textContent=it.source; meta.appendChild(s); }
   if(it.deadline){ const d=document.createElement('span'); d.className='when'; d.textContent='apply by '+fmtWhen(it.deadline); meta.appendChild(d); }
@@ -1045,6 +1168,7 @@ const LEAD_CATS = [
   ['generic','🗂️ General creative roles','role'],
   ['opencall','🌟 Open calls & programs','flat'],
   ['client','🤝 Client gigs','fit'],
+  ['remotework','🏠 Remote work platforms','flat'],
 ];
 // Role buckets, checked top to bottom (first match wins).
 const ROLE_ORDER = [
@@ -1103,13 +1227,27 @@ function buildCat(type,label,mode,items){
   d.addEventListener('toggle',()=>{ catOpen[type]=d.open; localStorage.setItem(LS_CATOPEN, JSON.stringify(catOpen)); });
   return d;
 }
+/* ---------- REMOTE FILTER ----------
+   A lead counts as remote if the hunter flagged it (remote:true), it's a remote-work
+   platform, or the title/org says so. The last check keeps older leads (written before
+   the flag existed) from being wrongly hidden when the chip is on. */
+const REMOTE_RE=/\bremote\b|work from home|\bwfh\b|anywhere|virtual/i;
+const isRemote = it => it.remote===true || it.type==='remotework' ||
+  REMOTE_RE.test((it.title||'')+' '+(it.org||''));
+const LS_REMOTEONLY='lupita-leads-remoteonly-v1';
+let remoteOnly = localStorage.getItem(LS_REMOTEONLY)==='1';
+
 // Leads whose apply-by deadline already passed are hidden automatically.
-const liveLeads = () => LEAD_DATA.filter(it=>(!it.deadline || parse(it.deadline)>=today) && !arch[it.id]);
+const liveLeads = () => LEAD_DATA.filter(it=>(!it.deadline || parse(it.deadline)>=today) && !arch[it.id]
+  && (!remoteOnly || isRemote(it)));
 function renderLeads(){
   const ll=document.getElementById('leadList'); ll.innerHTML='';
   const data=liveLeads();
   if(!data.length){ const e=document.createElement('div'); e.className='empty';
-    e.textContent='No leads yet. Your morning run will fill this in. 🌷'; ll.appendChild(e); return; }
+    e.textContent = remoteOnly
+      ? 'No remote leads in the list yet. Tap 🏠 again to see everything, or 🎯 hunt for fresh ones.'
+      : 'No leads yet. Your morning run will fill this in. 🌷';
+    ll.appendChild(e); return; }
   const seen=new Set();
   LEAD_CATS.forEach(([type,label,mode])=>{
     const items=data.filter(it=>it.type===type);
@@ -1181,6 +1319,7 @@ async function loadState(){
       if(s.money){ money=s.money; localStorage.setItem(LS_MONEY, JSON.stringify(money)); }
       if(s.arch){ arch=s.arch; localStorage.setItem(LS_ARCH, JSON.stringify(arch)); }
       if(s.moved){ moved=s.moved; localStorage.setItem(LS_MOVED, JSON.stringify(moved)); }
+      if(s.edits){ edits=s.edits; localStorage.setItem(LS_EDITS, JSON.stringify(edits)); }
       if(s.slotted){ slotted=s.slotted; localStorage.setItem(LS_SLOT, JSON.stringify(slotted)); }
       if(s.food){ food=s.food; food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[]; localStorage.setItem(LS_FOOD, JSON.stringify(food)); }
       if(s.friends){ friends=s.friends; friends.people=friends.people||[]; localStorage.setItem(LS_FRIENDS, JSON.stringify(friends)); }
@@ -1204,7 +1343,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, slotted, food, friends, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, food, friends, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -1266,7 +1405,7 @@ function render(){
   const S=scheduleLists();
   const allTasks=S.task, allBills=S.bill, allAppts=S.appt;
   const tl=document.getElementById('taskList'); tl.innerHTML='';
-  const visTasks=allTasks.filter(it=>(!it.date||inView(it.date))&&!arch[it.id]).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
+  const visTasks=allTasks.filter(it=>(!it.date||inView(it.date)||onRadar(it))&&!arch[it.id]).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
   if(!visTasks.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='No to-dos for this view. Breathe easy. 🌿'; tl.appendChild(e);}
   else visTasks.forEach(it=>tl.appendChild(itemRow(it,'task', !!it.custom)));
 
@@ -1287,6 +1426,14 @@ function render(){
   renderLeads();
   const lv=liveLeads();
   document.getElementById('leadCount').textContent = lv.length ? (lv.filter(it=>!done[it.id]).length+' open') : '';
+  // 🏠 remote-only chip: reflect the current filter and how many remote leads exist
+  const chip=document.getElementById('leadRemoteOnly');
+  chip.classList.toggle('on', remoteOnly);
+  const remoteN = LEAD_DATA.filter(it=>isRemote(it) && !arch[it.id] && !done[it.id]
+    && (!it.deadline || parse(it.deadline)>=today)).length;
+  document.getElementById('remoteNote').textContent = remoteOnly
+    ? ('work-from-home only ('+remoteN+')')
+    : (remoteN ? (remoteN+' can be done from home') : '');
   const authOpen = !getToken() || window._showTokenBox;
   document.getElementById('leadAuth').style.display = authOpen ? 'block' : 'none';
   document.getElementById('ghChange').style.display = authOpen ? 'none' : 'block';
@@ -1308,8 +1455,9 @@ function render(){
     const s=document.createElement('div'); s.className='status '+p.cls; s.textContent=p.status;
     r.appendChild(n); r.appendChild(s); pl.appendChild(r); });
 
-  // progress (schedule items only: tasks+bills+appts in current view)
-  const sched=[...allTasks,...allBills,...allAppts].filter(it=>!it.date||inView(it.date));
+  // progress = exactly what the three lists are showing (to-dos in view, plus the
+  // standing bills and appts, which are always shown)
+  const sched=[...allTasks.filter(it=>!it.date||inView(it.date)||onRadar(it)), ...allBills, ...allAppts];
   const total=sched.length;
   const completed=sched.filter(it=>done[it.id]).length;
   const pct= total? Math.round(completed/total*100):0;
@@ -1622,28 +1770,68 @@ function checklist(items,cntEl,ctx){
       qb.title='Research on the web: '+it.q;
       qb.onclick=e=>{ e.stopPropagation(); window.open('https://www.google.com/search?q='+encodeURIComponent(it.q),'_blank'); };
       tbs.appendChild(qb); }
-    // 📌 real-life to-dos: grab them and drop them into a time block (or tap ⇅)
+    /* 📌 real life on a day card. Everything here can be given a time block AND
+       moved to another day (drag it, tap a day chip, or open the 📅 calendar).
+       Picking a day moves the item to THAT day's card, into that day's 📌 strip,
+       where it can then be dropped into one of that day's blocks. It leaves no
+       copy behind: the home tab is what keeps a pushed item in front of you today. */
     if(it.agenda && ctx){
-      row.classList.add('ag-row');
-      row.draggable=true;
-      row.ondragstart=e=>{ e.dataTransfer.setData('text/plain', it.id); e.dataTransfer.effectAllowed='move'; row.classList.add('dragging'); };
-      row.ondragend=()=>row.classList.remove('dragging');
+      const canMove=!it.fixed;
+      row.classList.add('ag-row'); if(!canMove) row.classList.add('ag-fixed');
+      if(canMove){
+        row.draggable=true;
+        row.ondragstart=e=>{ e.dataTransfer.setData('text/plain', it.id); e.dataTransfer.effectAllowed='move'; row.classList.add('dragging'); };
+        row.ondragend=()=>row.classList.remove('dragging');
+      }
       const mv=document.createElement('button'); mv.className='tb'; mv.textContent='⇅';
-      mv.title='Put this in a time block (or move it to another day)';
+      mv.title=canMove?'Put this in a time block (or move it to another day)'
+                      :'Set aside time for this (it stays on its own day)';
       tbs.insertBefore(mv, tbs.firstChild);
       const drw=document.createElement('div'); drw.className='ag-move'; drw.style.display='none';
       const chip=(label,title,on,fn)=>{ const b=document.createElement('button');
         b.textContent=label; b.title=title; if(on) b.classList.add('on');
         b.onclick=e=>{ e.stopPropagation(); fn(); }; drw.appendChild(b); return b; };
       const lbl=x=>{ const s=document.createElement('span'); s.className='rs-lbl'; s.textContent=x; drw.appendChild(s); };
+      // the day this item really belongs to (an overdue one is riding along on today's card)
+      const homeISO=(AGENDA_INDEX[it.id]||{}).date || ctx.dayISO;
+      const slotDay=canMove?ctx.dayISO:homeISO;
       lbl('do it during:');
-      chip('📌 no set time','leave it loose in the day, no block',!it.slot,()=>agPlace(it.id,ctx.dayISO,null));
-      ctx.blocks.forEach(b=>chip(b.n, b.t+' · '+b.d, it.slot===b.k, ()=>agPlace(it.id,ctx.dayISO,b.k)));
-      lbl('or another day:');
-      ctx.days.forEach(dy=>chip(dy.name.slice(0,3), dy.name+' '+dy.label, dy.iso===ctx.dayISO,
-        ()=>agPlace(it.id, dy.iso, slotted[it.id]||null)));
-      mv.onclick=e=>{ e.stopPropagation(); const open=drw.style.display==='none';
-        drw.style.display=open?'flex':'none'; mv.classList.toggle('on',open); };
+      chip('📌 no set time','leave it loose in the day, no block',!it.slot,()=>agPlace(it.id,slotDay,null));
+      ctx.blocks.forEach(b=>chip(b.n, b.t+' · '+b.d, it.slot===b.k, ()=>agPlace(it.id,slotDay,b.k)));
+      const openDrw=()=>{ const open=drw.style.display==='none';
+        drw.style.display=open?'flex':'none'; mv.classList.toggle('on',open); return open; };
+      mv.onclick=e=>{ e.stopPropagation(); openDrw(); };
+      if(canMove){
+        lbl('or another day:');
+        ctx.days.forEach(dy=>chip(dy.name.slice(0,3), dy.name+' '+dy.label, dy.iso===ctx.dayISO,
+          ()=>agPlace(it.id, dy.iso, slotted[it.id]||null)));
+        // 📅 any day at all, no dragging across weeks: pick a date and it hops there
+        const keepSlot=()=>slotted[it.id]||null;
+        chip('today','bring it back to today',ctx.dayISO===fromToday(0),()=>agPlace(it.id, fromToday(0), keepSlot()));
+        chip('tomorrow','push it to tomorrow',false,()=>agPlace(it.id, fromToday(1), keepSlot()));
+        const wk=fromItem(ctx.dayISO,7);
+        if(wk<=PLAN_END) chip('+1 week','same day next week',false,()=>agPlace(it.id, wk, keepSlot()));
+        const dp=document.createElement('input'); dp.type='date'; dp.className='ag-date';
+        dp.title='pick any day in the sprint, even weeks out'; dp.value=ctx.dayISO;
+        // kept inside the sprint so it always lands on a day card you can actually see
+        dp.min=PLAN_START; dp.max=PLAN_END;
+        dp.onclick=e=>e.stopPropagation();
+        dp.onchange=e=>{ e.stopPropagation(); if(dp.value) agPlace(it.id, dp.value, keepSlot()); };
+        drw.appendChild(dp);
+        // the 📅 button: straight to the calendar, one tap
+        const cal=document.createElement('button'); cal.className='tb'; cal.textContent='📅';
+        cal.title='Move this to any day (opens a calendar)';
+        cal.onclick=e=>{ e.stopPropagation();
+          if(drw.style.display==='none') openDrw();
+          try{ dp.showPicker(); }catch(err){ dp.focus(); } };
+        tbs.insertBefore(cal, tbs.firstChild);
+      } else {
+        const kind=(AGENDA_INDEX[it.id]||{}).kind;
+        const s=document.createElement('span'); s.className='rs-was';
+        s.textContent='🔒 '+(kind==='bill'?'Bills':'Appointments')+' keep their real date, so this one stays on '
+          +fmtWhen(homeISO)+'. Give it a block and the time is set aside.';
+        drw.appendChild(s);
+      }
       row.appendChild(cb); row.appendChild(t); row.appendChild(tbs);
       box.appendChild(row); box.appendChild(drw); sync(); return;
     }
@@ -1767,22 +1955,32 @@ const AGENDA_INDEX={};   // item id -> {text, kind, date}, so a day card can fil
    uses), and blockKey null means "on that day, but no set time". */
 function agPlace(id, dayISO, blockKey){
   const info=AGENDA_INDEX[id]; if(!info) return;
-  if(info.date!==dayISO){ moved[id]=Object.assign({}, moved[id], {d:dayISO}); saveMoved(); }
+  // to-dos, bills and appts can all be given a time block AND pushed to another day.
+  // (a push never hides anything: see onRadar, it stays on today's card too.)
+  if(MOVABLE(info.kind) && info.date!==dayISO){
+    moved[id]=Object.assign({}, moved[id], {d:dayISO}); saveMoved();
+  }
   if(blockKey) slotted[id]=blockKey; else delete slotted[id];
   saveSlotted(); render(); rebuildWeeks();
 }
+/* A day card shows exactly what is set for THAT day: pick a day for something and
+   it hops to that day's card, in that day's 📌 strip, ready to be dropped into one
+   of that day's blocks. It does NOT leave a ghost copy behind on today (the home
+   tab is what keeps a pushed item in front of you today: see onRadar).
+   The one exception stays: something whose day has come and gone and is still open
+   tags along on today's card, because that one really is unfinished business. */
 function agendaFor(dateStr, isToday){
   const S=scheduleLists();
   const out=[];
   ['appt','bill','task'].forEach(kind=>S[kind].forEach(it=>{
     if(!it.date) return;
     const late=it.date<dateStr;
-    // its own day always; overdue leftovers only tag along on today, and only while still open
     if(it.date!==dateStr && !(isToday && late && !done[it.id] && !arch[it.id])) return;
     AGENDA_INDEX[it.id]={text:it.text, kind, date:it.date};
     out.push({
       id:it.id,
       agenda:true,
+      fixed:!MOVABLE(kind),
       slot:slotted[it.id]||null,
       mins:it.time?Number((to24(it.time)||'99:99').replace(':','')):9999,
       txt:AG_ICON[kind]+' '+it.text+(it.time?(' · '+it.time):'')
@@ -2308,6 +2506,13 @@ if(!getToken() && location.protocol!=='file:') setLeadOpen(true);
 
 // live leads: refresh + one-time token save
 document.getElementById('leadRefresh').onclick=(e)=>{ e.stopPropagation(); setLeadOpen(true); fetchLeads(); fetchData(); };
+// 🏠 remote only: filter the whole leads card down to work-from-home leads (sticks between visits)
+document.getElementById('leadRemoteOnly').onclick=(e)=>{
+  e.stopPropagation();
+  remoteOnly=!remoteOnly;
+  localStorage.setItem(LS_REMOTEONLY, remoteOnly?'1':'0');
+  render();
+};
 function saveToken(){
   const inp=document.getElementById('ghToken'); const v=inp.value.trim(); if(!v) return;
   localStorage.setItem(LS_TOKEN, v); inp.value='';
