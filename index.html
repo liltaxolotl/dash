@@ -327,6 +327,10 @@
   #friendsPanel{max-width:1150px; margin:0 auto; flex-direction:column; gap:18px}
   .fr-cols{display:grid; grid-template-columns:1.05fr 1fr; gap:18px; align-items:start}
   @media(max-width:860px){.fr-cols{grid-template-columns:1fr}}
+  /* foldable cards: tap the header to open/close, state remembered per card */
+  h2[data-fold]{cursor:pointer; user-select:none; margin-bottom:0}
+  .fold-caret{display:inline-block; width:.9em; font-size:.8em; color:var(--soft)}
+  .fold-body{margin-top:12px}
   .chips{display:flex; flex-wrap:wrap; gap:7px; margin:4px 0 2px}
   .chip{display:inline-flex; align-items:center; gap:6px; background:#faf6ff; border:1px solid var(--line); border-radius:99px; padding:5px 11px; font-size:.86rem}
   .chip button{border:none; background:none; cursor:pointer; color:#cbb8cf; font-size:.85rem; padding:0; line-height:1}
@@ -717,14 +721,17 @@
   <!-- 💌 FRIENDS (opened from the Game Plan's friends button) -->
   <section id="friendsPanel" style="display:none">
     <div class="card">
-      <h2>💌 Friends &amp; Replies <button class="cl-btn ghost" id="friendsBack" style="margin-left:auto">← back to Game Plan</button></h2>
-      <p class="cl-lead" style="margin-bottom:0">The 10-minutes-a-day page. Everyone you mean to write back to lives here, with a reason and a ready-made way to start. House rules: one reply counts, a meme counts, the apology is one line max. They miss you, they are not grading you. 💗</p>
+      <h2 data-fold="fr-intro"><span class="fold-caret">▸</span>💌 Friends &amp; Replies <button class="cl-btn ghost" id="friendsBack" style="margin-left:auto">← back to Game Plan</button></h2>
+      <div class="fold-body">
+        <p class="cl-lead" style="margin:0">The 10-minutes-a-day page. Everyone you mean to write back to lives here, with a reason and a ready-made way to start. House rules: one reply counts, a meme counts, the apology is one line max. They miss you, they are not grading you. 💗</p>
+      </div>
     </div>
 
     <div class="fr-cols">
     <div class="col">
     <div class="card">
-      <h2>🕰️ Waiting on a reply from me <span class="pill" id="friendCount"></span></h2>
+      <h2 data-fold="fr-queue" data-open="1"><span class="fold-caret">▸</span>🕰️ Waiting on a reply from me <span class="pill" id="friendCount"></span></h2>
+      <div class="fold-body">
       <div class="note" style="margin:0 0 8px">Check someone off once you've replied (yes there's confetti). The 🤖 on each person copies a prompt about that exact reply and opens Claude to draft it with you.</div>
       <ul class="list" id="friendList"></ul>
       <div class="money-row" style="margin-top:12px">
@@ -739,14 +746,15 @@
         </select>
       </div>
       <div class="add-row" style="margin-top:8px"><input id="frNote" type="text" placeholder="why / what you owe them (optional)..." maxlength="200"><button id="frAdd">Add</button></div>
+      </div>
     </div>
 
     <div class="card">
-      <h2 id="frLogToggle" style="cursor:pointer; user-select:none">
-        <span id="frLogCaret" style="display:inline-block; width:.9em; font-size:.8em; color:var(--soft)">▸</span>
+      <h2 data-fold="fr-log">
+        <span class="fold-caret">▸</span>
         📖 Replied &amp; archived <span class="pill" id="frLogCount"></span>
       </h2>
-      <div id="frLogBody" style="display:none">
+      <div class="fold-body">
         <div class="note" style="margin:0 0 8px">Proof you did the thing. Everyone you've written back to, newest first, with the day you did it. ↩ puts someone back in the queue if they've written again.</div>
         <ul class="list" id="frLogList"></ul>
       </div>
@@ -755,17 +763,19 @@
 
     <div class="col">
     <div class="card">
-      <h2>🤖 Draft replies with Claude</h2>
-      <p class="cl-lead">The button copies your whole queue plus a ready-made prompt and opens Claude. It drafts every reply in your voice; you just paste, tweak, send. (In a Claude Code chat you can also paste the actual messages and ask directly.) ✨</p>
-      <div class="cl-actions" style="margin-top:0">
-        <button class="cl-btn" id="friendsAsk">🤖 Draft all my replies</button>
-        <span class="cl-status" id="friendsStatus"></span>
+      <h2 data-fold="fr-ai"><span class="fold-caret">▸</span>🤖 Draft replies with Claude</h2>
+      <div class="fold-body">
+        <p class="cl-lead">The button copies your whole queue plus a ready-made prompt and opens Claude. It drafts every reply in your voice; you just paste, tweak, send. (In a Claude Code chat you can also paste the actual messages and ask directly.) ✨</p>
+        <div class="cl-actions" style="margin-top:0">
+          <button class="cl-btn" id="friendsAsk">🤖 Draft all my replies</button>
+          <span class="cl-status" id="friendsStatus"></span>
+        </div>
       </div>
     </div>
 
     <div class="card">
-      <h2>✍️ Openers <span class="pill">tap one to copy · tweak to taste</span></h2>
-      <div id="openerList"></div>
+      <h2 data-fold="fr-openers"><span class="fold-caret">▸</span>✍️ Openers <span class="pill">tap one to copy · tweak to taste</span></h2>
+      <div class="fold-body" id="openerList"></div>
     </div>
     </div>
     </div>
@@ -2482,16 +2492,23 @@ function renderFriendLog(){
     li.appendChild(body); li.appendChild(back); li.appendChild(del); ul.appendChild(li);
   });
 }
-const LS_FRLOGOPEN='lupita-dash-frlogopen-v1';
-function setFrLogOpen(open){
-  document.getElementById('frLogBody').style.display = open ? 'block' : 'none';
-  document.getElementById('frLogCaret').textContent = open ? '▾' : '▸';
-  localStorage.setItem(LS_FRLOGOPEN, open ? '1' : '0');
-}
-document.getElementById('frLogToggle').addEventListener('click',()=>{
-  setFrLogOpen(document.getElementById('frLogBody').style.display==='none');
+/* ---- foldable cards: any h2 with data-fold collapses its card's .fold-body.
+   data-open="1" starts open the first time; after that each card remembers
+   what Lupita left it at (per card, per device). ---- */
+document.querySelectorAll('h2[data-fold]').forEach(h=>{
+  const body=h.parentElement.querySelector('.fold-body');
+  const caret=h.querySelector('.fold-caret');
+  if(!body||!caret) return;
+  const key='lupita-dash-fold-'+h.dataset.fold;
+  const set=open=>{ body.style.display=open?'':'none'; caret.textContent=open?'▾':'▸'; };
+  h.addEventListener('click',e=>{
+    if(e.target.closest('button,input,select,a')) return;   // headers can hold real buttons (← back)
+    const open=body.style.display==='none';
+    set(open); localStorage.setItem(key, open?'1':'0');
+  });
+  const saved=localStorage.getItem(key);
+  set(saved===null ? h.dataset.open==='1' : saved==='1');
 });
-setFrLogOpen(localStorage.getItem(LS_FRLOGOPEN)==='1');
 function addFriend(){
   const name=document.getElementById('frName').value.trim(); if(!name) return;
   friends.people.push({id:'fr-'+Date.now(), name, vibe:document.getElementById('frVibe').value, note:document.getElementById('frNote').value.trim(), added:iso(new Date())});
