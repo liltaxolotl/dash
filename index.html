@@ -369,6 +369,22 @@
       </div>
 
       <div class="card">
+        <h2 id="mailToggle" style="cursor:pointer; user-select:none">
+          <span id="mailCaret" style="display:inline-block; width:.9em; font-size:.8em; color:var(--soft)">▸</span>
+          💌 Inbox Helper <span class="pill" id="mailCount"></span>
+          <button id="mailRefresh" title="refresh drafted replies"
+            style="margin-left:auto; border:none; background:none; cursor:pointer; font-size:1rem; color:var(--lav-deep)">↻</button>
+        </h2>
+        <div id="mailBody" style="display:none">
+          <div class="note" id="mailStatus"></div>
+          <ul class="list" id="mailList"></ul>
+          <button id="mailScan" title="scan the last week of Gmail and draft replies for anything that needs one"
+            style="width:100%; margin:.4rem 0; padding:.45rem; border:1px dashed var(--lav-deep); border-radius:8px; background:none; cursor:pointer; color:var(--lav-deep); font-size:.85rem">💌 Scan my inbox now</button>
+          <div class="note" style="font-size:.7rem">Drafts land here and in Gmail. Nothing sends until you hit send.</div>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>🎯 Top Focuses Right Now</h2>
         <div id="focusList"></div>
       </div>
@@ -2043,6 +2059,104 @@ async function watchForFreshLeads(){
 }
 document.getElementById('leadHunt').onclick=(e)=>{ e.stopPropagation(); requestHunt(); };
 
+/* ==================== INBOX HELPER ====================
+   Same flow as the hunt button: the scan button writes mail-request.json to the
+   private repo + pings the home PC, which runs a headless triage over the last
+   week of Gmail, drafts replies (saved as real Gmail drafts, never sent), and
+   pushes mail.json here. This card renders mail.json. */
+const LS_MAILOPEN='lupita-dash-mailopen-v1';
+let MAIL_DATA=[], MAIL_UPDATED='';
+const mailBodyEl=document.getElementById('mailBody');
+const mailCaretEl=document.getElementById('mailCaret');
+function setMailOpen(open){
+  mailBodyEl.style.display = open ? 'block' : 'none';
+  mailCaretEl.textContent = open ? '▾' : '▸';
+  localStorage.setItem(LS_MAILOPEN, open ? '1' : '0');
+}
+document.getElementById('mailToggle').addEventListener('click',e=>{
+  if(e.target.closest('#mailRefresh')) return;
+  setMailOpen(mailBodyEl.style.display==='none');
+});
+setMailOpen(localStorage.getItem(LS_MAILOPEN)==='1');
+function setMailStatus(msg){ const el=document.getElementById('mailStatus'); if(el) el.textContent=msg||''; }
+function renderMail(){
+  const ul=document.getElementById('mailList'); if(!ul) return;
+  ul.innerHTML='';
+  document.getElementById('mailCount').textContent = MAIL_DATA.length ? String(MAIL_DATA.length) : '';
+  MAIL_DATA.forEach((m,i)=>{
+    const li=document.createElement('li');
+    li.style.cssText='display:block; padding:.45rem 0; border-bottom:1px dashed var(--line, #eee)';
+    const gmailUrl='https://mail.google.com/mail/u/0/#all/'+encodeURIComponent(m.threadId||'');
+    li.innerHTML=
+      `<div style="cursor:pointer" data-mi="${i}">`+
+      `<strong>${esc(m.from)}</strong> <span style="color:var(--soft)">· ${esc(m.subject)}</span><br>`+
+      `<span class="note">${esc(m.gist)}</span></div>`+
+      `<div class="mail-draft" style="display:none; margin-top:.35rem">`+
+      `<textarea data-md="${i}" style="width:100%; min-height:7rem; font:inherit; font-size:.8rem; padding:.4rem; border:1px solid var(--lav-deep); border-radius:8px; background:none; color:inherit">${esc(m.draft)}</textarea>`+
+      `<div style="display:flex; gap:.4rem; margin-top:.25rem">`+
+      `<button data-mc="${i}" style="flex:1; padding:.3rem; border:1px dashed var(--lav-deep); border-radius:8px; background:none; cursor:pointer; color:var(--lav-deep); font-size:.75rem">📋 Copy</button>`+
+      (m.threadId?`<a href="${gmailUrl}" target="_blank" style="flex:1; text-align:center; padding:.3rem; border:1px dashed var(--lav-deep); border-radius:8px; color:var(--lav-deep); font-size:.75rem; text-decoration:none">✉️ Open in Gmail</a>`:'')+
+      `</div></div>`;
+    ul.appendChild(li);
+  });
+  ul.querySelectorAll('[data-mi]').forEach(el=>{
+    el.onclick=()=>{ const d=el.parentElement.querySelector('.mail-draft'); d.style.display = d.style.display==='none' ? 'block' : 'none'; };
+  });
+  ul.querySelectorAll('[data-mc]').forEach(btn=>{
+    btn.onclick=async()=>{
+      const ta=ul.querySelector(`[data-md="${btn.dataset.mc}"]`);
+      try{ await navigator.clipboard.writeText(ta.value); btn.textContent='✅ Copied'; setTimeout(()=>btn.textContent='📋 Copy',1500); }
+      catch(_){ ta.select(); }
+    };
+  });
+}
+async function fetchMail(){
+  if(!getToken()) return;
+  const d=await fetchPrivate('mail.json');
+  if(!d) return;
+  MAIL_DATA=d.items||[]; MAIL_UPDATED=d.updated||'';
+  setMailStatus(MAIL_DATA.length
+    ? ('Scanned '+(MAIL_UPDATED?fmtWhen(MAIL_UPDATED.slice(0,10)):'recently')+': '+MAIL_DATA.length+' waiting on a reply. Tap one to see the draft. 💛')
+    : (MAIL_UPDATED?'Inbox is all caught up as of the last scan! 🎉':''));
+  renderMail();
+}
+async function requestMailScan(){
+  if(!getToken()){ setLeadOpen(true); setMailOpen(true); setMailStatus('Paste your token in the Leads card first, then tap 💌 again.'); return; }
+  setMailStatus('Asking your computer to scan Gmail...');
+  const url=`https://api.github.com/repos/${LEAD_FEED.owner}/${LEAD_FEED.repo}/contents/mail-request.json`;
+  const payload={message:'mail scan requested from dashboard', content:b64enc({requestedAt:Date.now()}), branch:LEAD_FEED.branch};
+  try{
+    const g=await fetch(url+`?ref=${LEAD_FEED.branch}&t=${Date.now()}`,{headers:ghHdr(), cache:'no-store'});
+    if(g.ok) payload.sha=(await g.json()).sha;
+    const res=await fetch(url,{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
+    if(res.ok){
+      try{ await fetch('https://ntfy.sh/'+HUNT_PING_TOPIC,{method:'POST', body:'mail'}); }catch(_){/* PC catches up on next wake if the ping fails */}
+      setMailStatus('Scan requested! 💌 Drafts will appear here in a few minutes (home computer must be on).');
+      watchForFreshMail();
+    }
+    else if(res.status===401||res.status===403) setMailStatus('Token can\'t write. Paste a read+write token to use the scan button.');
+    else setMailStatus('Could not request the scan right now. Try again in a minute.');
+  }catch(err){ setMailStatus('Could not request the scan (offline?).'); }
+}
+let _mailWatch=null;
+async function watchForFreshMail(){
+  if(_mailWatch){ clearInterval(_mailWatch); _mailWatch=null; }
+  const url=`https://api.github.com/repos/${LEAD_FEED.owner}/${LEAD_FEED.repo}/contents/mail.json`;
+  const snap=async()=>{ try{ const r=await fetch(url+`?ref=${LEAD_FEED.branch}&t=${Date.now()}`,{headers:ghHdr(), cache:'no-store'}); return r.ok?(await r.json()).sha:null; }catch(_){ return null; } };
+  const before=await snap(); const started=Date.now();
+  _mailWatch=setInterval(async()=>{
+    if(Date.now()-started>30*60*1000){ clearInterval(_mailWatch); _mailWatch=null; return; }
+    const now=await snap();
+    if(now && now!==before){
+      clearInterval(_mailWatch); _mailWatch=null;
+      await fetchMail(); setMailOpen(true);
+      setMailStatus('Fresh drafts just landed! 💌 '+(MAIL_DATA.length?MAIL_DATA.length+' waiting for your once-over.':'Nothing needed a reply, you are all caught up!'));
+    }
+  },60000);
+}
+document.getElementById('mailScan').onclick=(e)=>{ e.stopPropagation(); requestMailScan(); };
+document.getElementById('mailRefresh').onclick=(e)=>{ e.stopPropagation(); setMailOpen(true); fetchMail(); };
+
 /* ==================== COVER LETTER GENERATOR ==================== */
 const OLLAMA_URL='http://localhost:11434';
 const CL_PROFILE='cover-profile-v2', CL_MODEL='cover-model-v1', CL_OUT='cover-output-v1';
@@ -2334,10 +2448,11 @@ applyLayout();
 renderFood();
 fetchLeads();
 fetchData();
+fetchMail();
 loadState();
 fetchPlan();
 // pick up changes made on the other device when you come back to this one
-document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ loadState(); fetchData(); } });
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ loadState(); fetchData(); fetchMail(); } });
 // hosted copy: pull the sprint plan as soon as a token gets saved
 document.getElementById('ghSave').addEventListener('click',()=>setTimeout(fetchPlan,400));
 </script>
