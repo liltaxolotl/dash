@@ -1156,12 +1156,11 @@ function reschedPanel(it, kind, li){
   pick.value=it.date||fromToday(0);
   pick.onchange=()=>{ if(pick.value) setDate(pick.value); };
   p.appendChild(pick);
-  if(kind==='appt'){
-    const tp=document.createElement('input'); tp.type='time'; tp.title='new time (optional)';
-    tp.value=to24(it.time||'');
-    tp.onchange=()=>{ moved[it.id]=Object.assign({}, moved[it.id], {t:to12(tp.value)}); saveMoved(); render(); rebuildWeeks(); };
-    p.appendChild(tp);
-  }
+  // 🕐 to-dos and bills get one too, not just appts (clear it to undo just the time)
+  const tp=document.createElement('input'); tp.type='time'; tp.title='set or change the clock time (optional)';
+  tp.value=to24(it.time||'');
+  tp.onchange=()=>agTime(it.id, tp.value);
+  p.appendChild(tp);
   // ✏️ same drawer, second job: change the wording (double-clicking the text does this too)
   chip('✏️ reword','change the wording of this one', ()=>{
     const t=li.querySelector('.txt'); if(t) startRename(it, t);
@@ -1652,8 +1651,23 @@ function moveBlock(n,dk,k){
   const ck=clockFor(n,dk,def);
   const i=ck.findIndex(b=>b.k===k); if(i<0) return;
   const b=ck[i];
-  const ans=prompt('Slide "'+b.n+'" to what start time?\n(like 12:20 or 9pm. Add am/pm if it could be either. Everything after it slides along, just this one day.)', fmtMins(b.s));
+  const ans=prompt('New time for "'+b.n+'"? Just this one day.\n· a start (12:20, 9pm): everything after it slides along\n· a range (7-8:30): ONLY this block changes, the rest stay put', fmtMins(b.s));
   if(ans===null||!ans.trim()) return;
+  const parts=ans.split(/\s*(?:-|–|—|\bto\b)\s*/i).filter(x=>x.trim());
+  if(parts.length>=2){
+    // a range re-times this ONE block: shrink a break, stretch deep applies,
+    // park it wherever. Everyone else keeps their exact times; the day re-sorts
+    // into clock order so the card still reads top to bottom.
+    const ns=parseBlockTime(parts[0], b.s);
+    let ne=ns===null?null:parseBlockTime(parts[1], ns+(b.e-b.s));
+    if(ns===null||ne===null){ alert('Hmm, I couldn’t read that. Try a range like 7-8:30 or 9pm-10:15pm 💛'); return; }
+    while(ne<=ns) ne+=720;                    // "11:30-12" means the NEXT 12, not the last one
+    const mods=ck.map((x,j)=> j===i ? {k:x.k,s:ns,e:ne} : {k:x.k,s:x.s,e:x.e});
+    mods.sort((a,c)=>a.s-c.s);
+    blockMods['w'+n+'-'+dk]=mods;
+    saveBlockMods(); rebuildWeeks(); if(view==='plan') renderPlan();
+    return;
+  }
   const ns=parseBlockTime(ans, b.s);
   if(ns===null){ alert('Hmm, I couldn’t read that time. Try something like 12, 12:30, or 9:15pm 💛'); return; }
   const delta=ns-b.s; if(!delta) return;
@@ -2037,6 +2051,14 @@ function checklist(items,cntEl,ctx){
       lbl('do it during:');
       chip('📌 no set time','leave it loose in the day, no block',!it.slot,()=>agPlace(it.id,slotDay,null));
       ctx.blocks.forEach(b=>chip(b.n, b.t+' · '+b.d, it.slot===b.k, ()=>agPlace(it.id,slotDay,b.k)));
+      // 🕐 the clock time itself (the "· 7:00 PM" on the row), not just the block
+      lbl('at:');
+      const tp=document.createElement('input'); tp.type='time'; tp.className='ag-date';
+      tp.title='set or change this one\'s clock time (clear it to get the original time back)';
+      tp.value=to24((AGENDA_INDEX[it.id]||{}).time||'');
+      tp.onclick=e=>e.stopPropagation();
+      tp.onchange=e=>{ e.stopPropagation(); agTime(it.id, tp.value); };
+      drw.appendChild(tp);
       const openDrw=()=>{ const open=drw.style.display==='none';
         drw.style.display=open?'flex':'none'; mv.classList.toggle('on',open); return open; };
       mv.onclick=e=>{ e.stopPropagation(); openDrw(); };
@@ -2264,6 +2286,16 @@ function agPlace(id, dayISO, blockKey){
   if(blockKey) slotted[id]=blockKey; else delete slotted[id];
   saveSlotted(); render(); rebuildWeeks();
 }
+/* give an item a (new) clock time, like the therapy call moving from 7 to 8.
+   Same override a day-move uses (moved[id].t), layered on at render time, so the
+   data files are never rewritten; clearing the picker brings the original time
+   back, and "↺ put it back" still undoes the whole move in one tap. */
+function agTime(id, v24){
+  const m=Object.assign({}, moved[id]);
+  if(v24) m.t=to12(v24); else delete m.t;
+  if(!m.d && !m.t) delete moved[id]; else moved[id]=m;
+  saveMoved(); render(); rebuildWeeks();
+}
 /* A day card shows exactly what is set for THAT day: pick a day for something and
    it hops to that day's card, in that day's 📌 strip, ready to be dropped into one
    of that day's blocks. It does NOT leave a ghost copy behind on today (the home
@@ -2277,7 +2309,7 @@ function agendaFor(dateStr, isToday){
     if(!it.date) return;
     const late=it.date<dateStr;
     if(it.date!==dateStr && !(isToday && late && !done[it.id] && !arch[it.id])) return;
-    AGENDA_INDEX[it.id]={text:it.text, kind, date:it.date};
+    AGENDA_INDEX[it.id]={text:it.text, kind, date:it.date, time:it.time};
     out.push({
       id:it.id,
       agenda:true,
