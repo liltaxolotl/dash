@@ -1192,6 +1192,7 @@ async function fetchPlan(){
     if(!p||!p.guides||!p.dayDefs) return;
     CLOCKS=p.clocks||CLOCKS; PLAN_PHASES=p.phases||PLAN_PHASES; GUIDE_STEPS=p.guides;
     SPECIALS=p.specials||{}; DAY_DEFS=p.dayDefs; WEEK_TITLES=p.weekTitles||WEEK_TITLES;
+    CLOCK_OVERRIDES=p.clockOverrides||{};
     normalizeGuides();
     const w=document.getElementById('planWeeks'), g=document.getElementById('planGuides');
     w.innerHTML=''; delete w.dataset.built;
@@ -1316,6 +1317,15 @@ let PLAN_PHASES = [];
 // blocks use 1440+ so the "schedule day" runs 11:00am to 11:00am. k = slot key that
 // day tasks attach to.
 let CLOCKS={wk:[],sat:[],sun:[]};
+// One-off day reschedules: {weekNumber:{dayKey:'clockName'}}. Overrides DAY_DEFS.clock
+// for that ONE day only, so a single day can be reshuffled without touching the
+// weekday skeleton. Lives in game-plan.json as `clockOverrides`.
+let CLOCK_OVERRIDES={};
+const DK_BY_DAY=['sun','mon','tue','wed','thu','fri','sat'];
+function clockFor(n,dk,def){
+  const key=((CLOCK_OVERRIDES[n]||{})[dk])||def;
+  return CLOCKS[key]||CLOCKS[def]||CLOCKS.wk||[];
+}
 function renderPlan(){
   const startD=parse('2026-07-13'), endD=parse('2026-09-06');
   // phase bar + week pill
@@ -1337,14 +1347,17 @@ function renderPlan(){
   let nowM=now.getHours()*60+now.getMinutes();
   const dref=new Date(now); if(now.getHours()<11){ nowM+=1440; dref.setDate(dref.getDate()-1); }
   const variant=dref.getDay()===6?'sat':(dref.getDay()===0?'sun':'wk');
+  // honor a one-off reshuffle for today (CLOCK_OVERRIDES), else the normal skeleton
+  const wkNum=Math.floor((dref-startD)/604800000)+1;
+  const todayClock=clockFor(wkNum,DK_BY_DAY[dref.getDay()],variant);
   const wrap=document.getElementById('planDays'); wrap.innerHTML='';
-  (CLOCKS[variant]||[]).forEach(b=>{
+  todayClock.forEach(b=>{
     const r=document.createElement('div');
     r.className='pd-row'+((nowM>=b.s&&nowM<b.e)?' now-block':'');
     r.innerHTML='<div class="pd-time">'+b.t+'</div><div class="pd-name">'+b.n+'</div><div class="pd-desc">'+b.d+'</div>';
     wrap.appendChild(r);
   });
-  const curBlock=(CLOCKS[variant]||[]).find(b=>nowM>=b.s&&nowM<b.e);
+  const curBlock=todayClock.find(b=>nowM>=b.s&&nowM<b.e);
   document.getElementById('clockNow').textContent=curBlock?('now: '+curBlock.n):'free right now 🌈';
   renderQuickBar(); renderApps(); renderMoney(); buildWeeks(); buildGuides();
 }
@@ -1677,7 +1690,7 @@ function buildWeeks(){
       dDet.appendChild(dSum);
       // hour-by-hour body: every clock block is checkable, tasks nest under their block
       const dBody=document.createElement('div'); dBody.className='pd-body';
-      const ck=CLOCKS[dd.clock]||CLOCKS.wk||[];
+      const ck=clockFor(n,dd.dk,dd.clock);
       const dayIds=tasks.map(t=>t.id);
       ck.forEach(b=>{
         const bid='gpb-w'+n+'-'+dd.dk+'-'+b.k;
