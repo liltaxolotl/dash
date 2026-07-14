@@ -274,6 +274,11 @@
   .pl-item.blk{background:#fbf7fc; border-radius:10px; border-bottom:none; margin-top:7px; padding:7px 8px}
   .pl-item.blk b{font-weight:800}
   .blk-time{display:inline-block; min-width:92px; font-weight:700; color:var(--lav-deep); font-size:.78rem}
+  /* tap a block's time to slide it (and everything after it) to a new start */
+  .blk-time.movable, .pd-time.movable{cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px; text-decoration-color:var(--line)}
+  .blk-time.movable:hover, .pd-time.movable:hover{color:var(--pink-deep); text-decoration-color:var(--pink-deep)}
+  .blk-reset{display:inline-block; margin:8px 2px 2px; padding:3px 10px; font-size:.72rem; font-weight:700; color:var(--lav-deep); background:#f6effa; border:1px solid var(--line); border-radius:999px; cursor:pointer}
+  .blk-reset:hover{background:#efe3f7}
   .blk-tasks{margin-left:22px; border-left:2px dashed var(--line); padding-left:9px}
   /* 📌 real-life strip: the day's to-dos, bills and appointments, pinned on top */
   .ag-strip{background:#fff2f8; border:1px solid #ffd6e8; border-radius:12px; padding:4px 10px 6px; margin:8px 0 2px}
@@ -877,6 +882,7 @@ const LS_ARCH = 'lupita-archive-v1';
 const LS_MOVED = 'lupita-dash-moved-v1';
 const LS_EDITS = 'lupita-dash-edits-v1';
 const LS_SLOT = 'lupita-dash-slot-v1';
+const LS_BLOCKMODS = 'lupita-dash-blockmods-v1';
 let done = JSON.parse(localStorage.getItem(LS_DONE) || '{}');
 let custom = JSON.parse(localStorage.getItem(LS_CUSTOM) || '[]');
 let arch = JSON.parse(localStorage.getItem(LS_ARCH) || '{}');   // id -> {t:text, k:kind, at:'YYYY-MM-DD'}
@@ -887,6 +893,11 @@ let edits = JSON.parse(localStorage.getItem(LS_EDITS) || '{}');
 // id -> block key ('flex', 'msgs', ...). No entry = it just sits in the day's
 // 📌 strip with no set time, which is a perfectly fine place to live.
 let slotted = JSON.parse(localStorage.getItem(LS_SLOT) || '{}');
+// per-day clock reshuffles made ON the dashboard (tap a block's time to slide it).
+// 'w2-tue' -> [{k,s,e},...] in display order. Layered over the base clock at
+// render time by clockFor(), so the wk/sat/sun skeletons never get touched and
+// "↺ back to the usual times" can always undo it.
+let blockMods = JSON.parse(localStorage.getItem(LS_BLOCKMODS) || '{}');
 let view = 'today';
 const saveDone = () => { localStorage.setItem(LS_DONE, JSON.stringify(done)); pushStateSoon(); };
 const saveCustom = () => { localStorage.setItem(LS_CUSTOM, JSON.stringify(custom)); pushStateSoon(); };
@@ -894,6 +905,7 @@ const saveArch = () => { localStorage.setItem(LS_ARCH, JSON.stringify(arch)); pu
 const saveMoved = () => { localStorage.setItem(LS_MOVED, JSON.stringify(moved)); pushStateSoon(); };
 const saveEdits = () => { localStorage.setItem(LS_EDITS, JSON.stringify(edits)); pushStateSoon(); };
 const saveSlotted = () => { localStorage.setItem(LS_SLOT, JSON.stringify(slotted)); pushStateSoon(); };
+const saveBlockMods = () => { localStorage.setItem(LS_BLOCKMODS, JSON.stringify(blockMods)); pushStateSoon(); };
 const getToken = () => localStorage.getItem(LS_TOKEN) || '';
 
 /* ---------- DATE HELPERS ---------- */
@@ -1376,6 +1388,7 @@ async function loadState(){
       if(s.moved){ moved=s.moved; localStorage.setItem(LS_MOVED, JSON.stringify(moved)); }
       if(s.edits){ edits=s.edits; localStorage.setItem(LS_EDITS, JSON.stringify(edits)); }
       if(s.slotted){ slotted=s.slotted; localStorage.setItem(LS_SLOT, JSON.stringify(slotted)); }
+      if(s.blockMods){ blockMods=s.blockMods; localStorage.setItem(LS_BLOCKMODS, JSON.stringify(blockMods)); }
       if(s.food){ food=s.food; food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[]; localStorage.setItem(LS_FOOD, JSON.stringify(food)); }
       if(s.friends){ friends=s.friends; friends.people=friends.people||[]; friends.log=friends.log||[]; localStorage.setItem(LS_FRIENDS, JSON.stringify(friends)); }
       if(s.mailDone){ mailDone=s.mailDone; localStorage.setItem(LS_MAILDONE, JSON.stringify(mailDone)); }
@@ -1388,6 +1401,7 @@ async function loadState(){
       // refresh every game-plan checkbox/count + the counters
       Object.values(gpReg).forEach(fns=>fns.forEach(f=>f()));
       renderApps(); renderMoney(); renderFood(); renderFriends(); renderMail(); updateMailStatus();
+      if(view==='plan') renderPlan();   // another device may have slid today's blocks around
     }
   }catch(err){}
 }
@@ -1400,7 +1414,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, food, friends, mailDone, mailStore, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, blockMods, food, friends, mailDone, mailStore, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -1572,7 +1586,55 @@ let CLOCK_OVERRIDES={};
 const DK_BY_DAY=['sun','mon','tue','wed','thu','fri','sat'];
 function clockFor(n,dk,def){
   const key=((CLOCK_OVERRIDES[n]||{})[dk])||def;
-  return CLOCKS[key]||CLOCKS[def]||CLOCKS.wk||[];
+  const base=CLOCKS[key]||CLOCKS[def]||CLOCKS.wk||[];
+  // layer on any reshuffle made right on the dashboard (tap a block's time).
+  // Blocks whose times didn't change keep their hand-written labels ('All day',
+  // 'moved →'); shifted ones get a freshly formatted range.
+  const mods=blockMods['w'+n+'-'+dk];
+  if(!mods) return base;
+  const byK={}; base.forEach(b=>byK[b.k]=b);
+  const out=[];
+  mods.forEach(m=>{
+    const b=byK[m.k]; if(!b) return; delete byK[m.k];
+    out.push((m.s===b.s&&m.e===b.e)?b:Object.assign({},b,{s:m.s,e:m.e,t:fmtRange(m.s,m.e)}));
+  });
+  base.forEach(b=>{ if(byK[b.k]) out.push(b); });   // plan grew a new block since the reshuffle: keep it
+  return out;
+}
+/* ---- ⏰ sliding blocks around (cats happen, sisters happen) ----
+   Tap a block's time (day card or today's clock) and give it a new start: that
+   block and EVERYTHING AFTER it slide by the same amount, durations kept, so the
+   day's shape survives, it just starts later (or earlier). One day only; the
+   weekly skeleton is untouched. Undo lives on the day card. */
+const fmtMins=m=>{ const h=Math.floor((m%1440)/60), mm=m%60; return (((h+11)%12)+1)+':'+String(mm).padStart(2,'0'); };
+const fmtRange=(s,e)=>fmtMins(s)+'-'+fmtMins(e);
+// "12", "12:30", "9pm", "1:15 am", "13:40" -> minutes on the 11am-to-11am schedule
+// day (660..2100). Bare hours pick the first slot at-or-after 11am, so "12" =
+// noon and "1" = 1pm, matching how the clock reads.
+function parseBlockTime(str){
+  const m=/^(\d{1,2})(?::(\d{2}))?\s*(?:(a|p)\.?m?\.?)?$/i.exec((str||'').trim());
+  if(!m) return null;
+  const H=Number(m[1]), mm=Number(m[2]||0);
+  if(H>23||mm>59) return null;
+  const ap=(m[3]||'').toLowerCase();
+  if(ap){ let v=(H%12)*60+mm+(ap==='p'?720:0); if(v<660) v+=1440; return v; }
+  if(H===0) return 1440+mm;                          // 0:xx = past midnight
+  if(H>12){ const v=H*60+mm; return v<660?v+1440:v; } // 24h style
+  for(const c of [(H%12)*60+mm,(H%12)*60+mm+720,(H%12)*60+mm+1440]) if(c>=660) return c;
+  return (H%12)*60+mm+1440;
+}
+function moveBlock(n,dk,k){
+  const def=(DAY_DEFS.find(d=>d.dk===dk)||{}).clock||'wk';
+  const ck=clockFor(n,dk,def);
+  const i=ck.findIndex(b=>b.k===k); if(i<0) return;
+  const b=ck[i];
+  const ans=prompt('Slide "'+b.n+'" to what start time?\n(like 12, 12:30, or 9pm. Everything after it slides along, just this one day.)', fmtMins(b.s));
+  if(ans===null||!ans.trim()) return;
+  const ns=parseBlockTime(ans);
+  if(ns===null){ alert('Hmm, I couldn’t read that time. Try something like 12, 12:30, or 9:15pm 💛'); return; }
+  const delta=ns-b.s; if(!delta) return;
+  blockMods['w'+n+'-'+dk]=ck.map((x,j)=> j<i ? {k:x.k,s:x.s,e:x.e} : {k:x.k,s:x.s+delta,e:x.e+delta});
+  saveBlockMods(); rebuildWeeks(); if(view==='plan') renderPlan();
 }
 function renderPlan(){
   const startD=parse(PLAN_START), endD=parse(PLAN_END);
@@ -1602,7 +1664,8 @@ function renderPlan(){
   todayClock.forEach(b=>{
     const r=document.createElement('div');
     r.className='pd-row'+((nowM>=b.s&&nowM<b.e)?' now-block':'');
-    r.innerHTML='<div class="pd-time">'+b.t+'</div><div class="pd-name">'+b.n+'</div><div class="pd-desc">'+b.d+'</div>';
+    r.innerHTML='<div class="pd-time movable" title="tap to slide this block (today only)">'+b.t+'</div><div class="pd-name">'+b.n+'</div><div class="pd-desc">'+b.d+'</div>';
+    r.querySelector('.pd-time').onclick=()=>moveBlock(wkNum, DK_BY_DAY[dref.getDay()], b.k);
     wrap.appendChild(r);
   });
   const curBlock=todayClock.find(b=>nowM>=b.s&&nowM<b.e);
@@ -2123,10 +2186,17 @@ function buildWeeks(){
         dropZone(strip, id=>agPlace(id, dISO, null));             // drop back here: unset its block
         dBody.appendChild(strip);
       }
+      // one-tap undo for a day whose blocks got slid around
+      if(blockMods['w'+n+'-'+dd.dk]){
+        const rb=document.createElement('button'); rb.className='blk-reset';
+        rb.textContent='↺ back to the usual times';
+        rb.onclick=e=>{ e.stopPropagation(); delete blockMods['w'+n+'-'+dd.dk]; saveBlockMods(); rebuildWeeks(); if(view==='plan') renderPlan(); };
+        dBody.appendChild(rb);
+      }
       ck.forEach(b=>{
         const bid='gpb-w'+n+'-'+dd.dk+'-'+b.k;
         dayIds.push(bid);
-        const hr=hourRow(b,bid);
+        const hr=hourRow(b,bid,{n:n, dk:dd.dk});
         dropZone(hr, id=>agPlace(id, dISO, b.k));                 // drop on a block: that's when you're doing it
         dBody.appendChild(hr);
         const sub=[...tasks.filter(t=>(t.slot||'focus')===b.k), ...agIn(b.k)];
@@ -2162,12 +2232,18 @@ function dropZone(el, onDrop){
     if(id && AGENDA_INDEX[id]) onDrop(id);
   });
 }
-/* one checkable hour block row */
-function hourRow(b,bid){
+/* one checkable hour block row. mv = {n, dk}: tap the time to slide the block
+   (and the rest of the day) to a new start, that one day only. */
+function hourRow(b,bid,mv){
   const row=document.createElement('div'); row.className='pl-item blk';
   const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox';
   const t=document.createElement('div'); t.className='txt2';
   t.innerHTML='<span class="pd-time blk-time">'+b.t+'</span><b>'+b.n+'</b> <span class="pd-desc">'+b.d+'</span>';
+  if(mv){
+    const tm=t.querySelector('.blk-time');
+    tm.classList.add('movable'); tm.title='tap to slide this block to a new time (this day only)';
+    tm.onclick=e=>{ e.stopPropagation(); moveBlock(mv.n, mv.dk, b.k); };
+  }
   const sync=()=>{ cb.checked=!!done[bid]; row.classList.toggle('done',!!done[bid]); };
   sync.el=row;
   (gpReg[bid]=gpReg[bid]||[]).push(sync);
