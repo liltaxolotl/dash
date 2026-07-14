@@ -260,6 +260,22 @@
   .pl-item.blk b{font-weight:800}
   .blk-time{display:inline-block; min-width:92px; font-weight:700; color:var(--lav-deep); font-size:.78rem}
   .blk-tasks{margin-left:22px; border-left:2px dashed var(--line); padding-left:9px}
+  /* 📌 real-life strip: the day's to-dos, bills and appointments, pinned on top */
+  .ag-strip{background:#fff2f8; border:1px solid #ffd6e8; border-radius:12px; padding:4px 10px 6px; margin:8px 0 2px}
+  .ag-head{font-size:.72rem; font-weight:800; letter-spacing:.3px; text-transform:uppercase; color:var(--pink-deep); padding:6px 2px 2px}
+  .ag-strip .pl-item{border-bottom-color:#ffdcea}
+  /* grab a to-do and drop it into a time block (⇅ does the same by tap) */
+  .ag-row{cursor:grab}
+  .ag-row:active{cursor:grabbing}
+  .ag-row.dragging{opacity:.45}
+  .drop-on{outline:2px dashed var(--pink-deep); outline-offset:2px; background:#fff2f8}
+  .ag-move{margin:0 0 8px 26px; padding:8px; border:1px dashed var(--pink-deep); border-radius:10px; background:#fff7fb;
+    display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+  .ag-move button{border:1px solid var(--line); background:#fff; border-radius:99px; padding:4px 10px;
+    font-family:inherit; font-size:.76rem; font-weight:700; color:var(--ink); cursor:pointer}
+  .ag-move button:hover{border-color:var(--pink-deep); background:#ffeaf3}
+  .ag-move button.on{border-color:var(--pink-deep); background:#ffdcea}
+  .ag-move .rs-lbl{width:100%}
   .day-theme{font-size:.68rem; font-weight:800; padding:2px 9px; border-radius:99px; background:#ece4ff; color:var(--lav-deep)}
   details.plan-day details.plan-day{margin:8px 0; box-shadow:none; background:#fdfafe}
   details.plan-day.day-done>summary{opacity:.55}
@@ -587,6 +603,7 @@
         <div class="card">
           <h2>🗓️ The 8-Week Sprint <span class="pill">check off days AND tasks · 🤖 Claude helps · 🔎 research</span></h2>
           <p class="cl-lead" style="margin-bottom:6px">Jobs every weekday. Then each day has its own project: 💰 commissions Mon, 🎬 content Tue, 🌐 website Wed, 🎨 portfolio Thu, 🛍️🧑‍🏫 shop + tutoring Fri, 🎥 Ugly Dolls Sat. Every project grows week over week. The 🤖 button copies a ready-made prompt (and opens Claude) so you never start from a blank page.</p>
+          <p class="cl-lead" style="margin-bottom:6px">📌 Your real life shows up here on its own: any to-do, bill, or appointment you add on the 🌸 Today tab lands in a pink strip at the top of its day. <b>Drag it onto a time block</b> to decide when you're actually doing it, drag it between blocks to shuffle it, or drop it on another day's header to move it there. On your phone, tap <b>⇅</b> for the same thing. Tick it here or on the Today tab, it stays in step either way.</p>
           <div id="planWeeks"></div>
         </div>
 
@@ -774,15 +791,21 @@ const LS_CUSTOM = 'lupita-dash-custom-v1';
 const LS_TOKEN = 'lupita-gh-token-v1';
 const LS_ARCH = 'lupita-archive-v1';
 const LS_MOVED = 'lupita-dash-moved-v1';
+const LS_SLOT = 'lupita-dash-slot-v1';
 let done = JSON.parse(localStorage.getItem(LS_DONE) || '{}');
 let custom = JSON.parse(localStorage.getItem(LS_CUSTOM) || '[]');
 let arch = JSON.parse(localStorage.getItem(LS_ARCH) || '{}');   // id -> {t:text, k:kind, at:'YYYY-MM-DD'}
 let moved = JSON.parse(localStorage.getItem(LS_MOVED) || '{}'); // id -> {d:'YYYY-MM-DD', t:'8:20 AM'} date overrides
+// which clock block a to-do has been parked in on its Game Plan day card.
+// id -> block key ('flex', 'msgs', ...). No entry = it just sits in the day's
+// 📌 strip with no set time, which is a perfectly fine place to live.
+let slotted = JSON.parse(localStorage.getItem(LS_SLOT) || '{}');
 let view = 'today';
 const saveDone = () => { localStorage.setItem(LS_DONE, JSON.stringify(done)); pushStateSoon(); };
 const saveCustom = () => { localStorage.setItem(LS_CUSTOM, JSON.stringify(custom)); pushStateSoon(); };
 const saveArch = () => { localStorage.setItem(LS_ARCH, JSON.stringify(arch)); pushStateSoon(); };
 const saveMoved = () => { localStorage.setItem(LS_MOVED, JSON.stringify(moved)); pushStateSoon(); };
+const saveSlotted = () => { localStorage.setItem(LS_SLOT, JSON.stringify(slotted)); pushStateSoon(); };
 const getToken = () => localStorage.getItem(LS_TOKEN) || '';
 
 /* ---------- DATE HELPERS ---------- */
@@ -841,6 +864,26 @@ function withMove(it){
   });
 }
 
+/* ---------- ONE SOURCE OF TRUTH FOR THE SCHEDULE ----------
+   Every dated to-do, bill, and appointment: the private feed's copy when it's
+   loaded, the baked-in arrays otherwise, plus anything Lupita added herself and
+   any calendar events, with day-moves layered on. Both the home lists AND the
+   Game Plan day cards read from here, so they can never drift apart. */
+function scheduleLists(){
+  const D=REMOTE||{};
+  const baseAppts=D.appts||APPTS;
+  const withEvents=[...baseAppts, ...EVENTS.filter(e=>!baseAppts.some(a=>a.id===e.id))];
+  return {
+    task:[...(D.tasks||TASKS), ...custom.filter(c=>!c.kind||c.kind==='task')].map(withMove),
+    bill:[...(D.bills||BILLS), ...custom.filter(c=>c.kind==='bill')].map(withMove),
+    appt:[...withEvents,        ...custom.filter(c=>c.kind==='appt')].map(withMove),
+  };
+}
+
+/* checking something here also ticks its twin on the Game Plan day card (and the
+   other way round: see gpSet). One item, one checkmark, two places to tap it. */
+const syncGp = id => (gpReg[id]||[]).forEach(f=>f());
+
 /* ---------- RENDER ---------- */
 function itemRow(it, kind, deletable){
   const isDone = !!done[it.id];
@@ -856,10 +899,10 @@ function itemRow(it, kind, deletable){
       if(archivable){
         // log the completion date, show the ✓ for a beat, then tuck it into the Archive
         arch[it.id]={t:it.text, k:kind, at:iso(new Date())}; saveArch();
-        li.classList.add('done'); saveDone(); setTimeout(render,900); return;
+        li.classList.add('done'); saveDone(); syncGp(it.id); setTimeout(render,900); return;
       }
     } else { delete done[it.id]; if(arch[it.id]){ delete arch[it.id]; saveArch(); } }
-    saveDone(); render();
+    saveDone(); syncGp(it.id); render();
   };
   const body=document.createElement('div'); body.className='body';
   const txt=document.createElement('div'); txt.className='txt'; txt.textContent=it.text;
@@ -891,7 +934,7 @@ function itemRow(it, kind, deletable){
   }
   if(deletable){ const del=document.createElement('button'); del.className='del'; del.textContent='✕';
     del.title='remove'; del.onclick=()=>{ custom=custom.filter(c=>c.id!==it.id); delete done[it.id]; delete moved[it.id];
-      saveCustom(); saveDone(); saveMoved(); render(); };
+      saveCustom(); saveDone(); saveMoved(); render(); rebuildWeeks(); };
     li.appendChild(del); }
   return li;
 }
@@ -899,7 +942,8 @@ function itemRow(it, kind, deletable){
 /* the little "move to another day" drawer under an item (hidden until 📅 is tapped) */
 function reschedPanel(it, kind, li){
   const p=document.createElement('div'); p.className='resched'; p.style.display='none';
-  const setDate=d=>{ moved[it.id]=Object.assign({}, moved[it.id], {d}); saveMoved(); render(); };
+  // a move changes which day card it belongs to, so the Game Plan redraws too
+  const setDate=d=>{ moved[it.id]=Object.assign({}, moved[it.id], {d}); saveMoved(); render(); rebuildWeeks(); };
   const lbl=document.createElement('span'); lbl.className='rs-lbl'; lbl.textContent='move to:'; p.appendChild(lbl);
   const chip=(label,title,fn)=>{ const b=document.createElement('button'); b.textContent=label; b.title=title;
     b.onclick=fn; p.appendChild(b); return b; };
@@ -914,11 +958,11 @@ function reschedPanel(it, kind, li){
   if(kind==='appt'){
     const tp=document.createElement('input'); tp.type='time'; tp.title='new time (optional)';
     tp.value=to24(it.time||'');
-    tp.onchange=()=>{ moved[it.id]=Object.assign({}, moved[it.id], {t:to12(tp.value)}); saveMoved(); render(); };
+    tp.onchange=()=>{ moved[it.id]=Object.assign({}, moved[it.id], {t:to12(tp.value)}); saveMoved(); render(); rebuildWeeks(); };
     p.appendChild(tp);
   }
   if(it.moved){
-    chip('↺ put it back','undo the move, back to the original day', ()=>{ delete moved[it.id]; saveMoved(); render(); });
+    chip('↺ put it back','undo the move, back to the original day', ()=>{ delete moved[it.id]; saveMoved(); render(); rebuildWeeks(); });
     const was=document.createElement('span'); was.className='rs-was';
     was.textContent='was '+(it.orig&&it.orig.date?fmtWhen(it.orig.date):'undated')
       +((it.orig&&it.orig.time)?(' · '+it.orig.time):'');
@@ -1110,7 +1154,7 @@ async function fetchData(){
   if(d) REMOTE=d;
   const ev=await fetchPrivate('events.json');
   if(ev) EVENTS=ev.events||[];
-  if(d||ev) render();
+  if(d||ev){ render(); rebuildWeeks(); }   // fresh schedule: redraw the day cards too
 }
 
 /* ---------- CROSS-DEVICE STATE SYNC ----------
@@ -1137,12 +1181,14 @@ async function loadState(){
       if(s.money){ money=s.money; localStorage.setItem(LS_MONEY, JSON.stringify(money)); }
       if(s.arch){ arch=s.arch; localStorage.setItem(LS_ARCH, JSON.stringify(arch)); }
       if(s.moved){ moved=s.moved; localStorage.setItem(LS_MOVED, JSON.stringify(moved)); }
+      if(s.slotted){ slotted=s.slotted; localStorage.setItem(LS_SLOT, JSON.stringify(slotted)); }
       if(s.food){ food=s.food; food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[]; localStorage.setItem(LS_FOOD, JSON.stringify(food)); }
       if(s.friends){ friends=s.friends; friends.people=friends.people||[]; localStorage.setItem(LS_FRIENDS, JSON.stringify(friends)); }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
       localStorage.setItem(LS_CUSTOM, JSON.stringify(custom));
       localStorage.setItem(LS_SAVEDAT, String(s.savedAt||0));
       render();
+      rebuildWeeks();   // the phone may have added or moved a to-do: redraw its day card
       // refresh every game-plan checkbox/count + the counters
       Object.values(gpReg).forEach(fns=>fns.forEach(f=>f()));
       renderApps(); renderMoney(); renderFood(); renderFriends();
@@ -1158,7 +1204,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, food, friends, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, slotted, food, friends, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -1212,16 +1258,13 @@ function render(){
 
   // remote data (private repo) wins over the baked-in fallback arrays
   const D=REMOTE||{};
-  const dTASKS=D.tasks||TASKS, dBILLS=D.bills||BILLS, dFOCUSES=D.focuses||FOCUSES,
-        dRHYTHM=D.rhythm||RHYTHM, dMILES=D.miles||MILES, dPROJECTS=D.projects||PROJECTS;
-  const baseAppts=D.appts||APPTS;
-  const dAPPTS=[...baseAppts, ...EVENTS.filter(e=>!baseAppts.some(a=>a.id===e.id))];
+  const dFOCUSES=D.focuses||FOCUSES, dRHYTHM=D.rhythm||RHYTHM,
+        dMILES=D.miles||MILES, dPROJECTS=D.projects||PROJECTS;
 
-  // left lists (custom items merged into whichever card their kind says)
-  // .map(withMove) layers on anything Lupita has pushed to a different day
-  const allTasks=[...dTASKS, ...custom.filter(c=>!c.kind||c.kind==='task')].map(withMove);
-  const allBills=[...dBILLS, ...custom.filter(c=>c.kind==='bill')].map(withMove);
-  const allAppts=[...dAPPTS, ...custom.filter(c=>c.kind==='appt')].map(withMove);
+  // left lists: the same schedule the Game Plan day cards read (custom items
+  // merged into whichever card their kind says, day-moves already layered on)
+  const S=scheduleLists();
+  const allTasks=S.task, allBills=S.bill, allAppts=S.appt;
   const tl=document.getElementById('taskList'); tl.innerHTML='';
   const visTasks=allTasks.filter(it=>(!it.date||inView(it.date))&&!arch[it.id]).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
   if(!visTasks.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='No to-dos for this view. Breathe easy. 🌿'; tl.appendChild(e);}
@@ -1327,7 +1370,7 @@ function clockFor(n,dk,def){
   return CLOCKS[key]||CLOCKS[def]||CLOCKS.wk||[];
 }
 function renderPlan(){
-  const startD=parse('2026-07-13'), endD=parse('2026-09-06');
+  const startD=parse(PLAN_START), endD=parse(PLAN_END);
   // phase bar + week pill
   const pbEl=document.getElementById('phaseBar'); pbEl.innerHTML='';
   PLAN_PHASES.forEach(p=>{
@@ -1518,8 +1561,39 @@ function gpSet(id,val){
   if(val) done[id]=true; else delete done[id];
   saveDone(); (gpReg[id]||[]).forEach(f=>f());
   if(id.slice(0,4)==='gpd-'){ if(val) confetti(30); renderApps(); } // day checked: celebrate + refresh streak
+  // a real-life item ticked on a day card: file it home exactly like the home tab
+  // would (checked = tucked into the Archive, unchecked = back on the list)
+  const sch=AGENDA_INDEX[id];
+  if(sch){
+    if(val) arch[id]={t:sch.text, k:sch.kind, at:iso(new Date())};
+    else delete arch[id];
+    saveArch(); render();
+  }
 }
-function checklist(items,cntEl){
+/* drop the sync callbacks belonging to DOM we are about to throw away, so a
+   rebuilt week doesn't leave ghosts updating detached rows */
+function gpPrune(root){
+  Object.keys(gpReg).forEach(id=>{
+    gpReg[id]=gpReg[id].filter(f=>!(f.el && root.contains(f.el)));
+    if(!gpReg[id].length) delete gpReg[id];
+  });
+}
+/* the day cards read live from the schedule, so anything that changes a to-do
+   (added, moved, deleted, or synced in from the phone) redraws the weeks. Which
+   cards were open stays open. */
+function rebuildWeeks(){
+  const wrap=document.getElementById('planWeeks');
+  if(!wrap || !wrap.dataset.built) return;   // not drawn yet: it will pick things up when it is
+  const open=new Set();
+  wrap.querySelectorAll('details[data-key]').forEach(d=>{ if(d.open) open.add(d.dataset.key); });
+  gpPrune(wrap);
+  wrap.innerHTML=''; delete wrap.dataset.built;
+  buildWeeks();
+  wrap.querySelectorAll('details[data-key]').forEach(d=>{ d.open=open.has(d.dataset.key); });
+}
+/* ctx (day cards only) = {dayISO, blocks, days}: what a 📌 to-do needs to know to
+   be dragged into a time block, or tapped there with ⇅ when there's no mouse. */
+function checklist(items,cntEl,ctx){
   const box=document.createElement('div');
   const update=()=>{ if(cntEl) cntEl.textContent=items.filter(it=>done[it.id]).length+' / '+items.length; };
   items.forEach(it=>{
@@ -1527,6 +1601,7 @@ function checklist(items,cntEl){
     const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox';
     const t=document.createElement('div'); t.className='txt2'; t.textContent=it.txt;
     const sync=()=>{ cb.checked=!!done[it.id]; row.classList.toggle('done',!!done[it.id]); update(); };
+    sync.el=row;
     (gpReg[it.id]=gpReg[it.id]||[]).push(sync);
     cb.onchange=()=>gpSet(it.id,cb.checked);
     row.onclick=e=>{ if(e.target===cb||e.target.closest('.tbs')) return; gpSet(it.id,!done[it.id]); };
@@ -1547,6 +1622,31 @@ function checklist(items,cntEl){
       qb.title='Research on the web: '+it.q;
       qb.onclick=e=>{ e.stopPropagation(); window.open('https://www.google.com/search?q='+encodeURIComponent(it.q),'_blank'); };
       tbs.appendChild(qb); }
+    // 📌 real-life to-dos: grab them and drop them into a time block (or tap ⇅)
+    if(it.agenda && ctx){
+      row.classList.add('ag-row');
+      row.draggable=true;
+      row.ondragstart=e=>{ e.dataTransfer.setData('text/plain', it.id); e.dataTransfer.effectAllowed='move'; row.classList.add('dragging'); };
+      row.ondragend=()=>row.classList.remove('dragging');
+      const mv=document.createElement('button'); mv.className='tb'; mv.textContent='⇅';
+      mv.title='Put this in a time block (or move it to another day)';
+      tbs.insertBefore(mv, tbs.firstChild);
+      const drw=document.createElement('div'); drw.className='ag-move'; drw.style.display='none';
+      const chip=(label,title,on,fn)=>{ const b=document.createElement('button');
+        b.textContent=label; b.title=title; if(on) b.classList.add('on');
+        b.onclick=e=>{ e.stopPropagation(); fn(); }; drw.appendChild(b); return b; };
+      const lbl=x=>{ const s=document.createElement('span'); s.className='rs-lbl'; s.textContent=x; drw.appendChild(s); };
+      lbl('do it during:');
+      chip('📌 no set time','leave it loose in the day, no block',!it.slot,()=>agPlace(it.id,ctx.dayISO,null));
+      ctx.blocks.forEach(b=>chip(b.n, b.t+' · '+b.d, it.slot===b.k, ()=>agPlace(it.id,ctx.dayISO,b.k)));
+      lbl('or another day:');
+      ctx.days.forEach(dy=>chip(dy.name.slice(0,3), dy.name+' '+dy.label, dy.iso===ctx.dayISO,
+        ()=>agPlace(it.id, dy.iso, slotted[it.id]||null)));
+      mv.onclick=e=>{ e.stopPropagation(); const open=drw.style.display==='none';
+        drw.style.display=open?'flex':'none'; mv.classList.toggle('on',open); };
+      row.appendChild(cb); row.appendChild(t); row.appendChild(tbs);
+      box.appendChild(row); box.appendChild(drw); sync(); return;
+    }
     row.appendChild(cb); row.appendChild(t); row.appendChild(tbs); box.appendChild(row);
     sync();
   });
@@ -1582,13 +1682,16 @@ function recTasks(n,dk){
     T.push({id:id('msgs'), slot:'msgs', txt:'Clear the inbox + DMs (30 min, Claude drafts the replies)', links:[L.gmail,L.msgr,L.igdm],
       ai:'Triage my inbox and DMs with me: I will paste what came in, you sort by needs-reply / can-wait / ignore and draft the replies in my voice.'});
   }
-  if(dk==='mon'){
-    T.push({id:id('trend'), slot:'setup', txt:'20-min trend check: pick this week’s 3 video ideas',
+  const TREND={slot:'setup', txt:'20-min trend check: pick this week’s 3 video ideas',
       ai:'Search the web for what is trending THIS week on art TikTok, Instagram Reels, and YouTube Shorts for animators and illustrators: sounds, formats, challenges. Then give me 5 concrete video ideas in my quirky-cute style I can film today, ranked.',
-      q:'TikTok trending sounds art creators this week'});
+      q:'TikTok trending sounds art creators this week'};
+  if(dk==='mon'){
+    // week 1 only: Mon 7/13 started at 6:30pm, so the trend check slid to Tuesday
+    if(n!==1) T.push(Object.assign({id:id('trend')}, TREND));
     T.push({id:id('film'), slot:'content', txt:'Film video #1', links:[L.tiktok]});
   }
   if(dk==='tue'){
+    if(n===1) T.push(Object.assign({id:id('trend')}, TREND, {txt:'20-min trend check (slid from Monday): pick this week’s 3 video ideas'}));
     T.push({id:id('edit'), slot:'content', txt:'Edit + post video #1 to TikTok, IG Reels, YT Shorts', links:[L.tiktok,L.ytstudio]});
     T.push({id:id('eng'), slot:'content', txt:'15 min engagement: reply to every comment + DM', links:[L.igdm,L.tiktok],
       ai:'Draft short warm replies in my voice to the comments and DMs I paste. Batch them so I can copy-paste fast.'});
@@ -1643,11 +1746,59 @@ function friendTasks(n,dk){
       ai:'Help me text a friend to set up a real hangout. I will tell you who and our vibe. Draft a short low-pressure message that proposes one specific activity and two concrete day options, in my voice: warm, silly, sincere. No em dashes.'});
   return T;
 }
+/* ---- 📌 YOUR REAL LIFE, DROPPED ONTO THE DAY IT HAPPENS ----
+   Every to-do, bill, and appointment from the home tab lands on the day card for
+   its date, automatically. Add "eye appt tuesday 1:40pm" up top and it is on
+   Tuesday's card in the sprint, timed items first. Same ids on both sides, so a
+   check in either place shows up in the other, and moving an item with 📅 moves
+   it to the new day's card.
+   Anything still open and past its day rides along on TODAY's card so it can't
+   quietly rot at the bottom of a list. */
+const PLAN_START='2026-07-13', PLAN_END='2026-09-06';
+const AG_ICON={task:'📌', bill:'💸', appt:'🩺'};
+const AG_AI={
+  task:'Help me actually get this done right now: "%s". Break it into the smallest possible first step, then stay with me through the rest. Zero judgment if I have been putting it off.',
+  bill:'Help me pay this today: "%s". Give me the 3-step version (open the site, pay it, log it here) and keep it painless. If I am anxious about the money side, be kind about it.',
+  appt:'Help me get ready for this appointment: "%s". What should I bring, what should I ask, and when do I need to leave to be on time? Keep it short and calm.',
+};
+const AGENDA_INDEX={};   // item id -> {text, kind, date}, so a day card can file it home + move it
+/* drop a to-do onto a day + block: "this is when I'm doing it".
+   Dropping it on a different day moves it there (same override the 📅 button
+   uses), and blockKey null means "on that day, but no set time". */
+function agPlace(id, dayISO, blockKey){
+  const info=AGENDA_INDEX[id]; if(!info) return;
+  if(info.date!==dayISO){ moved[id]=Object.assign({}, moved[id], {d:dayISO}); saveMoved(); }
+  if(blockKey) slotted[id]=blockKey; else delete slotted[id];
+  saveSlotted(); render(); rebuildWeeks();
+}
+function agendaFor(dateStr, isToday){
+  const S=scheduleLists();
+  const out=[];
+  ['appt','bill','task'].forEach(kind=>S[kind].forEach(it=>{
+    if(!it.date) return;
+    const late=it.date<dateStr;
+    // its own day always; overdue leftovers only tag along on today, and only while still open
+    if(it.date!==dateStr && !(isToday && late && !done[it.id] && !arch[it.id])) return;
+    AGENDA_INDEX[it.id]={text:it.text, kind, date:it.date};
+    out.push({
+      id:it.id,
+      agenda:true,
+      slot:slotted[it.id]||null,
+      mins:it.time?Number((to24(it.time)||'99:99').replace(':','')):9999,
+      txt:AG_ICON[kind]+' '+it.text+(it.time?(' · '+it.time):'')
+        +(late?' (was '+fmtWhen(it.date)+', still open)':''),
+      ai:AG_AI[kind].replace('%s', it.text+(it.time?(' at '+it.time):'')+(it.note?('. Notes: '+it.note):'')),
+      links:(it.links||[]).map(l=>({ic:Array.from(l.label)[0]||'🔗', tip:l.label, u:l.url})),
+    });
+  }));
+  return out.sort((a,b)=>a.mins-b.mins);   // timed things first, in clock order
+}
+
 /* ---- one-off real-life items pinned to specific days ---- */
 let SPECIALS={};
 let DAY_DEFS=[];
 let WEEK_TITLES=[];
-function dayDate(n,idx){ const d=parse('2026-07-13'); d.setDate(d.getDate()+(n-1)*7+idx); return d; }
+function dayDate(n,idx){ const d=parse(PLAN_START); d.setDate(d.getDate()+(n-1)*7+idx); return d; }
 function buildWeeks(){
   const wrap=document.getElementById('planWeeks');
   if(wrap.dataset.built) return; wrap.dataset.built='1';
@@ -1660,11 +1811,14 @@ function buildWeeks(){
   for(let n=1;n<=8;n++){
     const f=dayDate(n,0), t=dayDate(n,6), cur=today>=f&&today<=t;
     const det=document.createElement('details'); det.className='plan-day'+(cur?' today-day':''); if(cur) det.open=true;
+    det.dataset.key='w'+n;
     const sum=document.createElement('summary');
     sum.innerHTML='<span class="caret">▸</span>Week '+n+(cur?' 🌸':'')+' <span class="sub">'+fmt(f)+' to '+fmt(t)+' · '+(WEEK_TITLES[n-1]||'')+'</span>';
     const cnt=document.createElement('span'); cnt.className='hrs'; sum.appendChild(cnt); det.appendChild(sum);
     const body=document.createElement('div'); body.className='pd-body';
     const weekIds=[];
+    // the week's seven dates, for the "or another day" chips in the ⇅ drawer
+    const weekDays=DAY_DEFS.map((x,i)=>({dk:x.dk, name:x.name, iso:isoLocal(dayDate(n,i)), label:fmt(dayDate(n,i))}));
     DAY_DEFS.forEach((dd,idx)=>{
       const tasks=[...recTasks(n,dd.dk), ...cleanTasks(n,dd.dk), ...friendTasks(n,dd.dk)];
       ((SPECIALS[n]||{})[dd.dk]||[]).forEach((sp,i)=>{
@@ -1672,15 +1826,17 @@ function buildWeeks(){
         tasks.push(t);
       });
       dd.proj.forEach(pk=>{ (GUIDE_STEPS[pk].steps[n-1]||[]).forEach(it=>{ if(pk==='ugly'&&!it.slot) it.slot='ugly'; tasks.push(it); }); });
-      const dDate=dayDate(n,idx), isToday=iso(dDate)===iso(today);
+      const dDate=dayDate(n,idx), dISO=isoLocal(dDate), isToday=dISO===isoLocal(today);
       const dDet=document.createElement('details'); dDet.className='plan-day'+(isToday?' today-day':'');
       if(isToday){ dDet.open=true; det.open=true; }
+      dDet.dataset.key='w'+n+'-'+dd.dk;
       const dSum=document.createElement('summary');
       const dayId='gpd-w'+n+'-'+dd.dk;
       const dcb=document.createElement('input'); dcb.type='checkbox'; dcb.className='cbox'; dcb.title='check off the whole day';
       dcb.onclick=e=>e.stopPropagation();
       dcb.onchange=()=>gpSet(dayId,dcb.checked);
       const dSync=()=>{ dcb.checked=!!done[dayId]; dDet.classList.toggle('day-done',!!done[dayId]); };
+      dSync.el=dDet;
       (gpReg[dayId]=gpReg[dayId]||[]).push(dSync);
       dSum.appendChild(dcb);
       const lbl=document.createElement('span'); lbl.className='daylbl';
@@ -1692,26 +1848,64 @@ function buildWeeks(){
       const dBody=document.createElement('div'); dBody.className='pd-body';
       const ck=clockFor(n,dd.dk,dd.clock);
       const dayIds=tasks.map(t=>t.id);
+      /* 📌 real life on this day: to-dos, bills, and appointments due today.
+         Ones you've parked in a time block sit under that block. The rest wait in
+         the pink strip up top with no set time, which is a fine place to stay.
+         Drag them anywhere (or tap ⇅): onto a block to give it a when, onto
+         another day's header to move it there. */
+      const ag=agendaFor(dISO, isToday);
+      const blockKeys=new Set(ck.map(b=>b.k));
+      const agIn=k=>ag.filter(it=>it.slot===k);
+      const agLoose=ag.filter(it=>!it.slot || !blockKeys.has(it.slot));
+      const ctx={dayISO:dISO, blocks:ck, days:weekDays};
+      dayIds.push(...ag.map(t=>t.id));
+      dropZone(dSum, id=>agPlace(id, dISO, slotted[id]||null));   // drop on the day header: move it to this day
+      if(agLoose.length){
+        const strip=document.createElement('div'); strip.className='ag-strip';
+        const hd=document.createElement('div'); hd.className='ag-head';
+        hd.textContent='📌 Real life '+(isToday?'today':'this day')+', no set time yet';
+        strip.appendChild(hd); strip.appendChild(checklist(agLoose,null,ctx));
+        dropZone(strip, id=>agPlace(id, dISO, null));             // drop back here: unset its block
+        dBody.appendChild(strip);
+      }
       ck.forEach(b=>{
         const bid='gpb-w'+n+'-'+dd.dk+'-'+b.k;
         dayIds.push(bid);
-        dBody.appendChild(hourRow(b,bid));
-        const sub=tasks.filter(t=>(t.slot||'focus')===b.k);
-        if(sub.length){ const st=document.createElement('div'); st.className='blk-tasks'; st.appendChild(checklist(sub,null)); dBody.appendChild(st); }
+        const hr=hourRow(b,bid);
+        dropZone(hr, id=>agPlace(id, dISO, b.k));                 // drop on a block: that's when you're doing it
+        dBody.appendChild(hr);
+        const sub=[...tasks.filter(t=>(t.slot||'focus')===b.k), ...agIn(b.k)];
+        if(sub.length){ const st=document.createElement('div'); st.className='blk-tasks';
+          st.appendChild(checklist(sub,null,ctx));
+          dropZone(st, id=>agPlace(id, dISO, b.k));
+          dBody.appendChild(st); }
       });
-      const slots=new Set(ck.map(b=>b.k));
-      const rest=tasks.filter(t=>!slots.has(t.slot||'focus'));
+      const rest=tasks.filter(t=>!blockKeys.has(t.slot||'focus'));
       if(rest.length){ const st=document.createElement('div'); st.className='blk-tasks'; st.appendChild(checklist(rest,null)); dBody.appendChild(st); }
       const dUpd=()=>{ dCnt.textContent=dayIds.filter(id=>done[id]).length+' / '+dayIds.length; };
+      dUpd.el=dDet;
       dayIds.forEach(id=>(gpReg[id]=gpReg[id]||[]).push(dUpd)); dUpd();
       weekIds.push(...dayIds);
       dDet.appendChild(dBody); body.appendChild(dDet);
       dSync();
     });
     const upd=()=>{ cnt.textContent=weekIds.filter(id=>done[id]).length+' / '+weekIds.length; };
+    upd.el=det;
     weekIds.forEach(id=>(gpReg[id]=gpReg[id]||[]).push(upd)); upd();
     det.appendChild(body); wrap.appendChild(det);
   }
+}
+/* anywhere a 📌 to-do can be dropped: a time block, the day's no-set-time strip,
+   or another day's header. Only real schedule items count, so dragging a sprint
+   task around does nothing. */
+function dropZone(el, onDrop){
+  el.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; el.classList.add('drop-on'); });
+  el.addEventListener('dragleave', ()=>el.classList.remove('drop-on'));
+  el.addEventListener('drop', e=>{
+    e.preventDefault(); e.stopPropagation(); el.classList.remove('drop-on');
+    const id=e.dataTransfer.getData('text/plain');
+    if(id && AGENDA_INDEX[id]) onDrop(id);
+  });
 }
 /* one checkable hour block row */
 function hourRow(b,bid){
@@ -1720,6 +1914,7 @@ function hourRow(b,bid){
   const t=document.createElement('div'); t.className='txt2';
   t.innerHTML='<span class="pd-time blk-time">'+b.t+'</span><b>'+b.n+'</b> <span class="pd-desc">'+b.d+'</span>';
   const sync=()=>{ cb.checked=!!done[bid]; row.classList.toggle('done',!!done[bid]); };
+  sync.el=row;
   (gpReg[bid]=gpReg[bid]||[]).push(sync);
   cb.onchange=()=>gpSet(bid,cb.checked);
   row.onclick=e=>{ if(e.target!==cb) gpSet(bid,!done[bid]); };
@@ -2081,8 +2276,10 @@ function addTask(){
   if(w.time) it.time=w.time;
   if(kind==='task') it.tag='work';
   custom.push(it);
-  saveCustom(); inp.value=''; sel.value='auto'; render();
+  saveCustom(); inp.value=''; sel.value='auto'; render(); rebuildWeeks();
   let msg='Filed under '+KIND_HOME[kind]+' · '+fmtWhen(it.date)+(it.time?(' '+it.time):'')+' ✓';
+  // if it lands inside the sprint, say so: it is already sitting on that day's card
+  if(it.date>=PLAN_START && it.date<=PLAN_END) msg+=' · also on your 🗺️ Game Plan day card';
   if(!inView(it.date)) msg+=' (it\'s outside this tab\'s dates, peek at 📅 This Week or ✨ Everything)';
   showAddHint(msg);
 }
