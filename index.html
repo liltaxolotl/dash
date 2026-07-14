@@ -274,9 +274,12 @@
   .pl-item.blk{background:#fbf7fc; border-radius:10px; border-bottom:none; margin-top:7px; padding:7px 8px}
   .pl-item.blk b{font-weight:800}
   .blk-time{display:inline-block; min-width:92px; font-weight:700; color:var(--lav-deep); font-size:.78rem}
-  /* tap a block's time to slide it (and everything after it) to a new start */
-  .blk-time.movable, .pd-time.movable{cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px; text-decoration-color:var(--line)}
+  /* grab a block by its time to drag it around the day; tap it to type a time */
+  .blk-time.movable, .pd-time.movable{cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; text-decoration:underline dotted; text-underline-offset:3px; text-decoration-color:var(--line)}
   .blk-time.movable:hover, .pd-time.movable:hover{color:var(--pink-deep); text-decoration-color:var(--pink-deep)}
+  .blk-dragging{opacity:.55; position:relative; z-index:5; cursor:grabbing}
+  .blk-insert{box-shadow:0 -3px 0 0 var(--pink-deep)}
+  .blk-insert-end{box-shadow:0 3px 0 0 var(--pink-deep)}
   .blk-reset{display:inline-block; margin:8px 2px 2px; padding:3px 10px; font-size:.72rem; font-weight:700; color:var(--lav-deep); background:#f6effa; border:1px solid var(--line); border-radius:999px; cursor:pointer}
   .blk-reset:hover{background:#efe3f7}
   .blk-tasks{margin-left:22px; border-left:2px dashed var(--line); padding-left:9px}
@@ -1619,17 +1622,19 @@ function clockFor(n,dk,def){
   base.forEach(b=>{ if(byK[b.k]) out.push(b); });   // plan grew a new block since the reshuffle: keep it
   return out;
 }
-/* ---- ⏰ sliding blocks around (cats happen, sisters happen) ----
-   Tap a block's time (day card or today's clock) and give it a new start: that
-   block and EVERYTHING AFTER it slide by the same amount, durations kept, so the
-   day's shape survives, it just starts later (or earlier). One day only; the
-   weekly skeleton is untouched. Undo lives on the day card. */
+/* ---- ⏰ moving blocks around (cats happen, sisters happen) ----
+   Every block's time label is a handle. DRAG it up or down to physically move
+   the block somewhere else in the day: it slots in where you drop it and the
+   blocks in between close ranks around it, durations kept, nothing else moves.
+   TAP it instead to type a new start time; then that block and everything after
+   it slide by the same amount. Either way it's that ONE day only; the weekly
+   skeleton is untouched and the day card grows an undo chip. */
 const fmtMins=m=>{ const h=Math.floor((m%1440)/60), mm=m%60; return (((h+11)%12)+1)+':'+String(mm).padStart(2,'0'); };
 const fmtRange=(s,e)=>fmtMins(s)+'-'+fmtMins(e);
 // "12", "12:30", "9pm", "1:15 am", "13:40" -> minutes on the 11am-to-11am schedule
-// day (660..2100). Bare hours pick the first slot at-or-after 11am, so "12" =
-// noon and "1" = 1pm, matching how the clock reads.
-function parseBlockTime(str){
+// day (660..2100). A bare time with no am/pm picks whichever reading is CLOSEST
+// to where the block sits now ("12:20" on a 9:20pm block means 12:20am, not noon).
+function parseBlockTime(str,near){
   const m=/^(\d{1,2})(?::(\d{2}))?\s*(?:(a|p)\.?m?\.?)?$/i.exec((str||'').trim());
   if(!m) return null;
   const H=Number(m[1]), mm=Number(m[2]||0);
@@ -1638,21 +1643,86 @@ function parseBlockTime(str){
   if(ap){ let v=(H%12)*60+mm+(ap==='p'?720:0); if(v<660) v+=1440; return v; }
   if(H===0) return 1440+mm;                          // 0:xx = past midnight
   if(H>12){ const v=H*60+mm; return v<660?v+1440:v; } // 24h style
-  for(const c of [(H%12)*60+mm,(H%12)*60+mm+720,(H%12)*60+mm+1440]) if(c>=660) return c;
-  return (H%12)*60+mm+1440;
+  const cands=[(H%12)*60+mm,(H%12)*60+mm+720,(H%12)*60+mm+1440].filter(c=>c>=660);
+  if(near!==undefined) cands.sort((a,b)=>Math.abs(a-near)-Math.abs(b-near));
+  return cands[0];
 }
 function moveBlock(n,dk,k){
   const def=(DAY_DEFS.find(d=>d.dk===dk)||{}).clock||'wk';
   const ck=clockFor(n,dk,def);
   const i=ck.findIndex(b=>b.k===k); if(i<0) return;
   const b=ck[i];
-  const ans=prompt('Slide "'+b.n+'" to what start time?\n(like 12, 12:30, or 9pm. Everything after it slides along, just this one day.)', fmtMins(b.s));
+  const ans=prompt('Slide "'+b.n+'" to what start time?\n(like 12:20 or 9pm. Add am/pm if it could be either. Everything after it slides along, just this one day.)', fmtMins(b.s));
   if(ans===null||!ans.trim()) return;
-  const ns=parseBlockTime(ans);
+  const ns=parseBlockTime(ans, b.s);
   if(ns===null){ alert('Hmm, I couldn’t read that time. Try something like 12, 12:30, or 9:15pm 💛'); return; }
   const delta=ns-b.s; if(!delta) return;
   blockMods['w'+n+'-'+dk]=ck.map((x,j)=> j<i ? {k:x.k,s:x.s,e:x.e} : {k:x.k,s:x.s+delta,e:x.e+delta});
   saveBlockMods(); rebuildWeeks(); if(view==='plan') renderPlan();
+}
+/* drop block k so it becomes the ins-th block of the day. The blocks between its
+   old and new spot shift over by its length; everything outside that stretch
+   keeps its exact times. */
+function reorderBlock(n,dk,k,ins){
+  const def=(DAY_DEFS.find(d=>d.dk===dk)||{}).clock||'wk';
+  const ck=clockFor(n,dk,def).map(b=>({k:b.k,s:b.s,e:b.e}));
+  const from=ck.findIndex(b=>b.k===k); if(from<0) return;
+  let to=ins>from?ins-1:ins;
+  to=Math.max(0,Math.min(ck.length-1,to));
+  if(to===from) return;
+  const lo=Math.min(from,to), hi=Math.max(from,to);
+  let t=ck[lo].s;
+  const [b]=ck.splice(from,1); ck.splice(to,0,b);
+  for(let i=lo;i<=hi;i++){ const d=ck[i].e-ck[i].s; ck[i].s=t; ck[i].e=t+d; t=ck[i].e; }
+  blockMods['w'+n+'-'+dk]=ck;
+  saveBlockMods(); rebuildWeeks(); if(view==='plan') renderPlan();
+}
+/* the shared handle: press-and-drag a time label to physically move its block
+   (works with mouse and finger), or plain tap it to type a time instead.
+   rowSel picks out the sibling block rows ('.pl-item.blk' on a day card,
+   '.pd-row' on the today's-clock strip); the row's position among them is the
+   block's index in the day's clock. */
+function attachBlockHandle(el,row,rowSel,onTap,onDrop){
+  el.addEventListener('click',e=>e.stopPropagation());
+  el.addEventListener('pointerdown',e=>{
+    if(e.button) return;
+    e.preventDefault(); e.stopPropagation();
+    try{ el.setPointerCapture(e.pointerId); }catch(err){}
+    const y0=e.clientY; let dragging=false, ins=null;
+    const rows=()=>[...row.parentElement.children].filter(c=>c.matches(rowSel));
+    const paint=rs=>rs.forEach((r,i)=>{
+      r.classList.toggle('blk-insert', i===ins);
+      r.classList.toggle('blk-insert-end', ins===rs.length && i===rs.length-1);
+    });
+    const move=ev=>{
+      if(!dragging && Math.abs(ev.clientY-y0)<6) return;   // still just a tap
+      dragging=true;
+      row.classList.add('blk-dragging');
+      row.style.transform='translateY('+(ev.clientY-y0)+'px)';
+      const rs=rows(); ins=rs.length;
+      for(let i=0;i<rs.length;i++){
+        if(rs[i]===row) continue;
+        const rc=rs[i].getBoundingClientRect();
+        if(ev.clientY<rc.top+rc.height/2){ ins=i; break; }
+      }
+      paint(rs);
+      // keep the page moving when the finger reaches the edge
+      if(ev.clientY<90) window.scrollBy(0,-14);
+      else if(ev.clientY>innerHeight-90) window.scrollBy(0,14);
+    };
+    const finish=doDrop=>ev=>{
+      el.removeEventListener('pointermove',move);
+      el.removeEventListener('pointerup',up); el.removeEventListener('pointercancel',cancel);
+      row.classList.remove('blk-dragging'); row.style.transform='';
+      rows().forEach(r=>r.classList.remove('blk-insert','blk-insert-end'));
+      if(!dragging){ if(doDrop) onTap(); return; }
+      if(doDrop && ins!==null) onDrop(ins);
+    };
+    const up=finish(true), cancel=finish(false);
+    el.addEventListener('pointermove',move);
+    el.addEventListener('pointerup',up);
+    el.addEventListener('pointercancel',cancel);
+  });
 }
 function renderPlan(){
   const startD=parse(PLAN_START), endD=parse(PLAN_END);
@@ -1682,8 +1752,10 @@ function renderPlan(){
   todayClock.forEach(b=>{
     const r=document.createElement('div');
     r.className='pd-row'+((nowM>=b.s&&nowM<b.e)?' now-block':'');
-    r.innerHTML='<div class="pd-time movable" title="tap to slide this block (today only)">'+b.t+'</div><div class="pd-name">'+b.n+'</div><div class="pd-desc">'+b.d+'</div>';
-    r.querySelector('.pd-time').onclick=()=>moveBlock(wkNum, DK_BY_DAY[dref.getDay()], b.k);
+    r.innerHTML='<div class="pd-time movable" title="drag to move this block · tap to type a time (today only)">'+b.t+'</div><div class="pd-name">'+b.n+'</div><div class="pd-desc">'+b.d+'</div>';
+    const dk=DK_BY_DAY[dref.getDay()];
+    attachBlockHandle(r.querySelector('.pd-time'), r, '.pd-row',
+      ()=>moveBlock(wkNum, dk, b.k), ins=>reorderBlock(wkNum, dk, b.k, ins));
     wrap.appendChild(r);
   });
   const curBlock=todayClock.find(b=>nowM>=b.s&&nowM<b.e);
@@ -2342,8 +2414,8 @@ function dropZone(el, onDrop){
     if(id && AGENDA_INDEX[id]) onDrop(id);
   });
 }
-/* one checkable hour block row. mv = {n, dk}: tap the time to slide the block
-   (and the rest of the day) to a new start, that one day only. */
+/* one checkable hour block row. mv = {n, dk}: the time label is a handle, drag
+   it to physically move the block, tap it to type a time. One day only. */
 function hourRow(b,bid,mv){
   const row=document.createElement('div'); row.className='pl-item blk';
   const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox';
@@ -2351,8 +2423,9 @@ function hourRow(b,bid,mv){
   t.innerHTML='<span class="pd-time blk-time">'+b.t+'</span><b>'+b.n+'</b> <span class="pd-desc">'+b.d+'</span>';
   if(mv){
     const tm=t.querySelector('.blk-time');
-    tm.classList.add('movable'); tm.title='tap to slide this block to a new time (this day only)';
-    tm.onclick=e=>{ e.stopPropagation(); moveBlock(mv.n, mv.dk, b.k); };
+    tm.classList.add('movable'); tm.title='drag to move this block · tap to type a new time (this day only)';
+    attachBlockHandle(tm, row, '.pl-item.blk',
+      ()=>moveBlock(mv.n, mv.dk, b.k), ins=>reorderBlock(mv.n, mv.dk, b.k, ins));
   }
   const sync=()=>{ cb.checked=!!done[bid]; row.classList.toggle('done',!!done[bid]); };
   sync.el=row;
