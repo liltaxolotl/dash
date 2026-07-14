@@ -144,6 +144,24 @@
     background:linear-gradient(90deg,var(--pink-deep),var(--lav-deep))}
   .del{margin-left:auto; border:none; background:none; cursor:pointer; color:#cbb8cf; font-size:1rem; padding:2px 6px}
   .del:hover{color:var(--urgent)}
+
+  /* 📅 move-to-another-day */
+  .snz{margin-left:auto; border:none; background:none; cursor:pointer; color:#cbb8cf; font-size:.95rem;
+    padding:2px 5px; line-height:1; filter:grayscale(1); opacity:.8; transition:.15s}
+  .snz:hover{filter:none; opacity:1}
+  .snz.on{filter:none; opacity:1}
+  .snz ~ .del{margin-left:0}
+  .resched{margin-top:8px; padding:8px; border:1px dashed var(--lav); border-radius:10px; background:#faf6ff;
+    display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+  .resched button{border:1px solid var(--line); background:#fff; border-radius:99px; padding:4px 10px;
+    font-size:.76rem; font-family:inherit; color:var(--lav-deep); cursor:pointer}
+  .resched button:hover{border-color:var(--lav); background:#f3ebff}
+  .resched input{border:1px solid var(--line); border-radius:9px; padding:4px 7px; font-size:.76rem;
+    font-family:inherit; color:var(--ink); background:#fff}
+  .resched input:focus{outline:none; border-color:var(--lav)}
+  .rs-lbl{font-size:.76rem; color:var(--soft); font-weight:700}
+  .rs-was{font-size:.74rem; color:var(--soft); font-style:italic; width:100%}
+  .tag.moved{background:#f3ebff; color:var(--lav-deep)}
   footer{text-align:center; color:var(--soft); font-size:.8rem; margin-top:26px}
   .reset{background:none; border:1px solid var(--line); color:var(--soft); border-radius:99px; padding:6px 14px; cursor:pointer; font-size:.8rem}
   .reset:hover{border-color:var(--pink)}
@@ -755,13 +773,16 @@ const LS_DONE = 'lupita-dash-done-v1';
 const LS_CUSTOM = 'lupita-dash-custom-v1';
 const LS_TOKEN = 'lupita-gh-token-v1';
 const LS_ARCH = 'lupita-archive-v1';
+const LS_MOVED = 'lupita-dash-moved-v1';
 let done = JSON.parse(localStorage.getItem(LS_DONE) || '{}');
 let custom = JSON.parse(localStorage.getItem(LS_CUSTOM) || '[]');
 let arch = JSON.parse(localStorage.getItem(LS_ARCH) || '{}');   // id -> {t:text, k:kind, at:'YYYY-MM-DD'}
+let moved = JSON.parse(localStorage.getItem(LS_MOVED) || '{}'); // id -> {d:'YYYY-MM-DD', t:'8:20 AM'} date overrides
 let view = 'today';
 const saveDone = () => { localStorage.setItem(LS_DONE, JSON.stringify(done)); pushStateSoon(); };
 const saveCustom = () => { localStorage.setItem(LS_CUSTOM, JSON.stringify(custom)); pushStateSoon(); };
 const saveArch = () => { localStorage.setItem(LS_ARCH, JSON.stringify(arch)); pushStateSoon(); };
+const saveMoved = () => { localStorage.setItem(LS_MOVED, JSON.stringify(moved)); pushStateSoon(); };
 const getToken = () => localStorage.getItem(LS_TOKEN) || '';
 
 /* ---------- DATE HELPERS ---------- */
@@ -792,6 +813,33 @@ function fmtWhen(dateStr){
 }
 function status(dateStr){ const d=parse(dateStr); const diff=Math.round((d-today)/86400000);
   if(diff<0) return 'over'; if(diff===0) return 'today'; return ''; }
+
+/* ---------- 📅 MOVING THINGS TO ANOTHER DAY ----------
+   Nothing gets rewritten in the data files: a move is just an override kept in
+   `moved` (id -> {d, t}) and layered on at render time, so it can always be undone. */
+// local-clock ISO. (iso() goes through UTC, which rolls a midnight date back a day in PST.)
+const isoLocal = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+// days from today (0 = today, 1 = tomorrow)
+function fromToday(n){ const d=new Date(today); d.setDate(d.getDate()+n); return isoLocal(d); }
+// days from whatever day the thing currently sits on (falls back to today if it has no date)
+function fromItem(dateStr, n){ const d=dateStr?parse(dateStr):new Date(today); d.setDate(d.getDate()+n); return isoLocal(d); }
+const to24 = s => { const m=/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec((s||'').trim()); if(!m) return '';
+  let H=Number(m[1]); const ap=(m[3]||'').toUpperCase();
+  if(ap==='PM'&&H<12) H+=12; if(ap==='AM'&&H===12) H=0;
+  return String(H).padStart(2,'0')+':'+m[2]; };
+const to12 = s => { const m=/^(\d{1,2}):(\d{2})$/.exec((s||'').trim()); if(!m) return '';
+  const H=Number(m[1]); return (((H+11)%12)+1)+':'+m[2]+' '+(H>=12?'PM':'AM'); };
+// layer a move onto an item (keeps the original around so "put it back" works)
+function withMove(it){
+  const m=moved[it.id];
+  if(!m || (!m.d && !m.t)) return it;
+  return Object.assign({}, it, {
+    date: m.d || it.date,
+    time: (m.t !== undefined && m.t !== '') ? m.t : it.time,
+    moved: true,
+    orig: {date: it.date, time: it.time},
+  });
+}
 
 /* ---------- RENDER ---------- */
 function itemRow(it, kind, deletable){
@@ -825,17 +873,58 @@ function itemRow(it, kind, deletable){
   if(it.tag){ const t=document.createElement('span'); t.className='tag '+it.tag; t.textContent=(it.tag==='work'?'creative':'life'); meta.appendChild(t); }
   if(kind==='bill'){ const t=document.createElement('span'); t.className='tag bill'; t.textContent='bill'; meta.appendChild(t); }
   if(kind==='appt'){ const t=document.createElement('span'); t.className='tag appt'; t.textContent='appt'; meta.appendChild(t); }
+  if(it.moved){ const t=document.createElement('span'); t.className='tag moved'; t.textContent='moved'; meta.appendChild(t); }
   body.appendChild(txt); if(meta.childNodes.length) body.appendChild(meta);
   if(it.note){ const n=document.createElement('div'); n.className='note'; n.textContent=it.note; body.appendChild(n); }
   if(it.links && it.links.length){ const ll=document.createElement('div'); ll.className='links';
     it.links.forEach(L=>{ const a=document.createElement('a'); a.href=L.url; a.textContent=L.label;
       if(!/^tel:/.test(L.url)){ a.target='_blank'; a.rel='noopener'; } ll.appendChild(a); });
     body.appendChild(ll); }
+  if(kind==='task'||kind==='bill'||kind==='appt') body.appendChild(reschedPanel(it, kind, li));
   li.appendChild(cb); li.appendChild(body);
+  if(kind==='task'||kind==='bill'||kind==='appt'){
+    const snz=document.createElement('button');
+    snz.className='snz'+(it.moved?' on':''); snz.textContent='📅'; snz.title='move this to another day';
+    snz.onclick=()=>{ const p=li.querySelector('.resched');
+      const open=p.style.display==='none'; p.style.display=open?'flex':'none'; snz.classList.toggle('on', open||!!it.moved); };
+    li.appendChild(snz);
+  }
   if(deletable){ const del=document.createElement('button'); del.className='del'; del.textContent='✕';
-    del.title='remove'; del.onclick=()=>{ custom=custom.filter(c=>c.id!==it.id); delete done[it.id]; saveCustom(); saveDone(); render(); };
+    del.title='remove'; del.onclick=()=>{ custom=custom.filter(c=>c.id!==it.id); delete done[it.id]; delete moved[it.id];
+      saveCustom(); saveDone(); saveMoved(); render(); };
     li.appendChild(del); }
   return li;
+}
+
+/* the little "move to another day" drawer under an item (hidden until 📅 is tapped) */
+function reschedPanel(it, kind, li){
+  const p=document.createElement('div'); p.className='resched'; p.style.display='none';
+  const setDate=d=>{ moved[it.id]=Object.assign({}, moved[it.id], {d}); saveMoved(); render(); };
+  const lbl=document.createElement('span'); lbl.className='rs-lbl'; lbl.textContent='move to:'; p.appendChild(lbl);
+  const chip=(label,title,fn)=>{ const b=document.createElement('button'); b.textContent=label; b.title=title;
+    b.onclick=fn; p.appendChild(b); return b; };
+  chip('today','put it back on today\'s list', ()=>setDate(fromToday(0)));
+  chip('tomorrow','push it to tomorrow', ()=>setDate(fromToday(1)));
+  chip('in 2 days','push it out two days', ()=>setDate(fromToday(2)));
+  chip('a week later','same day next week, counting from where it sits now', ()=>setDate(fromItem(it.date,7)));
+  const pick=document.createElement('input'); pick.type='date'; pick.title='pick any day';
+  pick.value=it.date||fromToday(0);
+  pick.onchange=()=>{ if(pick.value) setDate(pick.value); };
+  p.appendChild(pick);
+  if(kind==='appt'){
+    const tp=document.createElement('input'); tp.type='time'; tp.title='new time (optional)';
+    tp.value=to24(it.time||'');
+    tp.onchange=()=>{ moved[it.id]=Object.assign({}, moved[it.id], {t:to12(tp.value)}); saveMoved(); render(); };
+    p.appendChild(tp);
+  }
+  if(it.moved){
+    chip('↺ put it back','undo the move, back to the original day', ()=>{ delete moved[it.id]; saveMoved(); render(); });
+    const was=document.createElement('span'); was.className='rs-was';
+    was.textContent='was '+(it.orig&&it.orig.date?fmtWhen(it.orig.date):'undated')
+      +((it.orig&&it.orig.time)?(' · '+it.orig.time):'');
+    p.appendChild(was);
+  }
+  return p;
 }
 
 function fillList(el, items, kind, deletable){
@@ -1047,6 +1136,7 @@ async function loadState(){
       if(s.apps){ apps=s.apps; localStorage.setItem(LS_APPS, JSON.stringify(apps)); }
       if(s.money){ money=s.money; localStorage.setItem(LS_MONEY, JSON.stringify(money)); }
       if(s.arch){ arch=s.arch; localStorage.setItem(LS_ARCH, JSON.stringify(arch)); }
+      if(s.moved){ moved=s.moved; localStorage.setItem(LS_MOVED, JSON.stringify(moved)); }
       if(s.food){ food=s.food; food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[]; localStorage.setItem(LS_FOOD, JSON.stringify(food)); }
       if(s.friends){ friends=s.friends; friends.people=friends.people||[]; localStorage.setItem(LS_FRIENDS, JSON.stringify(friends)); }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
@@ -1068,7 +1158,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, food, friends, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, food, friends, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -1127,9 +1217,10 @@ function render(){
   const dAPPTS=[...baseAppts, ...EVENTS.filter(e=>!baseAppts.some(a=>a.id===e.id))];
 
   // left lists (custom items merged into whichever card their kind says)
-  const allTasks=[...dTASKS, ...custom.filter(c=>!c.kind||c.kind==='task')];
-  const allBills=[...dBILLS, ...custom.filter(c=>c.kind==='bill')];
-  const allAppts=[...dAPPTS, ...custom.filter(c=>c.kind==='appt')];
+  // .map(withMove) layers on anything Lupita has pushed to a different day
+  const allTasks=[...dTASKS, ...custom.filter(c=>!c.kind||c.kind==='task')].map(withMove);
+  const allBills=[...dBILLS, ...custom.filter(c=>c.kind==='bill')].map(withMove);
+  const allAppts=[...dAPPTS, ...custom.filter(c=>c.kind==='appt')].map(withMove);
   const tl=document.getElementById('taskList'); tl.innerHTML='';
   const visTasks=allTasks.filter(it=>(!it.date||inView(it.date))&&!arch[it.id]).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
   if(!visTasks.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='No to-dos for this view. Breathe easy. 🌿'; tl.appendChild(e);}
