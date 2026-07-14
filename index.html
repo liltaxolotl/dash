@@ -441,7 +441,14 @@
           <ul class="list" id="mailList"></ul>
           <button id="mailScan" title="scan the last week of Gmail and draft replies for anything that needs one"
             style="width:100%; margin:.4rem 0; padding:.45rem; border:1px dashed var(--lav-deep); border-radius:8px; background:none; cursor:pointer; color:var(--lav-deep); font-size:.85rem">💌 Scan my inbox now</button>
-          <div class="note" style="font-size:.7rem">Drafts land here and in Gmail. Nothing sends until you hit send.</div>
+          <div class="note" style="font-size:.7rem">Drafts land here and in Gmail. Nothing sends until you hit send. Check one off once you've replied.</div>
+          <div id="mailLogWrap" style="display:none; margin-top:.55rem; border-top:1px dashed var(--line, #eee); padding-top:.4rem">
+            <div id="mailLogToggle" style="cursor:pointer; user-select:none; color:var(--lav-deep); font-size:.8rem">
+              <span id="mailLogCaret" style="display:inline-block; width:.9em; font-size:.8em; color:var(--soft)">▸</span>
+              ✅ Replied <span class="pill" id="mailLogCount"></span>
+            </div>
+            <ul class="list" id="mailLogList" style="display:none"></ul>
+          </div>
         </div>
       </div>
 
@@ -1323,6 +1330,7 @@ async function loadState(){
       if(s.slotted){ slotted=s.slotted; localStorage.setItem(LS_SLOT, JSON.stringify(slotted)); }
       if(s.food){ food=s.food; food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[]; localStorage.setItem(LS_FOOD, JSON.stringify(food)); }
       if(s.friends){ friends=s.friends; friends.people=friends.people||[]; localStorage.setItem(LS_FRIENDS, JSON.stringify(friends)); }
+      if(s.mailDone){ mailDone=s.mailDone; localStorage.setItem(LS_MAILDONE, JSON.stringify(mailDone)); }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
       localStorage.setItem(LS_CUSTOM, JSON.stringify(custom));
       localStorage.setItem(LS_SAVEDAT, String(s.savedAt||0));
@@ -1330,7 +1338,7 @@ async function loadState(){
       rebuildWeeks();   // the phone may have added or moved a to-do: redraw its day card
       // refresh every game-plan checkbox/count + the counters
       Object.values(gpReg).forEach(fns=>fns.forEach(f=>f()));
-      renderApps(); renderMoney(); renderFood(); renderFriends();
+      renderApps(); renderMoney(); renderFood(); renderFriends(); renderMail(); updateMailStatus();
     }
   }catch(err){}
 }
@@ -1343,7 +1351,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, food, friends, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, food, friends, mailDone, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -2572,6 +2580,22 @@ document.getElementById('leadHunt').onclick=(e)=>{ e.stopPropagation(); requestH
    pushes mail.json here. This card renders mail.json. */
 const LS_MAILOPEN='lupita-dash-mailopen-v1';
 let MAIL_DATA=[], MAIL_UPDATED='';
+
+/* ---- the replied record ----
+   Checking an email off writes it to mailDone (keyed by Gmail thread id) and it
+   rides along in state.json, so the record is permanent and identical on phone
+   and desktop. Nothing in Gmail is touched: this is Lupita's own log of who she
+   has gotten back to. A checked thread drops off the to-reply list, but if the
+   person writes AGAIN (the next scan hands it back with a newer date than the
+   day she checked it) it resurfaces, because that is a new message, not one she
+   already handled. */
+const LS_MAILDONE='lupita-mail-done-v1';
+let mailDone=JSON.parse(localStorage.getItem(LS_MAILDONE)||'{}'); // threadId -> {from,subject,at:'YYYY-MM-DD'}
+const saveMailDone=()=>{ localStorage.setItem(LS_MAILDONE, JSON.stringify(mailDone)); pushStateSoon(); };
+const mailKey=m=>String(m.threadId||m.id||(m.from+'|'+m.subject));
+const mailRepliedTo=m=>{ const r=mailDone[mailKey(m)]; return !!r && !(m.date && r.at && m.date>r.at); };
+
+const LS_MAILLOGOPEN='lupita-dash-maillogopen-v1';
 const mailBodyEl=document.getElementById('mailBody');
 const mailCaretEl=document.getElementById('mailCaret');
 function setMailOpen(open){
@@ -2585,18 +2609,26 @@ document.getElementById('mailToggle').addEventListener('click',e=>{
 });
 setMailOpen(localStorage.getItem(LS_MAILOPEN)==='1');
 function setMailStatus(msg){ const el=document.getElementById('mailStatus'); if(el) el.textContent=msg||''; }
+function markReplied(m){
+  mailDone[mailKey(m)]={from:m.from||'', subject:m.subject||'', at:iso(today), gist:m.gist||''};
+  saveMailDone(); renderMail(); updateMailStatus();
+}
+function unmarkReplied(key){ delete mailDone[key]; saveMailDone(); renderMail(); updateMailStatus(); }
 function renderMail(){
   const ul=document.getElementById('mailList'); if(!ul) return;
   ul.innerHTML='';
-  document.getElementById('mailCount').textContent = MAIL_DATA.length ? String(MAIL_DATA.length) : '';
-  MAIL_DATA.forEach((m,i)=>{
+  const open=MAIL_DATA.filter(m=>!mailRepliedTo(m));
+  document.getElementById('mailCount').textContent = open.length ? String(open.length) : '';
+  open.forEach((m,i)=>{
     const li=document.createElement('li');
     li.style.cssText='display:block; padding:.45rem 0; border-bottom:1px dashed var(--line, #eee)';
     const gmailUrl='https://mail.google.com/mail/u/0/#all/'+encodeURIComponent(m.threadId||'');
     li.innerHTML=
-      `<div style="cursor:pointer" data-mi="${i}">`+
+      `<div style="display:flex; gap:.5rem; align-items:flex-start">`+
+      `<input type="checkbox" data-mdone="${i}" title="I replied to this one" style="margin-top:.25rem; flex:none; cursor:pointer">`+
+      `<div style="cursor:pointer; flex:1" data-mi="${i}">`+
       `<strong>${esc(m.from)}</strong> <span style="color:var(--soft)">· ${esc(m.subject)}</span><br>`+
-      `<span class="note">${esc(m.gist)}</span></div>`+
+      `<span class="note">${esc(m.gist)}</span></div></div>`+
       `<div class="mail-draft" style="display:none; margin-top:.35rem">`+
       `<textarea data-md="${i}" style="width:100%; min-height:7rem; font:inherit; font-size:.8rem; padding:.4rem; border:1px solid var(--lav-deep); border-radius:8px; background:none; color:inherit">${esc(m.draft)}</textarea>`+
       `<div style="display:flex; gap:.4rem; margin-top:.25rem">`+
@@ -2606,7 +2638,10 @@ function renderMail(){
     ul.appendChild(li);
   });
   ul.querySelectorAll('[data-mi]').forEach(el=>{
-    el.onclick=()=>{ const d=el.parentElement.querySelector('.mail-draft'); d.style.display = d.style.display==='none' ? 'block' : 'none'; };
+    el.onclick=()=>{ const d=el.closest('li').querySelector('.mail-draft'); d.style.display = d.style.display==='none' ? 'block' : 'none'; };
+  });
+  ul.querySelectorAll('[data-mdone]').forEach(box=>{
+    box.onclick=e=>{ e.stopPropagation(); markReplied(open[Number(box.dataset.mdone)]); };
   });
   ul.querySelectorAll('[data-mc]').forEach(btn=>{
     btn.onclick=async()=>{
@@ -2615,15 +2650,54 @@ function renderMail(){
       catch(_){ ta.select(); }
     };
   });
+  renderMailLog();
+}
+/* the permanent record: everyone Lupita has replied to, newest first */
+function renderMailLog(){
+  const wrap=document.getElementById('mailLogWrap'), ul=document.getElementById('mailLogList');
+  if(!wrap||!ul) return;
+  const rows=Object.entries(mailDone).sort((a,b)=>(b[1].at||'').localeCompare(a[1].at||''));
+  wrap.style.display = rows.length ? 'block' : 'none';
+  document.getElementById('mailLogCount').textContent = rows.length ? String(rows.length) : '';
+  ul.innerHTML='';
+  rows.forEach(([key,r])=>{
+    const li=document.createElement('li');
+    li.style.cssText='display:flex; gap:.5rem; align-items:baseline; padding:.3rem 0; border-bottom:1px dashed var(--line, #eee)';
+    li.innerHTML=
+      `<div style="flex:1; font-size:.78rem">✅ <strong>${esc(r.from||'(no name)')}</strong>`+
+      `<span style="color:var(--soft)"> · ${esc(r.subject||'')}</span><br>`+
+      `<span class="note" style="font-size:.7rem">replied ${r.at?esc(fmtWhen(r.at)):''}</span></div>`+
+      `<button data-mundo="${esc(key)}" title="put it back on the reply list" `+
+      `style="flex:none; border:none; background:none; cursor:pointer; color:var(--lav-deep); font-size:.72rem; text-decoration:underline">↩ undo</button>`;
+    ul.appendChild(li);
+  });
+  ul.querySelectorAll('[data-mundo]').forEach(b=>{ b.onclick=()=>unmarkReplied(b.dataset.mundo); });
+}
+function setMailLogOpen(open){
+  document.getElementById('mailLogList').style.display = open ? 'block' : 'none';
+  document.getElementById('mailLogCaret').textContent = open ? '▾' : '▸';
+  localStorage.setItem(LS_MAILLOGOPEN, open ? '1' : '0');
+}
+document.getElementById('mailLogToggle').addEventListener('click',()=>{
+  setMailLogOpen(document.getElementById('mailLogList').style.display==='none');
+});
+setMailLogOpen(localStorage.getItem(LS_MAILLOGOPEN)==='1');
+
+function updateMailStatus(){
+  const open=MAIL_DATA.filter(m=>!mailRepliedTo(m)).length;
+  const when=MAIL_UPDATED?fmtWhen(MAIL_UPDATED.slice(0,10)):'recently';
+  if(open) setMailStatus('Scanned '+when+': '+open+' waiting on a reply. Tap one to see the draft, check it off once you\'ve sent it. 💛');
+  else if(MAIL_UPDATED) setMailStatus(Object.keys(mailDone).length
+    ? 'All caught up as of the last scan, and everything you replied to is logged below. 🎉'
+    : 'Inbox is all caught up as of the last scan! 🎉');
+  else setMailStatus('');
 }
 async function fetchMail(){
   if(!getToken()) return;
   const d=await fetchPrivate('mail.json');
   if(!d) return;
   MAIL_DATA=d.items||[]; MAIL_UPDATED=d.updated||'';
-  setMailStatus(MAIL_DATA.length
-    ? ('Scanned '+(MAIL_UPDATED?fmtWhen(MAIL_UPDATED.slice(0,10)):'recently')+': '+MAIL_DATA.length+' waiting on a reply. Tap one to see the draft. 💛')
-    : (MAIL_UPDATED?'Inbox is all caught up as of the last scan! 🎉':''));
+  updateMailStatus();
   renderMail();
 }
 async function requestMailScan(){
@@ -2656,7 +2730,8 @@ async function watchForFreshMail(){
     if(now && now!==before){
       clearInterval(_mailWatch); _mailWatch=null;
       await fetchMail(); setMailOpen(true);
-      setMailStatus('Fresh drafts just landed! 💌 '+(MAIL_DATA.length?MAIL_DATA.length+' waiting for your once-over.':'Nothing needed a reply, you are all caught up!'));
+      const fresh=MAIL_DATA.filter(m=>!mailRepliedTo(m)).length;
+      setMailStatus('Fresh drafts just landed! 💌 '+(fresh?fresh+' waiting for your once-over.':'Nothing needed a reply, you are all caught up!'));
     }
   },60000);
 }
