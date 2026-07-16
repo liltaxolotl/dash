@@ -2024,7 +2024,14 @@ function openTimePop(anchor, n, dk, b){
   row.appendChild(inp); row.appendChild(seg); row.appendChild(go); p.appendChild(row);
   const hint=document.createElement('div'); hint.className='tpop-s';
   hint.textContent='A start time slides the rest of the day along. A range (7-8:30) moves only this block.';
-  p.appendChild(hint); p.appendChild(err);
+  p.appendChild(hint);
+  // ⧉ spawn a block just like this one (same name, same length, right after it),
+  // then drag the copy to wherever it actually goes
+  const dup=document.createElement('button'); dup.className='blk-reset';
+  dup.textContent='⧉ make a copy of this block';
+  dup.title='A new block just like this one, right after it. It\'s yours: drag it, rename it, 🗑 it.';
+  dup.onclick=()=>{ dupBlock(n,dk,b.k); closeTimePop(); };
+  p.appendChild(dup); p.appendChild(err);
   document.body.appendChild(veil); document.body.appendChild(p);
   tpop=p;
   // park it against the block: under the time label, or above it near the bottom
@@ -2051,6 +2058,41 @@ function moveBlock(n,dk,k,anchor){
   const ck=clockOf(n,dk);
   const b=ck.find(x=>x.k===k); if(!b) return;
   openTimePop(anchor, n, dk, b);
+}
+/* ⧉ a new block modeled on an existing one: same name, same length, parked
+   right after it so it's easy to grab and drag to where it actually goes.
+   The copy is YOURS (a 🧱 block): re-time it, rename it, 🗑 it freely. */
+function dupBlock(n,dk,k){
+  const ck=clockOf(n,dk);
+  const b=ck.find(x=>x.k===k); if(!b) return;
+  const len=Math.max(15, b.e-b.s);   // an 'All day' or 'moved →' oddball copies as something draggable
+  return addOwnBlock(n, dk, b.n, b.e, b.e+len);
+}
+/* ✏️ double-click a block's name to rename it. Three kinds, three homes:
+   a PLAN block renames everywhere it appears (clear the box, or retype the
+   plan's wording, to get the original back), a 🧱 block of your own is just
+   edited in place, and a promoted to-do's block renames the to-do itself
+   (they are the same thing, so the home tab hears about it too). */
+function setBlockName(n,dk,b,v){
+  if(b.solo){
+    if(!v) return;
+    const id=b.id, mineIt=custom.find(c=>c.id===id);
+    if(mineIt){ mineIt.text=v; delete edits[id]; saveCustom(); }
+    else if(v!==((AGENDA_INDEX[id]||{}).text)) edits[id]=v;
+    saveEdits(); render();
+  } else if(b.own){
+    if(!v) return;
+    const own=(blocksOwn['w'+n+'-'+dk]||[]).find(x=>x.k===b.k);
+    if(own){ own.n=v; saveBlocksOwn(); }
+  } else {
+    if(!v || v===(b.n0||b.n)) delete blockNames[b.k];
+    else blockNames[b.k]=v;
+    saveBlockNames();
+  }
+  rebuildWeeks(); if(view==='plan') renderPlan();
+}
+function renameBlockEl(n,dk,b,el){
+  inlineEdit(el, b.solo?((AGENDA_INDEX[b.id]||{}).text||''):b.n, v=>setBlockName(n,dk,b,v));
 }
 /* drop block k so it becomes the ins-th block of the day. The blocks between its
    old and new spot shift over by its length; everything outside that stretch
@@ -2148,6 +2190,10 @@ function renderPlan(){
     const tm=r.querySelector('.pd-time');
     attachBlockHandle(tm, r, '.pd-row',
       ()=>moveBlock(wkNum, dk, b.k, tm), ins=>reorderBlock(wkNum, dk, b.k, ins));
+    // ✏️ renameable right on the sidebar clock too
+    const nmEl=r.querySelector('.pd-name');
+    nmEl.title='double-click to rename this block';
+    nmEl.ondblclick=()=>renameBlockEl(wkNum, dk, b, nmEl);
     wrap.appendChild(r);
   });
   const curBlock=todayClock.find(b=>nowM>=b.s&&nowM<b.e);
@@ -2357,23 +2403,40 @@ function refreshGuides(){
 /* ✏️ reword one of the plan's own tasks, right on the day card. The plan file is
    never rewritten: your wording is an override (edits[id], same as a to-do's), and
    clearing the box empty hands the plan's own words back. */
-function gpRename(it, el){
-  if(el.parentNode && el.parentNode.querySelector('.txt-edit')) return;
-  const inp=document.createElement('input');
-  inp.type='text'; inp.className='txt-edit'; inp.value=el.textContent; inp.maxLength=200;
-  let closed=false;
-  const finish=commit=>{
-    if(closed) return; closed=true;
-    if(!commit){ if(inp.parentNode) inp.parentNode.replaceChild(el, inp); return; }
-    const v=inp.value.trim();
+function gpRename(it, el, del){
+  inlineEdit(el, edits[it.id]||it.txt, v=>{
     if(!v || v===it.txt) delete edits[it.id]; else edits[it.id]=v;
     saveEdits(); rebuildWeeks();
+  }, del);
+}
+/* one inline editor for anything renameable: swap `el` for a text box, Enter or
+   clicking away saves, Esc backs out. del = {title, fn}: a 🗑 that exists ONLY
+   while the box is open, so nothing stares at you from an idle list. It fires on
+   mousedown (before the box can blur away) and pointerdown covers touch. */
+function inlineEdit(el, val, onSave, del){
+  if(el.parentNode && el.parentNode.querySelector('.txt-edit')) return;
+  const inp=document.createElement('input');
+  inp.type='text'; inp.className='txt-edit'; inp.value=val; inp.maxLength=200;
+  let closed=false, db=null;
+  if(del){
+    db=document.createElement('button'); db.className='tb'; db.textContent='🗑'; db.title=del.title;
+    const fire=e=>{ e.preventDefault(); e.stopPropagation(); if(closed) return; closed=true; db.remove(); del.fn(); };
+    db.onmousedown=fire; db.onpointerdown=fire;
+    db.onclick=e=>{ e.preventDefault(); e.stopPropagation(); };
+  }
+  const finish=commit=>{
+    if(closed) return; closed=true;
+    if(db) db.remove();
+    if(!commit){ if(inp.parentNode) inp.parentNode.replaceChild(el, inp); return; }
+    onSave(inp.value.trim());
   };
   inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); finish(true); }
     else if(e.key==='Escape'){ e.preventDefault(); finish(false); } };
   inp.onblur=()=>finish(true);
   inp.onclick=e=>e.stopPropagation();
-  el.parentNode.replaceChild(inp, el); inp.focus(); inp.select();
+  el.parentNode.replaceChild(inp, el);
+  if(db) inp.parentNode.insertBefore(db, inp.nextSibling);
+  inp.focus(); inp.select();
 }
 /* ctx (day cards only) = {dayISO, blocks, days}: what a 📌 to-do needs to know to
    be dragged into a time block, or tapped there with ⇅ when there's no mouse. */
@@ -2421,17 +2484,21 @@ function checklist(items,cntEl,ctx){
         const s=document.createElement('span'); s.className='rs-lbl'; s.textContent='do it during:'; drw.appendChild(s);
         const cur=(mine.find(m=>m.id===it.mine)||{}).slot||null;
         chip('📌 no set time','it sits at the bottom of the day, no block',!cur,()=>mineSlot(it.mine,null));
-        ctx.blocks.forEach(b=>chip(b.n, b.t+' · '+b.d, cur===b.k, ()=>mineSlot(it.mine,b.k)));
+        // a routine item repeats every day, so its home has to be a block that
+        // repeats too, not a one-day 🧱 block
+        ctx.blocks.filter(b=>!b.solo&&!b.own).forEach(b=>chip(b.n, b.t+' · '+b.d, cur===b.k, ()=>mineSlot(it.mine,b.k)));
         mv.onclick=e=>{ e.stopPropagation(); const open=drw.style.display==='none';
           drw.style.display=open?'flex':'none'; mv.classList.toggle('on',open); };
-        const del=document.createElement('button'); del.className='tb'; del.textContent='🗑';
-        del.title=it.rep==='day'?'Remove this from your routine (every day)':'Remove this weekly routine item';
-        del.onclick=e=>{ e.stopPropagation();
-          const m=mine.find(x=>x.id===it.mine);
-          if(m && confirm('Remove "'+m.txt+'" from your routine? It disappears from all its days (already-checked days stay checked).')){
-            mine=mine.filter(x=>x.id!==it.mine); saveMine(); rebuildWeeks();
-          } };
-        tbs.appendChild(del);
+        // ✏️ + 🗑 behind a double-click, like every other task
+        t.title='double-click to reword or 🗑 this';
+        t.ondblclick=e=>{ e.stopPropagation();
+          const m=mine.find(x=>x.id===it.mine); if(!m) return;
+          inlineEdit(t, m.txt, v=>{ if(v && v!==m.txt){ m.txt=v; saveMine(); } rebuildWeeks(); },
+            {title:(it.rep==='day'?'Remove this from your routine (every day)':'Remove this weekly routine item'),
+             fn:()=>{ if(confirm('Remove "'+m.txt+'" from your routine? It disappears from all its days (already-checked days stay checked).')){
+                 mine=mine.filter(x=>x.id!==it.mine); saveMine(); }
+               rebuildWeeks(); }});
+        };
         row.appendChild(cb); row.appendChild(t); row.appendChild(tbs);
         box.appendChild(row); box.appendChild(drw); sync(); return;
       }
@@ -2449,6 +2516,9 @@ function checklist(items,cntEl,ctx){
         row.ondragstart=e=>{ e.dataTransfer.setData('text/plain', it.id); e.dataTransfer.effectAllowed='move'; row.classList.add('dragging'); };
         row.ondragend=()=>row.classList.remove('dragging');
       }
+      // ✏️ + 🗑 live behind a double-click, same as everywhere else
+      t.title='double-click to reword or 🗑 this';
+      t.ondblclick=e=>{ e.stopPropagation(); agRenameRow(it, t); };
       const mv=document.createElement('button'); mv.className='tb'; mv.textContent='⇅';
       mv.title=canMove?'Put this in a time block (or move it to another day)'
                       :'Set aside time for this (it stays on its own day)';
@@ -2461,9 +2531,9 @@ function checklist(items,cntEl,ctx){
       // the day this item really belongs to (an overdue one is riding along on today's card)
       const homeISO=(AGENDA_INDEX[it.id]||{}).date || ctx.dayISO;
       const slotDay=canMove?ctx.dayISO:homeISO;
-      lbl('do it during:');
-      chip('📌 no set time','leave it loose in the day, no block',!it.slot,()=>agPlace(it.id,slotDay,null));
-      ctx.blocks.forEach(b=>chip(b.n, b.t+' · '+b.d, it.slot===b.k, ()=>agPlace(it.id,slotDay,b.k)));
+      lbl('do it during (tap two blocks and it sits in both):');
+      chip('📌 no set time','leave it loose in the day, no block',!it.slots,()=>agPlace(it.id,slotDay,null));
+      ctx.blocks.forEach(b=>chip(b.n, b.t+' · '+b.d, (it.slots||[]).includes(b.k), ()=>agSlotToggle(it.id,slotDay,b.k)));
       // 🧱 or don't put it inside anything: make it its own block on the clock
       chip('🧱 its own block','Give it its own hour on the clock, then drag it wherever it belongs',
         false, ()=>agSolo(it.id, ctx.blocks));
@@ -2521,9 +2591,13 @@ function checklist(items,cntEl,ctx){
       if(away){ const s=document.createElement('span'); s.className='tmv';
         s.textContent='↪ from '+home.name; s.title='The plan had this on '+home.name+'. You moved it here.';
         t.appendChild(s); }
-      // ✏️ the plan's wording is a suggestion: double-click it and say it your way
-      t.title='double-click to reword this';
-      t.ondblclick=e=>{ e.stopPropagation(); gpRename(it,t); };
+      /* ✏️ the plan's wording is a suggestion: double-click it and say it your
+         way. The 🗑 lives in here too (it only appears while you're editing, so
+         it isn't staring at you all day), and the ↺ chip on the day undoes it. */
+      t.title='double-click to reword or 🗑 this';
+      t.ondblclick=e=>{ e.stopPropagation(); gpRename(it,t,
+        {title:'Delete this task (the ↺ chip on this day brings it back)',
+         fn:()=>{ taskOff[it.id]=1; saveTaskOff(); rebuildWeeks(); refreshGuides(); }}); };
       // drag it like anything else: onto another block (deep applies → fast applies),
       // onto the 📌 strip for no set time, or onto another day's header
       row.classList.add('ag-row'); row.draggable=true;
@@ -2537,10 +2611,10 @@ function checklist(items,cntEl,ctx){
         b.textContent=label; b.title=title; if(on) b.classList.add('on');
         b.onclick=e=>{ e.stopPropagation(); fn(); }; drw.appendChild(b); return b; };
       const lbl=x=>{ const s=document.createElement('span'); s.className='rs-lbl'; s.textContent=x; drw.appendChild(s); };
-      const cur=taskSlot(it);
-      lbl('do it during:');
-      chip('📌 no set time','leave it loose at the bottom of the day',!cur,()=>gpSlot(it.id,null));
-      ctx.blocks.forEach(b=>chip(b.n, b.t+' · '+b.d, cur===b.k, ()=>gpSlot(it.id,b.k)));
+      const cur=taskSlots(it);
+      lbl('do it during (tap two blocks and it sits in both):');
+      chip('📌 no set time','leave it loose at the bottom of the day',!cur.length,()=>gpSlot(it.id,null));
+      ctx.blocks.forEach(b=>chip(b.n, b.t+' · '+b.d, cur.includes(b.k), ()=>gpSlotToggle(it,b.k)));
       lbl('or another day:');
       ctx.days.forEach(dy=>chip(dy.name.slice(0,3), dy.name+' '+dy.label, dy.iso===ctx.dayISO,
         ()=>gpMove(it.id, dy.iso)));
@@ -2554,14 +2628,6 @@ function checklist(items,cntEl,ctx){
       if(away) chip('↩ back to '+home.name,'Put it back on the day the plan chose',false,()=>gpMove(it.id,null));
       mv.onclick=e=>{ e.stopPropagation(); const open=drw.style.display==='none';
         drw.style.display=open?'flex':'none'; mv.classList.toggle('on',open); };
-      /* 🗑 the plan is a suggestion, not a boss. Delete any task it wrote (no, you
-         are not filming video #1 this week) and it's off the card. The day keeps an
-         "↺ bring back" chip, so a delete is never a door that locks behind you. */
-      const del=document.createElement('button'); del.className='tb'; del.textContent='🗑';
-      del.title='Delete this task (the ↺ chip on this day brings it back)';
-      del.onclick=e=>{ e.stopPropagation();
-        taskOff[it.id]=1; saveTaskOff(); rebuildWeeks(); refreshGuides(); };
-      tbs.appendChild(del);
       row.appendChild(cb); row.appendChild(t); row.appendChild(tbs);
       box.appendChild(row); box.appendChild(drw); sync(); return;
     }
@@ -2822,6 +2888,29 @@ function agTime(id, v24){
   }
   saveMoved(); render(); rebuildWeeks(); if(view==='plan') renderPlan();
 }
+/* ✏️ reword a real-life item right on its day card (same override the home tab
+   uses; things you added yourself are edited in place). The 🗑 only exists while
+   the rename box is open, so it isn't staring at you from an idle list: your own
+   to-dos are deleted for real, anything from the feed is tucked into the Archive
+   instead, so nothing is ever truly lost. */
+function agRenameRow(it, el){
+  const id=it.id, info=AGENDA_INDEX[id]||{};
+  const mineIt=custom.find(c=>c.id===id);
+  inlineEdit(el, info.text||'', v=>{
+    if(v && mineIt){ mineIt.text=v; delete edits[id]; saveCustom(); }
+    else if(v && v!==info.text) edits[id]=v;
+    saveEdits(); render(); rebuildWeeks();
+  }, {
+    title: mineIt?'Delete this to-do for good (it was yours)':'Remove this (it moves to the Archive, never truly gone)',
+    fn:()=>{
+      if(mineIt){ custom=custom.filter(c=>c.id!==id); delete done[id]; delete moved[id];
+        delete edits[id]; delete slotted[id]; delete solo[id];
+        saveCustom(); saveDone(); saveMoved(); saveEdits(); saveSlotted(); saveSolo(); }
+      else { arch[id]={t:info.text, k:info.kind, at:iso(new Date())}; saveArch(); }
+      render(); rebuildWeeks();
+    }
+  });
+}
 /* A day card shows exactly what is set for THAT day: pick a day for something and
    it hops to that day's card, in that day's 📌 strip, ready to be dropped into one
    of that day's blocks. It does NOT leave a ghost copy behind on today (the home
@@ -2840,7 +2929,7 @@ function agendaFor(dateStr, isToday){
       id:it.id,
       agenda:true,
       fixed:!MOVABLE(kind),
-      slot:slotted[it.id]||null,
+      slots:slotsRaw(it.id),
       mins:it.time?Number((to24(it.time)||'99:99').replace(':','')):9999,
       txt:AG_ICON[kind]+' '+it.text+(it.time?(' · '+it.time):'')
         +(late?' (was '+fmtWhen(it.date)+', still open)':''),
@@ -2886,8 +2975,35 @@ function indexTasks(){
     });
   });
 }
-// a task's block on the day it's actually on: your pick first, then the plan's
-const taskSlot = t => slotted[t.id]==='none' ? null : (slotted[t.id] || t.slot || 'focus');
+// a task's block(s) on the day it's actually on: your pick first, then the
+// plan's. A task can sit in more than one block at once (fast applies AND deep
+// applies): same checkbox everywhere it shows up, tick it in either place.
+const taskSlots = t => { const v=slotted[t.id];
+  if(v==='none') return [];
+  if(v==null) return [t.slot||'focus'];
+  return Array.isArray(v)?v:[v]; };
+const taskSlot = t => taskSlots(t)[0]||null;
+/* the ⇅ chips toggle now: tap a block to put the task in it, tap it again to
+   take it out, and two lit chips means it lives in both. Dragging still means
+   "move": a drop replaces every parking spot with where it landed. */
+function gpSlotToggle(it,k){
+  const cur=taskSlots(it);
+  const nv=cur.includes(k)?cur.filter(x=>x!==k):[...cur,k];
+  slotted[it.id]=nv.length?(nv.length===1?nv[0]:nv):'none';
+  saveSlotted(); rebuildWeeks();
+}
+// same toggle for a 📌 to-do/bill/appt (it may also need to hop to this day
+// first, exactly like agPlace: a ride-along item slotted on today STAYS today)
+function agSlotToggle(id, dayISO, k){
+  const info=AGENDA_INDEX[id];
+  if(info && MOVABLE(info.kind) && dayISO && info.date!==dayISO){
+    moved[id]=Object.assign({}, moved[id], {d:dayISO}); saveMoved();
+  }
+  const cur=slotsRaw(id)||[];
+  const nv=cur.includes(k)?cur.filter(x=>x!==k):[...cur,k];
+  if(!nv.length) delete slotted[id]; else slotted[id]=nv.length===1?nv[0]:nv;
+  saveSlotted(); render(); rebuildWeeks();
+}
 // push a sprint task to another day (iso null = back to the day the plan chose)
 function gpMove(id, iso){
   const home=(TASK_HOME[id]||{}).iso;
@@ -2981,9 +3097,11 @@ function buildWeeks(){
       // 🧱 ones promoted onto the clock ARE blocks now, so they don't also sit in a list
       const ag=agAll.filter(it=>!solo[it.id]);
       const blockKeys=new Set(ck.map(b=>b.k));
-      const agIn=k=>ag.filter(it=>it.slot===k);
-      const agLoose=ag.filter(it=>!it.slot || !blockKeys.has(it.slot));
-      const ctx={dayISO:dISO, blocks:ck.filter(b=>!b.solo), days:weekDays};
+      const agIn=k=>ag.filter(it=>(it.slots||[]).includes(k));
+      const agLoose=ag.filter(it=>!(it.slots||[]).some(s=>blockKeys.has(s)));
+      // 🧱 promoted blocks count as real homes now: drag the appointment-prep
+      // to-do onto the appointment's own block and it nests right under it
+      const ctx={dayISO:dISO, blocks:ck, days:weekDays};
       dayIds.push(...agAll.map(t=>t.id));
       dropZone(dSum, id=>placeItem(id, dISO, 'keep'));   // drop on the day header: move it to this day, block and all
       if(agLoose.length){
@@ -3019,16 +3137,15 @@ function buildWeeks(){
         const bid=b.solo ? b.id : ('gpb-w'+n+'-'+dd.dk+'-'+b.k);
         if(!b.solo) dayIds.push(bid);
         const hr=hourRow(b,bid,{n:n, dk:dd.dk});
-        if(!b.solo) dropZone(hr, id=>placeItem(id, dISO, b.k));   // drop on a block: that's when you're doing it
+        dropZone(hr, id=>placeItem(id, dISO, b.k));   // drop on ANY block, 🧱 ones included: that's when you're doing it
         dBody.appendChild(hr);
-        if(b.solo) return;                                        // nothing nests inside your own block
-        const sub=[...tasks.filter(t=>taskSlot(t)===b.k), ...agIn(b.k)];
+        const sub=[...tasks.filter(t=>taskSlots(t).includes(b.k)), ...agIn(b.k)];
         if(sub.length){ const st=document.createElement('div'); st.className='blk-tasks';
           st.appendChild(checklist(sub,null,ctx));
           dropZone(st, id=>placeItem(id, dISO, b.k));
           dBody.appendChild(st); }
       });
-      const rest=tasks.filter(t=>!blockKeys.has(taskSlot(t)));
+      const rest=tasks.filter(t=>!taskSlots(t).some(k=>blockKeys.has(k)));
       if(rest.length){ const st=document.createElement('div'); st.className='blk-tasks'; st.appendChild(checklist(rest,null,ctx)); dBody.appendChild(st); }
       dBody.appendChild(myAddRow(dd, dISO, ck));   // ＋ add your own, always last
       dBody.appendChild(blockAddRow(dd, n));       // 🧱 ...and a block of your own
@@ -3068,6 +3185,10 @@ function hourRow(b,bid,mv){
     tm.classList.add('movable'); tm.title='drag to move this block · tap to type a new time (this day only)';
     attachBlockHandle(tm, row, '.pl-item.blk',
       ()=>moveBlock(mv.n, mv.dk, b.k, tm), ins=>reorderBlock(mv.n, mv.dk, b.k, ins));
+    // ✏️ double-click the name to rename the block
+    const nm=t.querySelector('b');
+    nm.title='double-click to rename this block';
+    nm.ondblclick=e=>{ e.stopPropagation(); renameBlockEl(mv.n, mv.dk, b, nm); };
   }
   const sync=()=>{ cb.checked=!!done[bid]; row.classList.toggle('done',!!done[bid]); };
   sync.el=row;
