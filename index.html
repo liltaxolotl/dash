@@ -286,6 +286,13 @@
   .pl-item.blk.solo{background:#fff2f8; border:1px solid #ffd6e8}
   .pl-item.blk.solo .blk-time{color:var(--pink-deep)}
   .pd-row.solo .pd-name::after{content:" 🧱"; font-size:.75rem}
+  /* 🧱 a block you invented yourself (same family, its own shade) */
+  .pl-item.blk.own{background:#f3f8ff; border:1px solid #d5e6ff}
+  .pl-item.blk.own .blk-time{color:#3f6ea8}
+  .pd-row.own .pd-name::after{content:" 🧱"; font-size:.75rem}
+  .blk-add .my-open{background:#f3f8ff; border-color:#d5e6ff}
+  .blk-add .my-open:hover{border-color:#8fb8e6; color:#3f6ea8}
+  .my-form .err{flex:1 1 100%; color:var(--urgent); font-size:.73rem; font-weight:700}
   /* ⏰ the little time popup that opens right next to the block you tapped */
   .tpop-veil{position:fixed; inset:0; z-index:59; background:rgba(40,20,55,.06)}
   .tpop{position:fixed; z-index:60; width:min(290px,calc(100vw - 24px)); background:#fff;
@@ -930,6 +937,9 @@ const LS_MINE = 'lupita-dash-mine-v1';
 const LS_SOLO = 'lupita-dash-solo-v1';
 const LS_TMOVED = 'lupita-dash-tmoved-v1';
 const LS_BLOCKOFF = 'lupita-dash-blockoff-v1';
+const LS_BLOCKSOWN = 'lupita-dash-blocksown-v1';
+const LS_TASKOFF = 'lupita-dash-taskoff-v1';
+const LS_BLOCKNAMES = 'lupita-dash-blocknames-v1';
 let done = JSON.parse(localStorage.getItem(LS_DONE) || '{}');
 let custom = JSON.parse(localStorage.getItem(LS_CUSTOM) || '[]');
 let arch = JSON.parse(localStorage.getItem(LS_ARCH) || '{}');   // id -> {t:text, k:kind, at:'YYYY-MM-DD'}
@@ -964,6 +974,21 @@ let tmoved = JSON.parse(localStorage.getItem(LS_TMOVED) || '{}');
 // "↺ back to the usual blocks" puts it right back. Anything parked inside a
 // deleted block isn't deleted with it, it just goes back to having no set time.
 let blockOff = JSON.parse(localStorage.getItem(LS_BLOCKOFF) || '{}');
+// 🧱 blocks YOU made up, on the day you made them for: 'w1-mon' -> [{k,s,e,n,d}].
+// A real block on that day's clock, not a to-do wearing a block costume: things
+// nest inside it, you drag it, you re-time it, 🗑 deletes it for good. Because a
+// block is minutes on the 11am-to-11am day, a 12:20am one stays on MONDAY's card
+// where it belongs, instead of jumping to Tuesday at midnight.
+let blocksOwn = JSON.parse(localStorage.getItem(LS_BLOCKSOWN) || '{}');
+// the plan's tasks you deleted ("no, I'm not filming video #1"). task id -> 1.
+// Per task, and the day card grows an "↺ bring back" chip, so nothing is ever
+// really gone: the plan itself is untouched, you just don't have to look at it.
+let taskOff = JSON.parse(localStorage.getItem(LS_TASKOFF) || '{}');
+// ✏️ blocks you renamed (double-click the name). block key -> your name. A plan
+// block renamed once is renamed EVERYWHERE it appears (every day, every week):
+// "Focus block" becoming "Studio time" shouldn't take 40 double-clicks. Clearing
+// the box, or retyping the plan's name, hands the original back.
+let blockNames = JSON.parse(localStorage.getItem(LS_BLOCKNAMES) || '{}');
 let view = 'today';
 const saveDone = () => { localStorage.setItem(LS_DONE, JSON.stringify(done)); pushStateSoon(); };
 const saveCustom = () => { localStorage.setItem(LS_CUSTOM, JSON.stringify(custom)); pushStateSoon(); };
@@ -976,10 +1001,19 @@ const saveMine = () => { localStorage.setItem(LS_MINE, JSON.stringify(mine)); pu
 const saveSolo = () => { localStorage.setItem(LS_SOLO, JSON.stringify(solo)); pushStateSoon(); };
 const saveTmoved = () => { localStorage.setItem(LS_TMOVED, JSON.stringify(tmoved)); pushStateSoon(); };
 const saveBlockOff = () => { localStorage.setItem(LS_BLOCKOFF, JSON.stringify(blockOff)); pushStateSoon(); };
+const saveBlocksOwn = () => { localStorage.setItem(LS_BLOCKSOWN, JSON.stringify(blocksOwn)); pushStateSoon(); };
+const saveTaskOff = () => { localStorage.setItem(LS_TASKOFF, JSON.stringify(taskOff)); pushStateSoon(); };
+const saveBlockNames = () => { localStorage.setItem(LS_BLOCKNAMES, JSON.stringify(blockNames)); pushStateSoon(); };
 const getToken = () => localStorage.getItem(LS_TOKEN) || '';
 
 /* ---------- DATE HELPERS ---------- */
 const today = new Date(); today.setHours(0,0,0,0);
+/* Your day is not the calendar's day. It runs seam-to-seam (5am to 5am, see DAY0),
+   so at 12:20am you are still inside Monday night and the Game Plan says so: the 🌸
+   day card, the clock strip, and the streak all roll over at 5am, not at midnight.
+   (The home tab keeps the real calendar date, so nothing on it ever hides.) */
+const planToday = new Date(today);
+{ const n=new Date(); if(n.getHours()*60+n.getMinutes() < 300) planToday.setDate(planToday.getDate()-1); }
 const iso = d => d.toISOString().slice(0,10);
 const parse = s => { const [y,m,d]=s.split('-').map(Number); const dt=new Date(y,m-1,d); dt.setHours(0,0,0,0); return dt; };
 /* rolling windows: "This Week" = today + the next 6 days (so saying a plain
@@ -1464,11 +1498,15 @@ async function loadState(){
       if(s.solo){ solo=s.solo; localStorage.setItem(LS_SOLO, JSON.stringify(solo)); }
       if(s.tmoved){ tmoved=s.tmoved; localStorage.setItem(LS_TMOVED, JSON.stringify(tmoved)); }
       if(s.blockOff){ blockOff=s.blockOff; localStorage.setItem(LS_BLOCKOFF, JSON.stringify(blockOff)); }
+      if(s.blocksOwn){ blocksOwn=s.blocksOwn; localStorage.setItem(LS_BLOCKSOWN, JSON.stringify(blocksOwn)); }
+      if(s.taskOff){ taskOff=s.taskOff; localStorage.setItem(LS_TASKOFF, JSON.stringify(taskOff)); }
+      if(s.blockNames){ blockNames=s.blockNames; localStorage.setItem(LS_BLOCKNAMES, JSON.stringify(blockNames)); }
       if(s.mailDone){ mailDone=s.mailDone; localStorage.setItem(LS_MAILDONE, JSON.stringify(mailDone)); }
       if(s.mailStore){ mailStore=s.mailStore; localStorage.setItem(LS_MAILSTORE, JSON.stringify(mailStore)); loadMailFromStore(); }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
       localStorage.setItem(LS_CUSTOM, JSON.stringify(custom));
       localStorage.setItem(LS_SAVEDAT, String(s.savedAt||0));
+      migrateSeam(1);   // the other device may still be speaking old-seam minutes
       render();
       rebuildWeeks();   // the phone may have added or moved a to-do: redraw its day card
       // refresh every game-plan checkbox/count + the counters
@@ -1487,7 +1525,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, blockMods, blockOff, food, friends, mine, solo, tmoved, mailDone, mailStore, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, food, friends, mine, solo, tmoved, mailDone, mailStore, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -1663,10 +1701,21 @@ function clockFor(n,dk,def){
   // 🗑 blocks you took off THIS day are simply not on it
   const off=blockOff['w'+n+'-'+dk];
   if(off && off.length) base=base.filter(b=>!off.includes(b.k));
+  // 🧱 blocks you made yourself, on this day, in clock order with everything else.
+  // They're real blocks: tasks nest inside them, they drag, they re-time. And they
+  // stay on THIS day even when they run past midnight, because a block's time is
+  // minutes on the 11am-to-11am day (12:20am on Monday night = 1460, still Monday).
+  const owns=(blocksOwn['w'+n+'-'+dk]||[])
+    .map(b=>({k:b.k, s:b.s, e:b.e, n:b.n, d:b.d||'your own block', t:fmtRange(b.s,b.e), own:true}));
+  if(owns.length) base=base.concat(owns);
   // 🧱 your own blocks (a to-do promoted onto the clock) sit in the day right
   // alongside the plan's blocks, in clock order
   const solos=soloBlocksOn(planDayISO(n,dk));
-  if(solos.length) base=base.concat(solos).sort((a,b)=>a.s-b.s);
+  if(solos.length) base=base.concat(solos);
+  if(owns.length||solos.length) base=base.slice().sort((a,b)=>a.s-b.s);
+  // ✏️ your renames (double-click a block's name). n0 keeps the plan's original
+  // wording so retyping it (or clearing the box) drops the rename.
+  base=base.map(x=>{ const nn=blockNames[x.k]; return nn?Object.assign({},x,{n:nn,n0:x.n}):x; });
   // layer on any reshuffle made right on the dashboard (tap a block's time).
   // Blocks whose times didn't change keep their hand-written labels ('All day',
   // 'moved →'); shifted ones get a freshly formatted range.
@@ -1697,6 +1746,70 @@ function hideBlock(n,dk,k){
   if(blockMods[day]){ blockMods[day]=blockMods[day].filter(m=>m.k!==k); saveBlockMods(); }
   saveBlockOff(); rebuildWeeks(); if(view==='plan') renderPlan();
 }
+/* Blocks you set BEFORE the seam moved were measured from the old 11am cut, so an
+   early-morning appointment (say 8:20am) got stored as "8:20 tomorrow" and sat at
+   the bottom of its day. Anything still parked out there past the seam gets pulled
+   back to the morning it always meant. Runs on load and after a sync, and doing it
+   twice changes nothing. */
+function migrateSeam(sync){
+  let touched=false;
+  const fix=b=>{ if(b.s>=1440+DAY0){ const len=b.e-b.s; b.s-=1440; b.e=b.s+len; touched=true; } };
+  Object.values(solo).forEach(fix);
+  Object.values(blocksOwn).forEach(list=>list.forEach(fix));
+  Object.values(blockMods).forEach(list=>{ list.forEach(fix); list.sort((a,b)=>a.s-b.s); });
+  if(!touched) return;
+  localStorage.setItem(LS_SOLO, JSON.stringify(solo));
+  localStorage.setItem(LS_BLOCKSOWN, JSON.stringify(blocksOwn));
+  localStorage.setItem(LS_BLOCKMODS, JSON.stringify(blockMods));
+  // at boot this only fixes THIS device (the phone fixes itself the same way, from
+  // the same numbers). Pushing here would race the first sync and could shove a
+  // stale copy over newer edits, so only the post-sync pass writes to the feed.
+  if(sync) pushStateSoon();
+}
+/* ---- 🧱 A BLOCK OF YOUR OWN ----
+   The plan doesn't know about the 12:20am kitchen-and-chores hour, or the bath,
+   or the hour the cats decided was theirs. Make the block yourself: name it, give
+   it a start and an end, and it lands on that day's clock like any other block.
+   Drag it, re-time it, drop tasks inside it, 🗑 it when it's done being a thing.
+   Past midnight is fine: 12:20am belongs to the night that started it. */
+function addOwnBlock(n,dk,name,s,e){
+  const day='w'+n+'-'+dk;
+  const b={k:'own-'+Date.now().toString(36), s, e, n:name, d:'your own block'};
+  blocksOwn[day]=[...(blocksOwn[day]||[]), b];
+  saveBlocksOwn();
+  // a day that's already been reshuffled keeps its own list of block times, and a
+  // block that isn't in it would get stranded, so put the newcomer in that list too
+  const mods=blockMods[day];
+  if(mods){ blockMods[day]=[...mods,{k:b.k,s,e}].sort((x,y)=>x.s-y.s); saveBlockMods(); }
+  rebuildWeeks(); if(view==='plan') renderPlan();
+  return b;
+}
+function delOwnBlock(n,dk,k){
+  const day='w'+n+'-'+dk;
+  blocksOwn[day]=(blocksOwn[day]||[]).filter(b=>b.k!==k);
+  if(!blocksOwn[day].length) delete blocksOwn[day];
+  if(blockMods[day]){ blockMods[day]=blockMods[day].filter(m=>m.k!==k); saveBlockMods(); }
+  // anything parked inside it isn't deleted with it: it goes back to no set time
+  unslotKey(k);
+  saveSlotted(); saveBlocksOwn(); rebuildWeeks(); if(view==='plan') renderPlan();
+}
+/* a task's parking spot(s), normalized: slotted[id] holds one block key, a LIST
+   of keys (a task can sit in two blocks at once, same checkbox in both), or
+   'none' (a sprint task told to have no set time). */
+function slotsRaw(id){ const v=slotted[id]; return v==null?null:(Array.isArray(v)?v:[v]); }
+/* take one block key out of every task's parking spot (that block is going away).
+   A task that was ONLY there goes back to no set time; one that also sits in
+   another block just keeps the other block. */
+function unslotKey(k){
+  Object.keys(slotted).forEach(id=>{
+    const v=slotted[id];
+    if(Array.isArray(v)){
+      if(!v.includes(k)) return;
+      const nv=v.filter(x=>x!==k);
+      if(!nv.length) delete slotted[id]; else slotted[id]=nv.length===1?nv[0]:nv;
+    } else if(v===k) delete slotted[id];
+  });
+}
 /* ---- 🧱 A TO-DO AS ITS OWN BLOCK ----
    Therapy at 7 is not "part of the flex block", it's its own thing on the clock.
    Promote any to-do, bill or appointment (⇅ → 🧱 its own block) and it leaves the
@@ -1706,14 +1819,14 @@ const DK_IDX = dk => Math.max(0, DAY_DEFS.findIndex(d=>d.dk===dk));
 const planDayISO = (n,dk) => isoLocal(dayDate(n, DK_IDX(dk)));
 const minsTo12 = m => { const mm=((m%1440)+1440)%1440, h=Math.floor(mm/60);
   return (((h+11)%12)+1)+':'+String(mm%60).padStart(2,'0')+' '+(h>=12?'PM':'AM'); };
-// a clock time ('7:00 PM') as minutes on the 11am-to-11am schedule day
+// a clock time ('7:00 PM') as minutes on the seam-to-seam schedule day
 const timeToMins = t => { const v=to24(t||''); if(!v) return null;
-  const m=Number(v.slice(0,2))*60+Number(v.slice(3)); return m<660 ? m+1440 : m; };
+  const m=Number(v.slice(0,2))*60+Number(v.slice(3)); return m<DAY0 ? m+1440 : m; };
 // the 🧱 blocks living on one day. Same ride-along rule as the to-dos themselves:
 // something still open from an earlier day tags along on today's card.
 function soloBlocksOn(dISO){
   if(!dISO || !Object.keys(solo).length) return [];
-  const S=scheduleLists(), out=[], isToday=dISO===isoLocal(today);
+  const S=scheduleLists(), out=[], isToday=dISO===isoLocal(planToday);
   ['appt','bill','task'].forEach(kind=>S[kind].forEach(it=>{
     const sv=solo[it.id]; if(!sv || !it.date) return;
     const late=it.date<dISO;
@@ -1727,9 +1840,13 @@ function soloBlocksOn(dISO){
    It starts at its own clock time when it has one, otherwise where its block was,
    otherwise noon, and runs an hour until you drag the ends around. */
 function agSolo(id, blocks){
-  if(solo[id]){ delete solo[id]; saveSolo(); render(); rebuildWeeks(); if(view==='plan') renderPlan(); return; }
+  if(solo[id]){ delete solo[id];
+    // tasks that were parked INSIDE this block go back to no set time
+    unslotKey('solo:'+id); saveSlotted();
+    saveSolo(); render(); rebuildWeeks(); if(view==='plan') renderPlan(); return; }
   const info=AGENDA_INDEX[id]||{};
-  const cur=(blocks||[]).find(b=>b.k===slotted[id]);
+  const ks=slotsRaw(id)||[];
+  const cur=(blocks||[]).find(b=>ks.includes(b.k));
   const s=timeToMins(info.time) ?? (cur ? cur.s : 720);
   solo[id]={s, e:s+60};
   delete slotted[id]; saveSlotted();          // it IS a block now, it can't also sit inside one
@@ -1766,6 +1883,20 @@ function syncSolo(mods){
    TAP it instead to type a new start time; then that block and everything after
    it slide by the same amount. Either way it's that ONE day only; the weekly
    skeleton is untouched and the day card grows an undo chip. */
+/* THE SEAM (DAY0). Your day is one long ribbon of minutes, and this is where it
+   gets cut. Everything after the seam is THIS day; everything before it belongs to
+   the night that just ended, so it lands at the bottom of the day before.
+   It used to be cut at 11am, which broke both ends of your night:
+     · 12:20am → fine (bottom of Monday), but
+     · "10am"  → earlier than the day's own start, so it got read as 10am TOMORROW
+                 and the block shot to the end of the card, and
+     · 8:20am  → same thing: an early appointment went to the BOTTOM of its day
+                 instead of the top, even though it happens before you even wake up.
+   Cut at 5am instead and both are true at once: 12:20am and 1:45am are still last
+   night (bottom of Monday), while 8:20am and 10am are this morning (top of Tuesday,
+   above the wake-up block). 5am is the quietest hour you have: nothing of yours
+   ever starts then, so it's the safest place to put the cut. */
+const DAY0=300;
 const merOf=m=>Math.floor((((m%1440)+1440)%1440)/60)>=12?'pm':'am';
 const fmtMins=(m,ap)=>{ const h=Math.floor((((m%1440)+1440)%1440)/60), mm=((m%60)+60)%60;
   return (((h+11)%12)+1)+':'+String(mm).padStart(2,'0')+(ap?merOf(m):''); };
@@ -1775,19 +1906,21 @@ const fmtRange=(s,e)=> merOf(s)===merOf(e) ? fmtMins(s)+'-'+fmtMins(e,1) : fmtMi
 // ...including the plan's own hand-written labels. Ones that aren't times at all
 // ('All day', 'moved →') are left exactly as the plan wrote them.
 const relabel=b => (/^\d/.test(b.t||'') && b.e>b.s) ? Object.assign({},b,{t:fmtRange(b.s,b.e)}) : b;
-// "12", "12:30", "9pm", "1:15 am", "13:40" -> minutes on the 11am-to-11am schedule
-// day (660..2100). A bare time with no am/pm picks whichever reading is CLOSEST
+// "12", "12:30", "9pm", "1:15 am", "13:40" -> minutes on the seam-to-seam schedule
+// day (300..1739). A bare time with no am/pm picks whichever reading is CLOSEST
 // to where the block sits now ("12:20" on a 9:20pm block means 12:20am, not noon).
 function parseBlockTime(str,near){
-  const m=/^(\d{1,2})(?::(\d{2}))?\s*(?:(a|p)\.?m?\.?)?$/i.exec((str||'').trim());
+  // typed by a person, not a form: "10:am", "9 pm", "12:30", "1.15pm", "10:"
+  const raw=(str||'').replace(/\s+/g,'').replace(/:(?=[ap]|$)/i,'');
+  const m=/^(\d{1,2})(?::(\d{2}))?(?:(a|p)\.?m?\.?)?$/i.exec(raw);
   if(!m) return null;
   const H=Number(m[1]), mm=Number(m[2]||0);
   if(H>23||mm>59) return null;
   const ap=(m[3]||'').toLowerCase();
-  if(ap){ let v=(H%12)*60+mm+(ap==='p'?720:0); if(v<660) v+=1440; return v; }
+  if(ap){ let v=(H%12)*60+mm+(ap==='p'?720:0); if(v<DAY0) v+=1440; return v; }
   if(H===0) return 1440+mm;                          // 0:xx = past midnight
-  if(H>12){ const v=H*60+mm; return v<660?v+1440:v; } // 24h style
-  const cands=[(H%12)*60+mm,(H%12)*60+mm+720,(H%12)*60+mm+1440].filter(c=>c>=660);
+  if(H>12){ const v=H*60+mm; return v<DAY0?v+1440:v; } // 24h style
+  const cands=[(H%12)*60+mm,(H%12)*60+mm+720,(H%12)*60+mm+1440].filter(c=>c>=DAY0);
   if(near!==undefined) cands.sort((a,b)=>Math.abs(a-near)-Math.abs(b-near));
   return cands[0];
 }
@@ -2000,7 +2133,8 @@ function renderPlan(){
   // today's clock, with the current block highlighted (before 11am = still yesterday's clock)
   const now=new Date();
   let nowM=now.getHours()*60+now.getMinutes();
-  const dref=new Date(now); if(now.getHours()<11){ nowM+=1440; dref.setDate(dref.getDate()-1); }
+  if(nowM<DAY0) nowM+=1440;                       // 12:20am is minute 1460 of Monday
+  const dref=new Date(planToday);
   const variant=dref.getDay()===6?'sat':(dref.getDay()===0?'sun':'wk');
   // honor a one-off reshuffle for today (CLOCK_OVERRIDES), else the normal skeleton
   const wkNum=Math.floor((dref-startD)/604800000)+1;
@@ -2008,7 +2142,7 @@ function renderPlan(){
   const wrap=document.getElementById('planDays'); wrap.innerHTML='';
   todayClock.forEach(b=>{
     const r=document.createElement('div');
-    r.className='pd-row'+((nowM>=b.s&&nowM<b.e)?' now-block':'')+(b.solo?' solo':'');
+    r.className='pd-row'+((nowM>=b.s&&nowM<b.e)?' now-block':'')+(b.solo?' solo':'')+(b.own?' own':'');
     r.innerHTML='<div class="pd-time movable" title="drag to move this block · tap to type a time (today only)">'+b.t+'</div><div class="pd-name">'+b.n+'</div><div class="pd-desc">'+b.d+'</div>';
     const dk=DK_BY_DAY[dref.getDay()];
     const tm=r.querySelector('.pd-time');
@@ -2040,8 +2174,7 @@ function dayIdFor(d){
   return 'gpd-w'+(Math.floor(diff/7)+1)+'-'+['mon','tue','wed','thu','fri','sat','sun'][diff%7];
 }
 function calcStreak(){
-  const now=new Date(); const d=new Date(now); d.setHours(0,0,0,0);
-  if(now.getHours()<11) d.setDate(d.getDate()-1);
+  const d=new Date(planToday);
   let id=dayIdFor(d);
   if(!(id&&done[id])) d.setDate(d.getDate()-1); // today not done yet? streak counts up to yesterday
   let s=0;
@@ -2206,6 +2339,20 @@ function rebuildWeeks(){
   wrap.innerHTML=''; delete wrap.dataset.built;
   buildWeeks();
   wrap.querySelectorAll('details[data-key]').forEach(d=>{ d.open=open.has(d.dataset.key); });
+}
+// a plan task as it reads right now (your ✏️ wording wins over the plan's)
+const gpText = it => edits[it.id] || it.txt;
+// the project guides show the same tasks as the day cards, so a 🗑 there has to
+// land here too. Same trick as the weeks: forget it, redraw it, keep it open.
+function refreshGuides(){
+  const wrap=document.getElementById('planGuides');
+  if(!wrap || !wrap.dataset.built) return;
+  const open=new Set();
+  wrap.querySelectorAll('details').forEach((d,i)=>{ if(d.open) open.add(i); });
+  gpPrune(wrap);
+  wrap.innerHTML=''; delete wrap.dataset.built;
+  buildGuides();
+  wrap.querySelectorAll('details').forEach((d,i)=>{ d.open=open.has(i); });
 }
 /* ✏️ reword one of the plan's own tasks, right on the day card. The plan file is
    never rewritten: your wording is an override (edits[id], same as a to-do's), and
@@ -2407,6 +2554,14 @@ function checklist(items,cntEl,ctx){
       if(away) chip('↩ back to '+home.name,'Put it back on the day the plan chose',false,()=>gpMove(it.id,null));
       mv.onclick=e=>{ e.stopPropagation(); const open=drw.style.display==='none';
         drw.style.display=open?'flex':'none'; mv.classList.toggle('on',open); };
+      /* 🗑 the plan is a suggestion, not a boss. Delete any task it wrote (no, you
+         are not filming video #1 this week) and it's off the card. The day keeps an
+         "↺ bring back" chip, so a delete is never a door that locks behind you. */
+      const del=document.createElement('button'); del.className='tb'; del.textContent='🗑';
+      del.title='Delete this task (the ↺ chip on this day brings it back)';
+      del.onclick=e=>{ e.stopPropagation();
+        taskOff[it.id]=1; saveTaskOff(); rebuildWeeks(); refreshGuides(); };
+      tbs.appendChild(del);
       row.appendChild(cb); row.appendChild(t); row.appendChild(tbs);
       box.appendChild(row); box.appendChild(drw); sync(); return;
     }
@@ -2533,6 +2688,40 @@ function mineSlot(mid, blockKey){
   if(blockKey) m.slot=blockKey; else delete m.slot;
   saveMine(); rebuildWeeks();
 }
+/* 🧱 the "add a block" form: a name, a start, an end, and it's on the day's clock.
+   The end may be earlier on the clock than the start (12:20am → 1:45am is a real
+   85 minutes on Monday night), so the times are read on the 11am-to-11am day and
+   an end that lands before the start is nudged forward instead of rejected. */
+function blockAddRow(dd, n){
+  const wrap=document.createElement('div'); wrap.className='my-add blk-add';
+  const open=document.createElement('button'); open.className='my-open';
+  open.textContent='🧱 add a block: chores, a bath, the cats, whatever this day actually needs';
+  const form=document.createElement('div'); form.className='my-form';
+  const txt=document.createElement('input'); txt.type='text'; txt.placeholder='e.g. 🧼 Kitchen + chores';
+  const s=document.createElement('input'); s.type='time'; s.className='ag-date'; s.title='starts at';
+  const e=document.createElement('input'); e.type='time'; e.className='ag-date'; e.title='ends at (after midnight is fine, it stays on this day)';
+  const go=document.createElement('button'); go.className='tb my-go'; go.textContent='Add ✓';
+  const err=document.createElement('div'); err.className='err'; err.style.display='none';
+  const add=()=>{
+    const v=txt.value.trim();
+    if(!v){ txt.focus(); return; }
+    const S=timeToMins(to12(s.value));
+    if(S===null||S===undefined){ err.textContent='It needs a start time 💛'; err.style.display='block'; return; }
+    let E=timeToMins(to12(e.value));
+    if(E===null||E===undefined) E=S+60;              // no end given: an hour, drag it later
+    while(E<=S) E+=720;                              // "12:20am to 1:45am" is a forward hour and a half
+    err.style.display='none';
+    addOwnBlock(n, dd.dk, v, S, E);
+    txt.value=''; s.value=''; e.value='';
+  };
+  go.onclick=add;
+  txt.addEventListener('keydown',ev=>{ if(ev.key==='Enter') add(); });
+  open.onclick=()=>{ const on=form.style.display!=='flex';
+    form.style.display=on?'flex':'none'; if(on) txt.focus(); };
+  form.appendChild(txt); form.appendChild(s); form.appendChild(e); form.appendChild(go); form.appendChild(err);
+  wrap.appendChild(open); wrap.appendChild(form);
+  return wrap;
+}
 /* the ＋ row itself, at the bottom of every day card */
 function myAddRow(dd, dISO, ck){
   const wrap=document.createElement('div'); wrap.className='my-add';
@@ -2574,7 +2763,7 @@ function myAddRow(dd, dISO, ck){
       custom.push(it);
       saveSlotted(); saveCustom(); render(); rebuildWeeks();
     } else {
-      const todayISO=isoLocal(today);
+      const todayISO=isoLocal(planToday);
       mine.push({id:'m'+Date.now().toString(36), txt:v, rep:rep.value, dk:dd.dk,
         slot:blk.value||undefined, start:(dISO<todayISO?dISO:todayISO)});
       saveMine(); rebuildWeeks();
@@ -2741,7 +2930,7 @@ function buildWeeks(){
   const fmt=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
   indexTasks();   // who lives where, before anyone gets pushed around
   for(let n=1;n<=8;n++){
-    const f=dayDate(n,0), t=dayDate(n,6), cur=today>=f&&today<=t;
+    const f=dayDate(n,0), t=dayDate(n,6), cur=planToday>=f&&planToday<=t;
     const det=document.createElement('details'); det.className='plan-day'+(cur?' today-day':''); if(cur) det.open=true;
     det.dataset.key='w'+n;
     const sum=document.createElement('summary');
@@ -2752,11 +2941,16 @@ function buildWeeks(){
     // the week's seven dates, for the "or another day" chips in the ⇅ drawer
     const weekDays=DAY_DEFS.map((x,i)=>({dk:x.dk, name:x.name, iso:isoLocal(dayDate(n,i)), label:fmt(dayDate(n,i))}));
     DAY_DEFS.forEach((dd,idx)=>{
-      const dDate=dayDate(n,idx), dISO=isoLocal(dDate), isToday=dISO===isoLocal(today);
+      // "today" on the Game Plan is the 11am-to-11am day: at 12:20am you are still
+      // in Monday night, so Monday is the card that opens and wears the 🌸
+      const dDate=dayDate(n,idx), dISO=isoLocal(dDate), isToday=dISO===isoLocal(planToday);
       // the plan's tasks for this day, minus the ones pushed to another day, plus
       // the ones pushed here from another day
-      const tasks=[...dayTasks(n,dd,dISO).filter(t=>!tmoved[t.id] || tmoved[t.id]===dISO),
-                   ...(TASK_IN[dISO]||[])];
+      const tasksAll=[...dayTasks(n,dd,dISO).filter(t=>!tmoved[t.id] || tmoved[t.id]===dISO),
+                      ...(TASK_IN[dISO]||[])];
+      // 🗑 the plan's tasks you deleted are off the card (and out of the day's count)
+      const tasks=tasksAll.filter(t=>!taskOff[t.id]);
+      const cut=tasksAll.filter(t=>taskOff[t.id]);
       const dDet=document.createElement('details'); dDet.className='plan-day'+(isToday?' today-day':'');
       if(isToday){ dDet.open=true; det.open=true; }
       dDet.dataset.key='w'+n+'-'+dd.dk;
@@ -2810,6 +3004,15 @@ function buildWeeks(){
           saveBlockMods(); saveBlockOff(); rebuildWeeks(); if(view==='plan') renderPlan(); };
         dBody.appendChild(rb);
       }
+      // 🗑 → ↺ : the tasks you deleted from this day are one tap from coming back
+      if(cut.length){
+        const tb=document.createElement('button'); tb.className='blk-reset';
+        tb.textContent='↺ bring back '+cut.length+' deleted task'+(cut.length>1?'s':'');
+        tb.title=cut.map(t=>gpText(t)).join('\n');
+        tb.onclick=e=>{ e.stopPropagation(); cut.forEach(t=>delete taskOff[t.id]);
+          saveTaskOff(); rebuildWeeks(); refreshGuides(); };
+        dBody.appendChild(tb);
+      }
       ck.forEach(b=>{
         // a 🧱 block IS its to-do, so it checks off as that one item, in every place
         // it shows up. Plan blocks keep their own per-day checkbox id.
@@ -2828,6 +3031,7 @@ function buildWeeks(){
       const rest=tasks.filter(t=>!blockKeys.has(taskSlot(t)));
       if(rest.length){ const st=document.createElement('div'); st.className='blk-tasks'; st.appendChild(checklist(rest,null,ctx)); dBody.appendChild(st); }
       dBody.appendChild(myAddRow(dd, dISO, ck));   // ＋ add your own, always last
+      dBody.appendChild(blockAddRow(dd, n));       // 🧱 ...and a block of your own
       const dUpd=()=>{ dCnt.textContent=dayIds.filter(id=>done[id]).length+' / '+dayIds.length; };
       dUpd.el=dDet;
       dayIds.forEach(id=>(gpReg[id]=gpReg[id]||[]).push(dUpd)); dUpd();
@@ -2855,7 +3059,7 @@ function dropZone(el, onDrop){
 /* one checkable hour block row. mv = {n, dk}: the time label is a handle, drag
    it to physically move the block, tap it to type a time. One day only. */
 function hourRow(b,bid,mv){
-  const row=document.createElement('div'); row.className='pl-item blk'+(b.solo?' solo':'');
+  const row=document.createElement('div'); row.className='pl-item blk'+(b.solo?' solo':'')+(b.own?' own':'');
   const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox';
   const t=document.createElement('div'); t.className='txt2';
   t.innerHTML='<span class="pd-time blk-time">'+b.t+'</span><b>'+b.n+'</b> <span class="pd-desc">'+b.d+'</span>';
@@ -2878,6 +3082,17 @@ function hourRow(b,bid,mv){
     back.title='Put this back in the list (it stops being its own block)';
     back.onclick=e=>{ e.stopPropagation(); agSolo(b.id); };
     tbs.appendChild(back); row.appendChild(tbs);
+  }
+  // 🧱 a block you made: 🗑 deletes it for real (it was never the plan's to keep)
+  else if(b.own && mv){
+    const tbs=document.createElement('div'); tbs.className='tbs';
+    const del=document.createElement('button'); del.className='tb'; del.textContent='🗑';
+    del.title='Delete this block (it is yours, so it goes for good)';
+    del.onclick=e=>{ e.stopPropagation();
+      if(confirm('Delete your "'+b.n+'" block?\n\nAnything parked inside it just goes back to having no set time. Nothing else changes.'))
+        delOwnBlock(mv.n, mv.dk, b.k);
+    };
+    tbs.appendChild(del); row.appendChild(tbs);
   }
   // 🗑 or take the plan's block off this one day. Nothing inside it is lost: those
   // tasks just go back to having no set time, and ↺ brings the block back.
@@ -2912,7 +3127,8 @@ function buildGuides(){
     const cnt=document.createElement('span'); cnt.className='hrs'; sum.appendChild(cnt); det.appendChild(sum);
     const body=document.createElement('div'); body.className='pd-body';
     const allItems=[];
-    g.steps.forEach((st,i)=>{
+    g.steps.forEach((steps,i)=>{
+      const st=steps.filter(x=>!taskOff[x.id]);   // 🗑 deleted on a day card = gone here too
       if(!st.length) return;
       const h=document.createElement('div'); h.className='wk-sub'; h.textContent='Week '+(i+1); body.appendChild(h);
       body.appendChild(checklist(st,null)); allItems.push(...st);
@@ -3984,6 +4200,7 @@ function makePdf(){
 }
 $('clPdf').onclick=makePdf;
 
+migrateSeam();   // old 11am-seam block times, pulled back to the morning they meant
 render();
 applyLayout();
 renderFood();
