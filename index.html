@@ -947,6 +947,7 @@ const LS_BLOCKOFF = 'lupita-dash-blockoff-v1';
 const LS_BLOCKSOWN = 'lupita-dash-blocksown-v1';
 const LS_TASKOFF = 'lupita-dash-taskoff-v1';
 const LS_BLOCKNAMES = 'lupita-dash-blocknames-v1';
+const LS_BLOCKDESCS = 'lupita-dash-blockdescs-v1';
 let done = JSON.parse(localStorage.getItem(LS_DONE) || '{}');
 let custom = JSON.parse(localStorage.getItem(LS_CUSTOM) || '[]');
 let arch = JSON.parse(localStorage.getItem(LS_ARCH) || '{}');   // id -> {t:text, k:kind, at:'YYYY-MM-DD'}
@@ -996,6 +997,8 @@ let taskOff = JSON.parse(localStorage.getItem(LS_TASKOFF) || '{}');
 // "Focus block" becoming "Studio time" shouldn't take 40 double-clicks. Clearing
 // the box, or retyping the plan's name, hands the original back.
 let blockNames = JSON.parse(localStorage.getItem(LS_BLOCKNAMES) || '{}');
+// ...and the little note after the name ("shower, real food, no work yet") reworded the same way
+let blockDescs = JSON.parse(localStorage.getItem(LS_BLOCKDESCS) || '{}');
 let view = 'today';
 const saveDone = () => { localStorage.setItem(LS_DONE, JSON.stringify(done)); pushStateSoon(); };
 const saveCustom = () => { localStorage.setItem(LS_CUSTOM, JSON.stringify(custom)); pushStateSoon(); };
@@ -1011,6 +1014,7 @@ const saveBlockOff = () => { localStorage.setItem(LS_BLOCKOFF, JSON.stringify(bl
 const saveBlocksOwn = () => { localStorage.setItem(LS_BLOCKSOWN, JSON.stringify(blocksOwn)); pushStateSoon(); };
 const saveTaskOff = () => { localStorage.setItem(LS_TASKOFF, JSON.stringify(taskOff)); pushStateSoon(); };
 const saveBlockNames = () => { localStorage.setItem(LS_BLOCKNAMES, JSON.stringify(blockNames)); pushStateSoon(); };
+const saveBlockDescs = () => { localStorage.setItem(LS_BLOCKDESCS, JSON.stringify(blockDescs)); pushStateSoon(); };
 const getToken = () => localStorage.getItem(LS_TOKEN) || '';
 
 /* ---------- DATE HELPERS ---------- */
@@ -1508,6 +1512,7 @@ async function loadState(){
       if(s.blocksOwn){ blocksOwn=s.blocksOwn; localStorage.setItem(LS_BLOCKSOWN, JSON.stringify(blocksOwn)); }
       if(s.taskOff){ taskOff=s.taskOff; localStorage.setItem(LS_TASKOFF, JSON.stringify(taskOff)); }
       if(s.blockNames){ blockNames=s.blockNames; localStorage.setItem(LS_BLOCKNAMES, JSON.stringify(blockNames)); }
+      if(s.blockDescs){ blockDescs=s.blockDescs; localStorage.setItem(LS_BLOCKDESCS, JSON.stringify(blockDescs)); }
       if(s.mailDone){ mailDone=s.mailDone; localStorage.setItem(LS_MAILDONE, JSON.stringify(mailDone)); }
       if(s.mailStore){ mailStore=s.mailStore; localStorage.setItem(LS_MAILSTORE, JSON.stringify(mailStore)); loadMailFromStore(); }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
@@ -1532,7 +1537,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, food, friends, mine, solo, tmoved, mailDone, mailStore, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -1720,9 +1725,15 @@ function clockFor(n,dk,def){
   const solos=soloBlocksOn(planDayISO(n,dk));
   if(solos.length) base=base.concat(solos);
   if(owns.length||solos.length) base=base.slice().sort((a,b)=>a.s-b.s);
-  // ✏️ your renames (double-click a block's name). n0 keeps the plan's original
-  // wording so retyping it (or clearing the box) drops the rename.
-  base=base.map(x=>{ const nn=blockNames[x.k]; return nn?Object.assign({},x,{n:nn,n0:x.n}):x; });
+  // ✏️ your renames (double-click a block's name) and reworded notes (double-click
+  // the words after it). n0/d0 keep the plan's original wording so retyping it
+  // (or clearing the box) drops the override.
+  base=base.map(x=>{ const nn=blockNames[x.k], dd=blockDescs[x.k];
+    if(nn==null && dd==null) return x;
+    const y=Object.assign({},x);
+    if(nn!=null){ y.n=nn; y.n0=x.n; }
+    if(dd!=null){ y.d=dd; y.d0=x.d; }
+    return y; });
   // layer on any reshuffle made right on the dashboard (tap a block's time).
   // Blocks whose times didn't change keep their hand-written labels ('All day',
   // 'moved →'); shifted ones get a freshly formatted range.
@@ -2100,6 +2111,21 @@ function setBlockName(n,dk,b,v){
 }
 function renameBlockEl(n,dk,b,el){
   inlineEdit(el, b.solo?((AGENDA_INDEX[b.id]||{}).text||''):b.n, v=>setBlockName(n,dk,b,v));
+}
+/* ✏️ double-click the little note after a block's name ("shower, real food, no
+   work yet") to reword it. A PLAN block's note changes everywhere the block
+   appears (clear the box, or retype the plan's wording, to get the original
+   back); a 🧱 block of your own is just edited in place. */
+function setBlockDesc(n,dk,b,v){
+  if(b.own){
+    const own=(blocksOwn['w'+n+'-'+dk]||[]).find(x=>x.k===b.k);
+    if(own){ own.d=v; saveBlocksOwn(); }
+  } else {
+    if(!v || v===(b.d0!=null?b.d0:b.d)) delete blockDescs[b.k];
+    else blockDescs[b.k]=v;
+    saveBlockDescs();
+  }
+  rebuildWeeks(); if(view==='plan') renderPlan();
 }
 /* drop block k so it becomes the ins-th block of the day. The blocks between its
    old and new spot shift over by its length; everything outside that stretch
@@ -3199,6 +3225,10 @@ function hourRow(b,bid,mv){
     const nm=t.querySelector('b');
     nm.title='double-click to rename this block';
     nm.ondblclick=e=>{ e.stopPropagation(); renameBlockEl(mv.n, mv.dk, b, nm); };
+    // ✏️ ...and the note after it to reword that too
+    const ds=t.querySelector('.pd-desc');
+    ds.title='double-click to reword this note';
+    ds.ondblclick=e=>{ e.stopPropagation(); inlineEdit(ds, b.d||'', v=>setBlockDesc(mv.n, mv.dk, b, v)); };
   }
   const sync=()=>{ cb.checked=!!done[bid]; row.classList.toggle('done',!!done[bid]); };
   sync.el=row;
