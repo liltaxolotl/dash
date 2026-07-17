@@ -193,8 +193,34 @@
   .reset{background:none; border:1px solid var(--line); color:var(--soft); border-radius:99px; padding:6px 14px; cursor:pointer; font-size:.8rem}
   .reset:hover{border-color:var(--pink)}
 
-  /* ---------- cover letter panel ---------- */
-  #coverPanel{max-width:900px; margin:0 auto}
+  /* ---------- 💼 jobs panel (listings + application tracker + analytics + cover letters) ---------- */
+  #jobsPanel .jgrid{display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; margin-bottom:18px}
+  @media(max-width:820px){#jobsPanel .jgrid{grid-template-columns:1fr}}
+  .jb-row{display:flex; flex-wrap:wrap; gap:8px; margin-top:4px}
+  a.jb{border:1px solid var(--line); border-radius:99px; padding:6px 13px; font-size:.82rem; font-weight:700;
+    color:var(--lav-deep); text-decoration:none; background:#fdfafe}
+  a.jb:hover{border-color:var(--lav); color:var(--pink-deep)}
+  /* what-happened chips on a tracked application */
+  .stchips{display:flex; flex-wrap:wrap; gap:5px; margin-top:5px}
+  .stchip{border:1px solid var(--line); background:#fff; border-radius:99px; padding:2px 9px;
+    font-size:.7rem; font-weight:700; color:var(--soft); cursor:pointer}
+  .stchip:hover{border-color:var(--lav)}
+  .stchip.on-wait{background:#eef0f4; border-color:#d6dae2; color:#6b7280}
+  .stchip.on-int{background:#ece4ff; border-color:#cdbcff; color:var(--lav-deep)}
+  .stchip.on-offer{background:#e8f8f1; border-color:#a5e6c4; color:var(--ok)}
+  .stchip.on-rej{background:#ffe1e6; border-color:#ffb3c2; color:#d23b5b}
+  .stchip.on-ghost{background:#e0f2fe; border-color:#a5d8f5; color:#0369a1}
+  /* analytics */
+  .jstats{display:grid; grid-template-columns:repeat(auto-fit,minmax(105px,1fr)); gap:10px; margin:6px 0 12px}
+  .jstat{border:1px solid var(--line); border-radius:12px; padding:10px 8px; background:#fdfafe; text-align:center}
+  .jstat b{display:block; font-size:1.3rem; line-height:1.2}
+  .jstat span{font-size:.7rem; font-weight:700; color:var(--soft)}
+  .jbar{display:flex; height:12px; border-radius:99px; overflow:hidden; background:var(--line); margin:2px 0 6px}
+  .jbar i{display:block; height:100%}
+  .jbar-key{display:flex; flex-wrap:wrap; gap:4px 12px; font-size:.7rem; font-weight:700; color:var(--soft); margin-bottom:4px}
+  .jbar-key .dot{display:inline-block; width:9px; height:9px; border-radius:99px; margin-right:4px}
+
+  /* ---------- cover letter cards (inside the jobs panel) ---------- */
   .cl-lead{color:var(--soft); font-size:.9rem; line-height:1.5; margin:0 0 14px}
   .cl-field{margin:0 0 12px}
   .cl-field label{display:block; font-size:.82rem; font-weight:700; color:var(--ink); margin-bottom:5px}
@@ -450,7 +476,7 @@
     <button class="tab" data-view="month">🗓️ This Month</button>
     <button class="tab" data-view="all">✨ Everything</button>
     <button class="tab" data-view="plan">🗺️ Game Plan</button>
-    <button class="tab" data-view="cover">✉️ Cover Letters</button>
+    <button class="tab" data-view="jobs">💼 Jobs</button>
   </div>
 
   <div class="grid">
@@ -580,15 +606,73 @@
           📦 Archive <span class="pill" id="archCount"></span>
         </h2>
         <div id="archBody" style="display:none">
-          <div class="note" style="margin:0 0 8px">Checked-off to-dos, bills, appointments, and leads land here with the day you finished them, so the active lists stay clean. ↩ puts one back.</div>
+          <div class="note" style="margin:0 0 8px">Checked-off to-dos, bills, and appointments land here with the day you finished them, so the active lists stay clean. ↩ puts one back. (Jobs you applied to or passed on live in the 💼 Jobs tab's tracker now.)</div>
           <ul class="list" id="archList"></ul>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ✉️ COVER LETTER GENERATOR (hidden until the Cover Letters tab is picked) -->
-  <section id="coverPanel" style="display:none">
+  <!-- 💼 JOBS HUB (hidden until the Jobs tab is picked):
+       job listings + application tracker + analytics + the cover letter generator.
+       The listings here are the SAME data as the home tab's 💼 card. -->
+  <section id="jobsPanel" style="display:none">
+    <div class="jgrid">
+      <div class="col">
+        <div class="card">
+          <h2>💼 Job &amp; Client Leads <span class="pill" id="jobsLeadCount"></span>
+            <button id="jobsLeadRefresh" title="refresh leads now"
+              style="margin-left:auto; border:none; background:none; cursor:pointer; font-size:1rem; color:var(--lav-deep)">↻</button>
+          </h2>
+          <div class="note" id="jobsLeadStatus"></div>
+          <div class="chiprow">
+            <button id="jobsRemoteOnly" class="chip" title="show only work-from-home leads">🏠 Remote only</button>
+            <span class="note" id="jobsRemoteNote" style="margin:0; font-size:.72rem"></span>
+          </div>
+          <div class="note" style="margin:0 0 8px">Same list as the 💼 card on your home tab. ✓ = I applied! (files it in the tracker ➡️). ✕ = not for me (files it under Passed, nothing is lost).</div>
+          <ul class="list" id="jobsLeadList"></ul>
+          <button id="jobsHunt" title="ask the lead hunter to search for brand-new leads"
+            style="width:100%; margin:.4rem 0; padding:.45rem; border:1px dashed var(--lav-deep); border-radius:8px; background:none; cursor:pointer; color:var(--lav-deep); font-size:.85rem">🎯 Hunt new leads now</button>
+        </div>
+
+        <div class="card">
+          <h2>🔎 Where to look <span class="pill">job boards</span></h2>
+          <div class="note" style="margin:0 0 4px">The 🎯 hunt checks these for you, but they're lovely for browsing yourself too. hiring.cafe is the newest one: it searches thousands of company career pages at once and has a remote filter.</div>
+          <div class="jb-row">
+            <a class="jb" href="https://hiring.cafe/" target="_blank" rel="noopener">☕ hiring.cafe</a>
+            <a class="jb" href="https://www.entertainmentcareers.net/" target="_blank" rel="noopener">🎬 EntertainmentCareers</a>
+            <a class="jb" href="https://animationguild.org/current-studio-employment/" target="_blank" rel="noopener">✏️ Animation Guild jobs</a>
+            <a class="jb" href="https://www.linkedin.com/jobs/" target="_blank" rel="noopener">💼 LinkedIn Jobs</a>
+            <a class="jb" href="https://www.indeed.com/" target="_blank" rel="noopener">🔍 Indeed</a>
+            <a class="jb" href="https://weworkremotely.com/" target="_blank" rel="noopener">🏠 We Work Remotely</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card">
+          <h2>📋 Application Tracker <span class="pill" id="jobsAppliedCount"></span></h2>
+          <div class="note" style="margin:0 0 8px">Every job you check off as applied lands here. Tag what happened with the little chips (⏳🗣️🎉❌👻) so the analytics stay honest. ↩ puts one back on the leads list. (The ⚡/🎯 +1 counters live on the Game Plan like always; these two count different things, so use both.)</div>
+          <ul class="list" id="jobsAppliedList"></ul>
+          <details id="jobsPassedWrap" style="margin-top:10px">
+            <summary style="cursor:pointer; font-size:.82rem; font-weight:700; color:var(--soft)">🙅 Passed on <span class="pill" id="jobsPassedCount"></span></summary>
+            <div class="note" style="margin:6px 0 4px">Jobs you decided against, kept for the record. ↩ puts one back on the leads list.</div>
+            <ul class="list" id="jobsPassedList"></ul>
+          </details>
+        </div>
+
+        <div class="card">
+          <h2>📊 How it's going <span class="pill">analytics</span></h2>
+          <div class="jstats" id="jobStatsRow"></div>
+          <div class="jbar-key" id="jobStatsKey"></div>
+          <div class="jbar" id="jobStatsBar" style="display:none"></div>
+          <div class="note" id="jobStatsNote" style="margin:6px 0 0"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="jgrid">
+      <div class="col">
     <div class="card">
       <h2>✉️ Cover Letter Generator</h2>
       <p class="cl-lead">Paste a job description, hit generate, and your local AI (runs on your PC, no Claude Code tokens) writes a tailored letter. Set your resume once below and it reuses it every time. 🌸</p>
@@ -666,7 +750,9 @@
         <span class="cl-status" id="clStatus"></span>
       </div>
     </div>
+      </div>
 
+      <div class="col">
     <div class="card">
       <h2>📝 Your letter <span class="pill">editable</span></h2>
       <div class="cl-field" style="margin:0">
@@ -680,6 +766,8 @@
         <span class="cl-status" id="clPolishStatus"></span>
       </div>
       <p class="cl-lead" style="margin-top:10px; margin-bottom:0">💡 "Polish in Claude chat" copies your letter plus a polish prompt to your clipboard and opens Claude in a new tab. Just paste (Ctrl+V) and send. It uses your normal Claude plan, so it's free and no API key needed. Then paste the improved version back here. ✨</p>
+    </div>
+      </div>
     </div>
   </section>
 
@@ -1017,6 +1105,12 @@ let taskOff = JSON.parse(localStorage.getItem(LS_TASKOFF) || '{}');
 let blockNames = JSON.parse(localStorage.getItem(LS_BLOCKNAMES) || '{}');
 // ...and the little note after the name ("shower, real food, no work yet") reworded the same way
 let blockDescs = JSON.parse(localStorage.getItem(LS_BLOCKDESCS) || '{}');
+// 💼 the application tracker on the Jobs tab. A lead leaves the listings the moment
+// it lands here. id -> {t, link, ty, at:'YYYY-MM-DD', s:'applied'|'passed',
+// r:'wait'|'int'|'offer'|'rej'|'ghost', rAt}. r = what happened after applying
+// (the tag chips); passed entries have no r. Nothing is deleted: this IS the record.
+const LS_JOBS = 'lupita-jobs-v1';
+let jobs = JSON.parse(localStorage.getItem(LS_JOBS) || '{}');
 let view = 'today';
 const saveDone = () => { localStorage.setItem(LS_DONE, JSON.stringify(done)); pushStateSoon(); };
 const saveCustom = () => { localStorage.setItem(LS_CUSTOM, JSON.stringify(custom)); pushStateSoon(); };
@@ -1033,6 +1127,24 @@ const saveBlocksOwn = () => { localStorage.setItem(LS_BLOCKSOWN, JSON.stringify(
 const saveTaskOff = () => { localStorage.setItem(LS_TASKOFF, JSON.stringify(taskOff)); pushStateSoon(); };
 const saveBlockNames = () => { localStorage.setItem(LS_BLOCKNAMES, JSON.stringify(blockNames)); pushStateSoon(); };
 const saveBlockDescs = () => { localStorage.setItem(LS_BLOCKDESCS, JSON.stringify(blockDescs)); pushStateSoon(); };
+const saveJobs = () => { localStorage.setItem(LS_JOBS, JSON.stringify(jobs)); pushStateSoon(); };
+// Leads checked off before the Jobs tab existed lived in the home tab's general
+// archive: move them over once so the tracker holds the whole history. Runs at
+// boot AND after a remote loadState apply (the other device may still send the
+// old shape). localStorage only; the next real change pushes the merged state.
+function migrateJobs(){
+  let movedAny=false;
+  Object.entries(arch).forEach(([id,a])=>{
+    if(a.k!=='lead') return;
+    if(!jobs[id]) jobs[id]={t:a.t, at:a.at||'', s:'applied', r:'wait'};
+    delete arch[id]; movedAny=true;
+  });
+  if(movedAny){
+    localStorage.setItem(LS_ARCH, JSON.stringify(arch));
+    localStorage.setItem(LS_JOBS, JSON.stringify(jobs));
+  }
+}
+migrateJobs();
 const getToken = () => localStorage.getItem(LS_TOKEN) || '';
 
 /* ---------- DATE HELPERS ---------- */
@@ -1328,26 +1440,30 @@ document.getElementById('archToggle').addEventListener('click',()=>{
   archBodyEl.style.display=open?'block':'none'; archCaretEl.textContent=open?'▾':'▸';
 });
 
+const LEAD_TYPE_LBL={fulltime:'production / full-time', freelance:'freelance', opencall:'open call', client:'client', generic:'general role', remotework:'remote platform'};
 function leadRow(it){
   const isDone=!!done[it.id];
   const li=document.createElement('li');
   li.className='item'+(isDone?' done':'');
+  // what the tracker remembers about this lead (title, link, type, and the day it moved)
+  const jobEntry=s=>({t:it.title+(it.org?(' · '+it.org):''), link:it.link||'', ty:it.type||'', at:iso(new Date()), s});
   const cb=document.createElement('input');
-  cb.type='checkbox'; cb.className='cbox'; cb.checked=isDone; cb.title='mark reviewed / applied';
+  cb.type='checkbox'; cb.className='cbox'; cb.checked=isDone; cb.title='I applied! files it in the 💼 Jobs tab tracker';
   cb.onchange=()=>{
     if(cb.checked){
       done[it.id]=true;
-      arch[it.id]={t:it.title+(it.org?(' · '+it.org):''), k:'lead', at:iso(new Date())}; saveArch();
+      jobs[it.id]=Object.assign(jobEntry('applied'),{r:'wait'}); saveJobs();
       li.classList.add('done'); saveDone(); setTimeout(render,900); return;
     }
-    delete done[it.id]; if(arch[it.id]){ delete arch[it.id]; saveArch(); }
+    delete done[it.id];
+    if(jobs[it.id]){ delete jobs[it.id]; saveJobs(); }
+    if(arch[it.id]){ delete arch[it.id]; saveArch(); }
     saveDone(); render();
   };
   const body=document.createElement('div'); body.className='body';
   const txt=document.createElement('div'); txt.className='txt'; txt.textContent=it.title+(it.org?(' · '+it.org):'');
   const meta=document.createElement('div'); meta.className='meta';
-  const typeLbl={fulltime:'production / full-time', freelance:'freelance', opencall:'open call', client:'client', generic:'general role', remotework:'remote platform'};
-  if(it.type){ const t=document.createElement('span'); t.className='tag '+it.type; t.textContent=typeLbl[it.type]||it.type; meta.appendChild(t); }
+  if(it.type){ const t=document.createElement('span'); t.className='tag '+it.type; t.textContent=LEAD_TYPE_LBL[it.type]||it.type; meta.appendChild(t); }
   if(isRemote(it) && it.type!=='remotework'){ const r=document.createElement('span'); r.className='tag remote'; r.textContent='🏠 remote'; meta.appendChild(r); }
   if(it.flag){ const f=document.createElement('span'); f.className='tag flag'; f.textContent=it.flag; meta.appendChild(f); }
   if(it.source){ const s=document.createElement('span'); s.className='tag src'; s.textContent=it.source; meta.appendChild(s); }
@@ -1355,7 +1471,10 @@ function leadRow(it){
   else if(it.date){ const d=document.createElement('span'); d.className='when'; d.textContent='posted '+fmtWhen(it.date); meta.appendChild(d); }
   if(it.link){ const a=document.createElement('a'); a.className='viewpost'; a.href=it.link; a.target='_blank'; a.rel='noopener'; a.textContent='View post →'; meta.appendChild(a); }
   body.appendChild(txt); if(meta.childNodes.length) body.appendChild(meta);
-  li.appendChild(cb); li.appendChild(body);
+  const pass=document.createElement('button'); pass.className='del'; pass.textContent='✕';
+  pass.title='not for you? files it under Passed on the 💼 Jobs tab (nothing is lost)';
+  pass.onclick=()=>{ jobs[it.id]=jobEntry('passed'); saveJobs(); render(); };
+  li.appendChild(cb); li.appendChild(body); li.appendChild(pass);
   return li;
 }
 
@@ -1436,11 +1555,13 @@ const isRemote = it => it.remote===true || it.type==='remotework' ||
 const LS_REMOTEONLY='lupita-leads-remoteonly-v1';
 let remoteOnly = localStorage.getItem(LS_REMOTEONLY)==='1';
 
-// Leads whose apply-by deadline already passed are hidden automatically.
+// Leads whose apply-by deadline already passed are hidden automatically, and a
+// lead in the tracker (applied to or passed on) has left the listings for good.
 const liveLeads = () => LEAD_DATA.filter(it=>(!it.deadline || parse(it.deadline)>=today) && !arch[it.id]
-  && (!remoteOnly || isRemote(it)));
-function renderLeads(){
-  const ll=document.getElementById('leadList'); ll.innerHTML='';
+  && !jobs[it.id] && (!remoteOnly || isRemote(it)));
+// The same listings live in two places: the 💼 card on the home tab and the 💼 Jobs tab.
+function renderLeadsInto(ll){
+  ll.innerHTML='';
   const data=liveLeads();
   if(!data.length){ const e=document.createElement('div'); e.className='empty';
     e.textContent = remoteOnly
@@ -1457,9 +1578,102 @@ function renderLeads(){
   const others=data.filter(it=>!seen.has(it.id));
   if(others.length) ll.appendChild(buildCat('__other','✨ Other','flat',others));
 }
+function renderLeads(){
+  renderLeadsInto(document.getElementById('leadList'));
+  renderLeadsInto(document.getElementById('jobsLeadList'));
+}
+
+/* ---------- 💼 JOBS TAB: application tracker + analytics ----------
+   Checking a lead off means "I applied": it moves from the listings into the
+   jobs store (s:'applied') where the chips tag what happened next. ✕ on a lead
+   means "not for me": same store, s:'passed'. Both lists keep the full history,
+   and ↩ hands a lead back to the listings if you change your mind. */
+const JOB_STATUSES=[
+  ['wait','⏳ waiting','#d6dae2'],
+  ['int','🗣️ interview','#cdbcff'],
+  ['offer','🎉 offer!','#a5e6c4'],
+  ['rej','❌ rejected','#ffb3c2'],
+  ['ghost','👻 ghosted','#a5d8f5'],
+];
+function jobRow(id, j){
+  const li=document.createElement('li'); li.className='item';
+  const body=document.createElement('div'); body.className='body';
+  const txt=document.createElement('div'); txt.className='txt'; txt.textContent=j.t;
+  const meta=document.createElement('div'); meta.className='meta';
+  const w=document.createElement('span'); w.className='when';
+  w.textContent=(j.s==='passed'?'passed ':'sent ')+(j.at?fmtWhen(j.at):''); meta.appendChild(w);
+  if(j.ty){ const t=document.createElement('span'); t.className='tag '+j.ty; t.textContent=LEAD_TYPE_LBL[j.ty]||j.ty; meta.appendChild(t); }
+  if(j.link){ const a=document.createElement('a'); a.className='viewpost'; a.href=j.link; a.target='_blank'; a.rel='noopener'; a.textContent='View post →'; meta.appendChild(a); }
+  body.appendChild(txt); body.appendChild(meta);
+  if(j.s!=='passed'){
+    const chips=document.createElement('div'); chips.className='stchips';
+    JOB_STATUSES.forEach(([k,lbl])=>{
+      const c=document.createElement('button');
+      c.className='stchip'+(((j.r||'wait')===k)?(' on-'+k):'');
+      c.textContent=lbl; c.title='tag what happened with this one';
+      c.onclick=()=>{ j.r=k; j.rAt=iso(new Date()); saveJobs(); render(); };
+      chips.appendChild(c);
+    });
+    body.appendChild(chips);
+  }
+  const back=document.createElement('button'); back.className='del'; back.textContent='↩';
+  back.title='put it back on the leads list';
+  back.onclick=()=>{ delete jobs[id]; delete done[id]; delete arch[id];
+    saveJobs(); saveDone(); saveArch(); render(); };
+  li.appendChild(body); li.appendChild(back);
+  return li;
+}
+function renderJobTrack(){
+  const ap=document.getElementById('jobsAppliedList'), pa=document.getElementById('jobsPassedList');
+  if(!ap||!pa) return;
+  const entries=Object.entries(jobs).sort((a,b)=>(b[1].at||'').localeCompare(a[1].at||''));
+  const applied=entries.filter(([,j])=>j.s!=='passed');
+  const passed=entries.filter(([,j])=>j.s==='passed');
+  ap.innerHTML='';
+  if(!applied.length){ const e=document.createElement('div'); e.className='empty';
+    e.textContent='Nothing yet. Check a lead off up there when you send an application and it lands here. 🌱'; ap.appendChild(e); }
+  else applied.forEach(([id,j])=>ap.appendChild(jobRow(id,j)));
+  pa.innerHTML='';
+  if(!passed.length){ const e=document.createElement('div'); e.className='empty';
+    e.textContent='Nothing passed on yet.'; pa.appendChild(e); }
+  else passed.forEach(([id,j])=>pa.appendChild(jobRow(id,j)));
+  document.getElementById('jobsAppliedCount').textContent=applied.length?(applied.length+' sent'):'';
+  document.getElementById('jobsPassedCount').textContent=passed.length?String(passed.length):'';
+
+  /* 📊 how it's going: counts up top, one proportion bar of what came back */
+  const counts={};
+  JOB_STATUSES.forEach(([k])=>{ counts[k]=applied.filter(([,j])=>(j.r||'wait')===k).length; });
+  const thisWeek=applied.filter(([,j])=>(j.at||'')>=appsWeekKey()).length;
+  const row=document.getElementById('jobStatsRow'); row.innerHTML='';
+  [['sent in total',applied.length],['sent this week',thisWeek],['interviews',counts.int],
+   ['offers',counts.offer],['rejections',counts.rej],['ghosted',counts.ghost]]
+    .forEach(([lbl,v])=>{ const d=document.createElement('div'); d.className='jstat';
+      const b=document.createElement('b'); b.textContent=v;
+      const s=document.createElement('span'); s.textContent=lbl;
+      d.appendChild(b); d.appendChild(s); row.appendChild(d); });
+  const bar=document.getElementById('jobStatsBar'), key=document.getElementById('jobStatsKey');
+  bar.innerHTML=''; key.innerHTML='';
+  bar.style.display=applied.length?'flex':'none';
+  JOB_STATUSES.forEach(([k,lbl,col])=>{
+    if(!applied.length||!counts[k]) return;
+    const i=document.createElement('i'); i.style.background=col;
+    i.style.width=(counts[k]/applied.length*100)+'%'; i.title=lbl+': '+counts[k];
+    bar.appendChild(i);
+    const kk=document.createElement('span');
+    const dot=document.createElement('i'); dot.className='dot'; dot.style.background=col;
+    kk.appendChild(dot); kk.appendChild(document.createTextNode(lbl+' '+counts[k]));
+    key.appendChild(kk);
+  });
+  const heard=counts.int+counts.offer+counts.rej;
+  document.getElementById('jobStatsNote').textContent = applied.length
+    ? (heard+' of '+applied.length+' got a human answer ('+Math.round(heard/applied.length*100)+'%).'
+      +(passed.length?(' Passed on '+passed.length+'.'):'')
+      +' Ghosting says nothing about your work, keep going. 💛')
+    : 'Send your first one and the numbers start here. One at a time, no pressure. 🌸';
+}
 
 /* ---------- LIVE LEADS FETCH ---------- */
-function setLeadStatus(msg){ const el=document.getElementById('leadStatus'); if(el) el.textContent=msg||''; }
+function setLeadStatus(msg){ ['leadStatus','jobsLeadStatus'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=msg||''; }); }
 async function fetchLeads(){
   const token=getToken();
   if(!token){ setLeadStatus('Not connected yet. Paste your token below to load live leads.'); return; }
@@ -1533,10 +1747,12 @@ async function loadState(){
       if(s.blockDescs){ blockDescs=s.blockDescs; localStorage.setItem(LS_BLOCKDESCS, JSON.stringify(blockDescs)); }
       if(s.mailDone){ mailDone=s.mailDone; localStorage.setItem(LS_MAILDONE, JSON.stringify(mailDone)); }
       if(s.mailStore){ mailStore=s.mailStore; localStorage.setItem(LS_MAILSTORE, JSON.stringify(mailStore)); loadMailFromStore(); }
+      if(s.jobs){ jobs=s.jobs; localStorage.setItem(LS_JOBS, JSON.stringify(jobs)); }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
       localStorage.setItem(LS_CUSTOM, JSON.stringify(custom));
       localStorage.setItem(LS_SAVEDAT, String(s.savedAt||0));
       migrateSeam(1);   // the other device may still be speaking old-seam minutes
+      migrateJobs();    // ...or the old archive-the-lead shape
       render();
       rebuildWeeks();   // the phone may have added or moved a to-do: redraw its day card
       // refresh every game-plan checkbox/count + the counters
@@ -1557,7 +1773,7 @@ async function pushState(){
   if(!getToken()) return;
   const savedAt=Date.now();
   localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore, savedAt}), branch:LEAD_FEED.branch};
+  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, jobs, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore, savedAt}), branch:LEAD_FEED.branch};
   try{
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
@@ -1637,17 +1853,22 @@ function render(){
     r.appendChild(n); r.appendChild(t); fl.appendChild(r); });
 
   // job & client leads: collapsible categories, jobs grouped by role, clients split good-fit / maybe
+  // (rendered twice: the 💼 card here and its twin on the 💼 Jobs tab)
   renderLeads();
   const lv=liveLeads();
-  document.getElementById('leadCount').textContent = lv.length ? (lv.filter(it=>!done[it.id]).length+' open') : '';
-  // 🏠 remote-only chip: reflect the current filter and how many remote leads exist
-  const chip=document.getElementById('leadRemoteOnly');
-  chip.classList.toggle('on', remoteOnly);
-  const remoteN = LEAD_DATA.filter(it=>isRemote(it) && !arch[it.id] && !done[it.id]
+  const openLeads = lv.length ? (lv.filter(it=>!done[it.id]).length+' open') : '';
+  document.getElementById('leadCount').textContent = openLeads;
+  document.getElementById('jobsLeadCount').textContent = openLeads;
+  // 🏠 remote-only chips (home card + Jobs tab): reflect the current filter
+  const remoteN = LEAD_DATA.filter(it=>isRemote(it) && !arch[it.id] && !jobs[it.id] && !done[it.id]
     && (!it.deadline || parse(it.deadline)>=today)).length;
-  document.getElementById('remoteNote').textContent = remoteOnly
+  const remoteMsg = remoteOnly
     ? ('work-from-home only ('+remoteN+')')
     : (remoteN ? (remoteN+' can be done from home') : '');
+  [['leadRemoteOnly','remoteNote'],['jobsRemoteOnly','jobsRemoteNote']].forEach(([cid,nid])=>{
+    document.getElementById(cid).classList.toggle('on', remoteOnly);
+    document.getElementById(nid).textContent = remoteMsg;
+  });
   const authOpen = !getToken() || window._showTokenBox;
   document.getElementById('leadAuth').style.display = authOpen ? 'block' : 'none';
   document.getElementById('ghChange').style.display = authOpen ? 'none' : 'block';
@@ -1681,6 +1902,7 @@ function render(){
     (view==='today'?'Today':view==='week'?'This week':view==='month'?'This month':'All')+' · schedule progress';
 
   renderArchive();
+  renderJobTrack();
 }
 
 /* ---------- EVENTS ---------- */
@@ -1695,17 +1917,17 @@ document.getElementById('tabs').addEventListener('click',e=>{
   view=b.dataset.view;
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===b));
   applyLayout();
-  if(view==='cover') loadModels(); // re-check the local AI each time the tab is opened
+  if(view==='jobs'){ render(); loadModels(); } // fresh listings + tracker, and re-check the local AI each time the tab is opened
   else if(view==='plan') renderPlan();
   else render();
 });
-// swap between the schedule grid and the full-width panels (cover letters / game plan / food / friends)
+// swap between the schedule grid and the full-width panels (jobs / game plan / food / friends)
 function applyLayout(){
-  const isCover = view==='cover', isPlan = view==='plan', isFood = view==='food', isBudget = view==='budget', isFriends = view==='friends';
-  const full = isCover||isPlan||isFood||isBudget||isFriends;
+  const isJobs = view==='jobs', isPlan = view==='plan', isFood = view==='food', isBudget = view==='budget', isFriends = view==='friends';
+  const full = isJobs||isPlan||isFood||isBudget||isFriends;
   document.querySelector('.grid').style.display = full ? 'none' : '';
   document.querySelector('.progress-card').style.display = full ? 'none' : '';
-  document.getElementById('coverPanel').style.display = isCover ? 'block' : 'none';
+  document.getElementById('jobsPanel').style.display = isJobs ? 'block' : 'none';
   document.getElementById('planPanel').style.display = isPlan ? 'flex' : 'none';
   document.getElementById('foodPanel').style.display = isFood ? 'flex' : 'none';
   document.getElementById('budgetPanel').style.display = isBudget ? 'flex' : 'none';
@@ -3813,6 +4035,14 @@ async function watchForFreshLeads(){
   },60000);
 }
 document.getElementById('leadHunt').onclick=(e)=>{ e.stopPropagation(); requestHunt(); };
+// 💼 Jobs tab twins of the lead buttons (same handlers; no collapse toggle up there)
+document.getElementById('jobsLeadRefresh').onclick=()=>{ fetchLeads(); fetchData(); };
+document.getElementById('jobsRemoteOnly').onclick=()=>{
+  remoteOnly=!remoteOnly;
+  localStorage.setItem(LS_REMOTEONLY, remoteOnly?'1':'0');
+  render();
+};
+document.getElementById('jobsHunt').onclick=()=>requestHunt();
 
 /* ==================== INBOX HELPER ====================
    Same flow as the hunt button: the scan button writes mail-request.json to the
@@ -4459,7 +4689,7 @@ $('clPdf').onclick=makePdf;
    time (deleted tasks, moved blocks, rewordings, check-offs, all of it), and
    Ctrl+Shift+Z / ↪ walks forward again. Snapshots live in memory only, so a
    refresh starts clean; the walked-back state itself syncs like any change. */
-function undoSnapAll(){ return JSON.stringify({done, custom, apps, money, arch, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore}); }
+function undoSnapAll(){ return JSON.stringify({done, custom, apps, money, arch, jobs, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore}); }
 var undoStack=[], redoStack=[], undoCur=null, undoQuiet=false, undoToastTimer=null;
 function undoBaseline(){ undoCur=undoSnapAll(); }
 function undoBtns(){ document.getElementById('redoBtn').style.display=redoStack.length?'':'none'; }
@@ -4482,13 +4712,13 @@ function undoApply(snap){
   undoQuiet=true;
   try{
     done=o.done||{}; custom=o.custom||[]; apps=o.apps||{}; money=o.money||[];
-    arch=o.arch||{}; moved=o.moved||{}; edits=o.edits||{}; slotted=o.slotted||{};
+    arch=o.arch||{}; jobs=o.jobs||{}; moved=o.moved||{}; edits=o.edits||{}; slotted=o.slotted||{};
     blockMods=o.blockMods||{}; blockOff=o.blockOff||{}; blocksOwn=o.blocksOwn||{};
     taskOff=o.taskOff||{}; blockNames=o.blockNames||{}; blockDescs=o.blockDescs||{};
     mine=o.mine||[]; solo=o.solo||{}; tmoved=o.tmoved||{}; mailDone=o.mailDone||{}; mailStore=o.mailStore||{};
     food=o.food||{}; food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[];
     friends=o.friends||{}; friends.people=friends.people||[]; friends.log=friends.log||[];
-    [[LS_DONE,done],[LS_CUSTOM,custom],[LS_APPS,apps],[LS_MONEY,money],[LS_ARCH,arch],[LS_MOVED,moved],
+    [[LS_DONE,done],[LS_CUSTOM,custom],[LS_APPS,apps],[LS_MONEY,money],[LS_ARCH,arch],[LS_JOBS,jobs],[LS_MOVED,moved],
      [LS_EDITS,edits],[LS_SLOT,slotted],[LS_BLOCKMODS,blockMods],[LS_BLOCKOFF,blockOff],[LS_BLOCKSOWN,blocksOwn],
      [LS_TASKOFF,taskOff],[LS_BLOCKNAMES,blockNames],[LS_BLOCKDESCS,blockDescs],[LS_FOOD,food],[LS_FRIENDS,friends],
      [LS_MINE,mine],[LS_SOLO,solo],[LS_TMOVED,tmoved],[LS_MAILDONE,mailDone],[LS_MAILSTORE,mailStore]]
