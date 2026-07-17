@@ -45,6 +45,18 @@
   }
   .spotify-btn:hover{transform:translateY(-1px); box-shadow:0 4px 12px rgba(29,185,84,.4)}
 
+  .undo-btn{
+    border:none; cursor:pointer; padding:10px 14px; border-radius:99px; font-size:.92rem; font-weight:600;
+    background:#ffffffcc; color:var(--soft); box-shadow:0 2px 8px rgba(180,140,200,.12); transition:.18s;
+  }
+  .undo-btn:hover{transform:translateY(-1px); box-shadow:0 4px 12px rgba(180,140,200,.25)}
+  .undo-toast{position:fixed; left:50%; bottom:26px; transform:translate(-50%,14px); opacity:0; pointer-events:none;
+    background:#3a3344; color:#fff; padding:10px 18px; border-radius:99px; font-size:.9rem; font-weight:600;
+    box-shadow:0 6px 18px rgba(60,40,80,.35); transition:.22s; z-index:9999}
+  .undo-toast.show{opacity:1; transform:translate(-50%,0)}
+  /* a blanked-out block note still needs somewhere to double-click to write a new one */
+  .pl-item.blk .pd-desc:empty{padding:0 16px}
+
   .tabs{display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 20px}
   .tab{
     border:none; cursor:pointer; padding:10px 18px; border-radius:99px; font-size:.92rem; font-weight:600;
@@ -296,6 +308,10 @@
   .pd-row.own .pd-name::after{content:" 🧱"; font-size:.75rem}
   .blk-add .my-open{background:#f3f8ff; border-color:#d5e6ff}
   .blk-add .my-open:hover{border-color:#8fb8e6; color:#3f6ea8}
+  /* the shelf of ready-made block names inside the add-a-block form */
+  .blk-shelf{flex:1 1 100%; display:flex; flex-wrap:wrap; gap:5px}
+  .blk-shelf button{border:1px solid var(--line); background:#fff; border-radius:99px; padding:3px 9px; font-size:.72rem; font-weight:700; color:var(--soft); cursor:pointer}
+  .blk-shelf button:hover{border-color:var(--lav); color:var(--lav-deep)}
   .my-form .err{flex:1 1 100%; color:var(--urgent); font-size:.73rem; font-weight:700}
   /* ⏰ the little time popup that opens right next to the block you tapped */
   .tpop-veil{position:fixed; inset:0; z-index:59; background:rgba(40,20,55,.06)}
@@ -417,6 +433,8 @@
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:14px">
+      <button class="undo-btn" id="undoBtn" title="Undo your last change (Ctrl+Z)">↩ undo</button>
+      <button class="undo-btn" id="redoBtn" title="Put it back (Ctrl+Shift+Z)" style="display:none">↪</button>
       <button class="spotify-btn" id="spotifyBtn" title="Open Spotify">🎧 Spotify</button>
       <div class="progress-card">
         <div class="lbl" id="progLbl">Your schedule progress</div>
@@ -1525,10 +1543,12 @@ async function loadState(){
       Object.values(gpReg).forEach(fns=>fns.forEach(f=>f()));
       renderApps(); renderMoney(); renderFood(); renderFriends(); renderMail(); updateMailStatus();
       if(view==='plan') renderPlan();   // another device may have slid today's blocks around
+      undoBaseline();   // remote state landed: undo measures from here, not from before the sync
     }
   }catch(err){}
 }
 function pushStateSoon(){
+  undoNote();   // every save funnels through here: remember the before-picture (works tokenless too)
   if(!getToken()) return;
   clearTimeout(statePushTimer);
   statePushTimer=setTimeout(pushState, 1500);
@@ -2114,15 +2134,15 @@ function renameBlockEl(n,dk,b,el){
 }
 /* ✏️ double-click the little note after a block's name ("shower, real food, no
    work yet") to reword it. A PLAN block's note changes everywhere the block
-   appears (clear the box, or retype the plan's wording, to get the original
-   back); a 🧱 block of your own is just edited in place. */
+   appears; emptying the box means BLANK (retype the plan's wording, or Ctrl+Z,
+   to get the original back); a 🧱 block of your own is just edited in place. */
 function setBlockDesc(n,dk,b,v){
   if(b.own){
     const own=(blocksOwn['w'+n+'-'+dk]||[]).find(x=>x.k===b.k);
     if(own){ own.d=v; saveBlocksOwn(); }
   } else {
-    if(!v || v===(b.d0!=null?b.d0:b.d)) delete blockDescs[b.k];
-    else blockDescs[b.k]=v;
+    if(v===(b.d0!=null?b.d0:b.d)) delete blockDescs[b.k];   // retyped the plan's words: back to stock
+    else blockDescs[b.k]=v;                                  // '' is real: an emptied note stays blank
     saveBlockDescs();
   }
   rebuildWeeks(); if(view==='plan') renderPlan();
@@ -2452,6 +2472,11 @@ function gpRename(it, el, del){
    mousedown (before the box can blur away) and pointerdown covers touch. */
 function inlineEdit(el, val, onSave, del){
   if(el.parentNode && el.parentNode.querySelector('.txt-edit')) return;
+  /* while the box is open, the row under it must stop being draggable: a
+     drag-to-highlight inside the input would move the row instead of
+     selecting text (draggable parents eat text selection) */
+  const dragHome=el.closest('[draggable="true"]');
+  if(dragHome) dragHome.draggable=false;
   const inp=document.createElement('input');
   inp.type='text'; inp.className='txt-edit'; inp.value=val; inp.maxLength=200;
   let closed=false, db=null;
@@ -2464,6 +2489,7 @@ function inlineEdit(el, val, onSave, del){
   const finish=commit=>{
     if(closed) return; closed=true;
     if(db) db.remove();
+    if(dragHome) dragHome.draggable=true;   // box is closing: the row can be a drag handle again
     if(!commit){ if(inp.parentNode) inp.parentNode.replaceChild(el, inp); return; }
     onSave(inp.value.trim());
   };
@@ -2820,6 +2846,18 @@ function blockAddRow(dd, n){
   txt.addEventListener('keydown',ev=>{ if(ev.key==='Enter') add(); });
   open.onclick=()=>{ const on=form.style.display!=='flex';
     form.style.display=on?'flex':'none'; if(on) txt.focus(); };
+  // a shelf of ready-made block names (plus ones you've already invented on any day):
+  // tap one to fill the name, then it just needs a start time
+  const shelf=document.createElement('div'); shelf.className='blk-shelf';
+  const names=['🍽 Dinner','🛁 Bath','🧼 Chores','🧺 Laundry','🛒 Groceries','🎨 Art time','📱 Post + engage','🚗 Errands','😴 Rest','🐱 Cats'];
+  names.push(...[].concat(...Object.values(blocksOwn)).map(b=>b.n).filter(Boolean).slice(-8));
+  const seen={};
+  names.forEach(nm=>{ const k=nm.toLowerCase(); if(seen[k]) return; seen[k]=1;
+    const c=document.createElement('button'); c.textContent=nm;
+    c.title='tap to use this name, then give it a start time';
+    c.onclick=()=>{ txt.value=nm; s.focus(); };
+    shelf.appendChild(c); });
+  form.appendChild(shelf);
   form.appendChild(txt); form.appendChild(s); form.appendChild(e); form.appendChild(go); form.appendChild(err);
   wrap.appendChild(open); wrap.appendChild(form);
   return wrap;
@@ -3227,7 +3265,7 @@ function hourRow(b,bid,mv){
     nm.ondblclick=e=>{ e.stopPropagation(); renameBlockEl(mv.n, mv.dk, b, nm); };
     // ✏️ ...and the note after it to reword that too
     const ds=t.querySelector('.pd-desc');
-    ds.title='double-click to reword this note';
+    ds.title='double-click to reword this note (empty it out and it stays blank)';
     ds.ondblclick=e=>{ e.stopPropagation(); inlineEdit(ds, b.d||'', v=>setBlockDesc(mv.n, mv.dk, b, v)); };
   }
   const sync=()=>{ cb.checked=!!done[bid]; row.classList.toggle('done',!!done[bid]); };
@@ -4415,8 +4453,78 @@ function makePdf(){
 }
 $('clPdf').onclick=makePdf;
 
+/* ---------- UNDO (Ctrl+Z, or the ↩ up top) ----------
+   Every change already funnels through pushStateSoon(), so that's where the
+   before-picture gets taken (undoNote). Ctrl+Z / ↩ walks back one change at a
+   time (deleted tasks, moved blocks, rewordings, check-offs, all of it), and
+   Ctrl+Shift+Z / ↪ walks forward again. Snapshots live in memory only, so a
+   refresh starts clean; the walked-back state itself syncs like any change. */
+function undoSnapAll(){ return JSON.stringify({done, custom, apps, money, arch, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore}); }
+var undoStack=[], redoStack=[], undoCur=null, undoQuiet=false, undoToastTimer=null;
+function undoBaseline(){ undoCur=undoSnapAll(); }
+function undoBtns(){ document.getElementById('redoBtn').style.display=redoStack.length?'':'none'; }
+function undoNote(){
+  if(undoQuiet || undoCur==null) return;   // mid-undo, or the page hasn't finished booting
+  const s=undoSnapAll(); if(s===undoCur) return;
+  undoStack.push(undoCur); if(undoStack.length>60) undoStack.shift();
+  redoStack.length=0; undoCur=s; undoBtns();
+}
+function undoToast(msg){
+  let t=document.getElementById('undoToast');
+  if(!t){ t=document.createElement('div'); t.id='undoToast'; t.className='undo-toast'; document.body.appendChild(t); }
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(undoToastTimer); undoToastTimer=setTimeout(()=>t.classList.remove('show'), 2000);
+}
+/* put the whole board back to a snapshot: same stores + same full redraw a
+   cross-device sync does (loadState), so every view hears about it */
+function undoApply(snap){
+  const o=JSON.parse(snap);
+  undoQuiet=true;
+  try{
+    done=o.done||{}; custom=o.custom||[]; apps=o.apps||{}; money=o.money||[];
+    arch=o.arch||{}; moved=o.moved||{}; edits=o.edits||{}; slotted=o.slotted||{};
+    blockMods=o.blockMods||{}; blockOff=o.blockOff||{}; blocksOwn=o.blocksOwn||{};
+    taskOff=o.taskOff||{}; blockNames=o.blockNames||{}; blockDescs=o.blockDescs||{};
+    mine=o.mine||[]; solo=o.solo||{}; tmoved=o.tmoved||{}; mailDone=o.mailDone||{}; mailStore=o.mailStore||{};
+    food=o.food||{}; food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[];
+    friends=o.friends||{}; friends.people=friends.people||[]; friends.log=friends.log||[];
+    [[LS_DONE,done],[LS_CUSTOM,custom],[LS_APPS,apps],[LS_MONEY,money],[LS_ARCH,arch],[LS_MOVED,moved],
+     [LS_EDITS,edits],[LS_SLOT,slotted],[LS_BLOCKMODS,blockMods],[LS_BLOCKOFF,blockOff],[LS_BLOCKSOWN,blocksOwn],
+     [LS_TASKOFF,taskOff],[LS_BLOCKNAMES,blockNames],[LS_BLOCKDESCS,blockDescs],[LS_FOOD,food],[LS_FRIENDS,friends],
+     [LS_MINE,mine],[LS_SOLO,solo],[LS_TMOVED,tmoved],[LS_MAILDONE,mailDone],[LS_MAILSTORE,mailStore]]
+      .forEach(p=>localStorage.setItem(p[0], JSON.stringify(p[1])));
+    loadMailFromStore();
+    render(); rebuildWeeks();
+    Object.values(gpReg).forEach(fns=>fns.forEach(f=>f()));
+    renderApps(); renderMoney(); renderFood(); renderFriends(); renderMail(); updateMailStatus();
+    if(view==='plan') renderPlan();
+  } finally{ undoQuiet=false; }
+  pushStateSoon();   // the other device hears about it too (no new snapshot: state matches undoCur)
+}
+function doUndo(){
+  if(!undoStack.length){ undoToast('nothing to undo 🌸'); return; }
+  redoStack.push(undoCur); undoCur=undoStack.pop();
+  undoApply(undoCur); undoBtns(); undoToast('↩ undone');
+}
+function doRedo(){
+  if(!redoStack.length){ undoToast('nothing to put back'); return; }
+  undoStack.push(undoCur); undoCur=redoStack.pop();
+  undoApply(undoCur); undoBtns(); undoToast('↪ put back');
+}
+document.getElementById('undoBtn').onclick=doUndo;
+document.getElementById('redoBtn').onclick=doRedo;
+document.addEventListener('keydown', e=>{
+  if(!(e.ctrlKey||e.metaKey) || e.altKey) return;
+  const k=(e.key||'').toLowerCase(); if(k!=='z' && k!=='y') return;
+  const t=e.target;   // inside a text box, the box's own text undo wins
+  if(t && (t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable)) return;
+  e.preventDefault();
+  if(k==='y'||e.shiftKey) doRedo(); else doUndo();
+});
+
 migrateSeam();   // old 11am-seam block times, pulled back to the morning they meant
 render();
+undoBaseline();  // undo measures from what just loaded, not from an empty page
 applyLayout();
 renderFood();
 fetchLeads();
