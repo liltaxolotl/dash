@@ -601,8 +601,8 @@
             <textarea id="clLinkedin" rows="3" placeholder="LinkedIn summary, links to work, extra context..."></textarea>
           </div>
           <div class="cl-field">
-            <label>Your cover letter template <span class="hint">optional: a letter you like, used as a style guide</span></label>
-            <textarea id="clTemplate" rows="5" placeholder="Paste a cover letter template or a past letter you liked. The AI follows its tone and structure..."></textarea>
+            <label>Your cover letter template <span class="hint" id="clTemplateHint">for: Production</span> <span class="hint">a real past letter per resume type; the AI copies its style and voice, never its facts</span></label>
+            <textarea id="clTemplate" rows="5" placeholder="Paste a real cover letter you wrote and liked. The AI follows its tone and structure..."></textarea>
           </div>
           <button class="cl-btn" id="clSaveBase">Save my base info</button>
         </div>
@@ -4047,7 +4047,10 @@ const cleanLetter=t=>fixSignoff(noEmDash(t));
 const RLABEL={production:'Production',animator:'Animator',general:'General',teaching:'Teaching'};
 
 // --- Lupita's real resumes + style, preloaded (she can edit + save over these) ---
-const RESUME_DEFAULTS={name:'',contact:'',linkedin:'',template:'',resumes:{production:'',animator:'',general:'',teaching:''}};
+const RESUME_DEFAULTS={name:'',contact:'',linkedin:'',facts:'',templates:{production:'',animator:'',general:'',teaching:''},resumes:{production:'',animator:'',general:'',teaching:''}};
+// animator + general reuse the production letter as their style default (until she saves her own)
+RESUME_DEFAULTS.templates.animator=RESUME_DEFAULTS.templates.production;
+RESUME_DEFAULTS.templates.general=RESUME_DEFAULTS.templates.production;
 
 let curType='production';
 const loadProfile=()=>JSON.parse(localStorage.getItem(CL_PROFILE)||'null');
@@ -4059,17 +4062,21 @@ const loadProfile=()=>JSON.parse(localStorage.getItem(CL_PROFILE)||'null');
     name: saved.name!=null ? saved.name : RESUME_DEFAULTS.name,
     contact: saved.contact!=null ? saved.contact : RESUME_DEFAULTS.contact,
     linkedin: saved.linkedin!=null ? saved.linkedin : RESUME_DEFAULTS.linkedin,
-    template: saved.template!=null ? saved.template : RESUME_DEFAULTS.template,
+    // templates went per-resume-type (old single saved.template is retired on purpose:
+    // it let the AI borrow unverified content; these are real letters Lupita wrote)
+    templates: Object.assign({}, RESUME_DEFAULTS.templates, saved.templates||{}),
     resumes: Object.assign({}, RESUME_DEFAULTS.resumes, saved.resumes||{}),
     lastUse: saved.lastUse||'production'
   };
   localStorage.setItem(CL_PROFILE, JSON.stringify(p)); // persist merged so defaults stick
   $('clName').value=p.name; $('clContact').value=p.contact;
-  $('clLinkedin').value=p.linkedin; $('clTemplate').value=p.template;
+  $('clLinkedin').value=p.linkedin;
   curType=p.lastUse;
   $('clUseResume').value=curType; $('clResumeType').value=curType;
   $('clResume').value=p.resumes[curType]||'';
   $('clResumeHint').textContent='editing: '+RLABEL[curType];
+  $('clTemplate').value=p.templates[curType]||'';
+  $('clTemplateHint').textContent='for: '+RLABEL[curType];
   $('clOutput').value=''; localStorage.removeItem(CL_OUT); // start each session with a blank letter, no stale one
   $('clSavedNote').textContent='ready ✓';
   loadModels();
@@ -4085,21 +4092,25 @@ $('clJobDesc').addEventListener('input',()=>{
 
 // keep the setup textarea in sync with whichever resume is selected
 function setResumeType(t){
-  const p=loadProfile()||{}; p.resumes=p.resumes||{};
+  const p=loadProfile()||{}; p.resumes=p.resumes||{}; p.templates=p.templates||{};
   p.resumes[curType]=$('clResume').value;          // stash edits to the one we're leaving
+  p.templates[curType]=$('clTemplate').value;
   localStorage.setItem(CL_PROFILE, JSON.stringify(p));
   curType=t;
   $('clResume').value=(p.resumes&&p.resumes[t])||'';
   $('clResumeHint').textContent='editing: '+RLABEL[t];
+  $('clTemplate').value=(p.templates&&p.templates[t])||'';
+  $('clTemplateHint').textContent='for: '+RLABEL[t];
   $('clUseResume').value=t; $('clResumeType').value=t;
 }
 $('clUseResume').onchange=e=>setResumeType(e.target.value);
 $('clResumeType').onchange=e=>setResumeType(e.target.value);
 
 function saveBase(){
-  const p=loadProfile()||{}; p.resumes=p.resumes||{};
+  const p=loadProfile()||{}; p.resumes=p.resumes||{}; p.templates=p.templates||{};
   p.name=$('clName').value.trim(); p.contact=$('clContact').value.trim();
-  p.linkedin=$('clLinkedin').value.trim(); p.template=$('clTemplate').value.trim();
+  p.linkedin=$('clLinkedin').value.trim();
+  p.templates[curType]=$('clTemplate').value.trim();
   p.resumes[curType]=$('clResume').value; p.lastUse=curType;
   localStorage.setItem(CL_PROFILE, JSON.stringify(p));
   $('clSavedNote').textContent='saved ✓';
@@ -4114,6 +4125,12 @@ function useResumeText(){
   const useType=$('clUseResume').value;
   if(useType===curType) return $('clResume').value.trim();
   const p=loadProfile()||{}; return ((p.resumes&&p.resumes[useType])||'').trim();
+}
+// matching style template for that resume type
+function useTemplateText(){
+  const useType=$('clUseResume').value;
+  if(useType===curType) return $('clTemplate').value.trim();
+  const p=loadProfile()||{}; return ((p.templates&&p.templates[useType])||'').trim();
 }
 
 // shared clipboard helper (works on file:// too)
@@ -4164,22 +4181,26 @@ METHOD (do this before writing):
 3. Group that mapped experience into 2 or 3 body paragraphs. Mirror how the STYLE EXAMPLE explicitly connects her duties to the role's needs.
 
 RULES:
-- Study and imitate the STYLE EXAMPLE's approach: warm, specific, confident, plain-spoken, concrete.
+- TRUTH IS THE #1 RULE. Every concrete claim (task, tool, client, number, duty) must literally appear in the CANDIDATE RESUME, VERIFIED EXTRA FACTS, or EXTRA CONTEXT below. Do NOT add plausible-sounding specifics that are not written there: no invented naming conventions, version control habits, onboarding or documentation duties, "point of contact" claims, metrics, or client names. If a detail is not written below, it did not happen.
+- If the job asks for a skill or experience she does not have, do not claim it. Bridge honestly from the closest real thing she did, or leave it out entirely.
+- Study and imitate the STYLE EXAMPLE's approach: warm, specific, confident, plain-spoken, concrete. Do NOT copy its opening or any company-specific lines; write a fresh opening for THIS company.
 - Do NOT use vague filler like "I believe my skills align well," "unique blend," "fast-paced environment," "I am confident that." Replace any such urge with a real, named example.
 - Open by naming the exact role and company and ONE genuine, specific reason it fits her.
-- Use ONLY her real background below. Never invent jobs, skills, tools, or facts.
 - NEVER use em dashes or en dashes. Use commas, colons, or shorter sentences.
 - 3 to 4 paragraphs, one page. Close with a short line of genuine interest, then "Thank you," on its own line, then "${p.name||'Maria Lupita Roa'}".
 
-CANDIDATE RESUME (her real experience, the ONLY source of facts):
+CANDIDATE RESUME (her real experience, the primary source of facts):
 ${useResumeText()||'(none provided)'}
+
+VERIFIED EXTRA FACTS (also true, from letters she wrote herself; safe to use anywhere):
+${RESUME_DEFAULTS.facts||'(none)'}
 
 EXTRA CONTEXT / LINKEDIN:
 ${p.linkedin||'(none)'}
 
-STYLE EXAMPLE (imitate this letter's structure and how it maps duties to the role, do NOT copy its company-specific content):
-${p.template||'(none)'}`;
-  const user=`Write Lupita's cover letter for this exact job. Map her real duties to the duties and requirements below, naming specific roles, companies, and tasks. No generic filler.
+STYLE EXAMPLE (a real letter Lupita wrote; every fact in it is true. Imitate its structure, voice, and duty-mapping. Do NOT copy its opening or company-specific lines):
+${useTemplateText()||'(none)'}`;
+  const user=`Write Lupita's cover letter for this exact job. Map her real duties to the duties and requirements below, naming specific roles, companies, and tasks. No generic filler, and nothing that is not written in her materials.
 
 JOB TITLE: ${title||'(see description)'}
 COMPANY: ${company||'(see description)'}
@@ -4203,7 +4224,7 @@ async function generate(){
   let out='';
   try{
     const res=await fetch(OLLAMA_URL+'/api/chat',{method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({model, messages:buildMessages(), stream:true, options:{temperature:0.6, num_ctx:8192}})});
+      body:JSON.stringify({model, messages:buildMessages(), stream:true, options:{temperature:0.4, num_ctx:8192}})});
     if(!res.ok){ throw new Error('HTTP '+res.status); }
     const reader=res.body.getReader(), dec=new TextDecoder(); let buf='';
     while(true){
