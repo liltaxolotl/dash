@@ -361,6 +361,7 @@
   .money-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
   .money-row input{width:92px; border:1px solid var(--line); border-radius:10px; padding:7px 10px; font-family:inherit; font-size:.9rem; color:var(--ink)}
   .money-row input:focus{outline:none; border-color:var(--lav)}
+  .money-row input.mnote{flex:1; width:auto; min-width:150px}
   .money-row select{width:auto; border:1px solid var(--line); border-radius:10px; padding:7px 10px; font-family:inherit; font-size:.86rem; color:var(--ink); background:#fff}
   .money-recent{font-size:.76rem; color:var(--soft); margin-top:7px; display:flex; flex-direction:column; gap:2px}
   .money-recent div{display:flex; align-items:center; gap:6px}
@@ -847,6 +848,7 @@
       <h2>✏️ Log money <span class="pill">+ in gets confetti, obviously</span></h2>
       <div class="money-row">
         <input id="moneyAmt" type="number" min="0" step="0.01" placeholder="$ in">
+        <input id="moneyNote" type="text" class="mnote" maxlength="80" placeholder="what / from who? (optional)">
         <select id="moneySrc">
           <option value="commission">commission</option>
           <option value="print">print</option>
@@ -858,6 +860,7 @@
       </div>
       <div class="money-row" style="margin-top:7px">
         <input id="spendAmt" type="number" min="0" step="0.01" placeholder="$ out">
+        <input id="spendNote" type="text" class="mnote" maxlength="80" placeholder="what / where? (optional)">
         <select id="spendSrc">
           <option value="rent">rent</option>
           <option value="car insurance">car insurance</option>
@@ -2298,7 +2301,7 @@ function renderMoney(){
   money.slice(-12).reverse().forEach(e=>{
     const row=document.createElement('div');
     const t=document.createElement('span');
-    t.textContent=e.d.slice(5).replace('-','/')+' · '+(isIn(e)?'+':'−')+fmt$(e.amt)+' · '+e.src;
+    t.textContent=e.d.slice(5).replace('-','/')+' · '+(isIn(e)?'+':'−')+fmt$(e.amt)+' · '+e.src+(e.note?' · '+e.note:'');
     t.style.color=isIn(e)?'var(--ok)':'var(--urgent)';
     const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove this entry';
     del.onclick=()=>{ money.splice(money.indexOf(e),1); localStorage.setItem(LS_MONEY,JSON.stringify(money)); pushStateSoon(); renderMoney(); };
@@ -2309,9 +2312,13 @@ function logMoney(kind){
   const inp=document.getElementById(kind==='in'?'moneyAmt':'spendAmt');
   const amt=parseFloat(inp.value);
   if(!(amt>0)) { inp.focus(); return; }
-  money.push({d:iso(new Date()), amt, src:document.getElementById(kind==='in'?'moneySrc':'spendSrc').value, t:kind});
+  const noteEl=document.getElementById(kind==='in'?'moneyNote':'spendNote');
+  const note=noteEl.value.trim();
+  const entry={d:iso(new Date()), amt, src:document.getElementById(kind==='in'?'moneySrc':'spendSrc').value, t:kind};
+  if(note) entry.note=note;
+  money.push(entry);
   localStorage.setItem(LS_MONEY,JSON.stringify(money)); pushStateSoon();
-  inp.value=''; if(kind==='in') confetti(20);
+  inp.value=''; noteEl.value=''; if(kind==='in') confetti(20);
   renderMoney();
 }
 document.getElementById('moneyAdd').onclick=()=>logMoney('in');
