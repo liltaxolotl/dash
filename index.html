@@ -196,6 +196,14 @@
   /* ---------- 💼 jobs panel (listings + application tracker + analytics + cover letters) ---------- */
   #jobsPanel .jgrid{display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; margin-bottom:18px}
   @media(max-width:820px){#jobsPanel .jgrid{grid-template-columns:1fr}}
+  /* long lead lists scroll INSIDE their card instead of stretching the whole page */
+  #leadList, #jobsLeadList, #jobsAppliedList{max-height:62vh; overflow-y:auto; overscroll-behavior:contain;
+    padding-right:4px; scrollbar-width:thin; scrollbar-color:var(--line) transparent}
+  #leadList::-webkit-scrollbar, #jobsLeadList::-webkit-scrollbar, #jobsAppliedList::-webkit-scrollbar{width:8px}
+  #leadList::-webkit-scrollbar-thumb, #jobsLeadList::-webkit-scrollbar-thumb, #jobsAppliedList::-webkit-scrollbar-thumb{
+    background:var(--line); border-radius:99px}
+  #leadList::-webkit-scrollbar-thumb:hover, #jobsLeadList::-webkit-scrollbar-thumb:hover, #jobsAppliedList::-webkit-scrollbar-thumb:hover{
+    background:var(--lav)}
   .jb-row{display:flex; flex-wrap:wrap; gap:8px; margin-top:4px}
   a.jb{border:1px solid var(--line); border-radius:99px; padding:6px 13px; font-size:.82rem; font-weight:700;
     color:var(--lav-deep); text-decoration:none; background:#fdfafe}
