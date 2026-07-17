@@ -601,7 +601,7 @@
             <textarea id="clLinkedin" rows="3" placeholder="LinkedIn summary, links to work, extra context..."></textarea>
           </div>
           <div class="cl-field">
-            <label>Your cover letter template <span class="hint" id="clTemplateHint">for: Production</span> <span class="hint">a real past letter per resume type; the AI copies its style and voice, never its facts</span></label>
+            <label>Your cover letter template <span class="hint" id="clTemplateHint">for: Production</span> <span class="hint">a real past letter: shows how a letter should flow; the roles and facts come from the resume</span></label>
             <textarea id="clTemplate" rows="5" placeholder="Paste a real cover letter you wrote and liked. The AI follows its tone and structure..."></textarea>
           </div>
           <button class="cl-btn" id="clSaveBase">Save my base info</button>
@@ -4048,9 +4048,13 @@ const RLABEL={production:'Production',animator:'Animator',general:'General',teac
 
 // --- Lupita's real resumes + style, preloaded (she can edit + save over these) ---
 const RESUME_DEFAULTS={name:'',contact:'',linkedin:'',facts:'',templates:{production:'',animator:'',general:'',teaching:''},resumes:{production:'',animator:'',general:'',teaching:''}};
-// animator + general reuse the production letter as their style default (until she saves her own)
+// every type defaults to her real letter as the FLOW example (it shows how a letter should
+// go, not which roles to feature; role choice comes from the resume). She can save her own per type.
 RESUME_DEFAULTS.templates.animator=RESUME_DEFAULTS.templates.production;
 RESUME_DEFAULTS.templates.general=RESUME_DEFAULTS.templates.production;
+RESUME_DEFAULTS.templates.teaching=RESUME_DEFAULTS.templates.production;
+// bump when the baked-in resumes/templates change: stale saved copies get replaced on load
+const RESUME_REV=3;
 
 let curType='production';
 const loadProfile=()=>JSON.parse(localStorage.getItem(CL_PROFILE)||'null');
@@ -4058,15 +4062,19 @@ const loadProfile=()=>JSON.parse(localStorage.getItem(CL_PROFILE)||'null');
 // --- load saved base info (merged over the real defaults) + last letter ---
 (function initCover(){
   const saved=loadProfile()||{};
+  // on a resume-version bump the shipped resumes/templates REPLACE stale saved copies
+  // (otherwise the first-load persist means baked-in updates would never reach the browser)
+  const fresh = saved.rv!==RESUME_REV;
   const p={
     name: saved.name!=null ? saved.name : RESUME_DEFAULTS.name,
     contact: saved.contact!=null ? saved.contact : RESUME_DEFAULTS.contact,
     linkedin: saved.linkedin!=null ? saved.linkedin : RESUME_DEFAULTS.linkedin,
     // templates went per-resume-type (old single saved.template is retired on purpose:
-    // it let the AI borrow unverified content; these are real letters Lupita wrote)
-    templates: Object.assign({}, RESUME_DEFAULTS.templates, saved.templates||{}),
-    resumes: Object.assign({}, RESUME_DEFAULTS.resumes, saved.resumes||{}),
-    lastUse: saved.lastUse||'production'
+    // it let the AI borrow unverified content; the default is a real letter Lupita wrote)
+    templates: Object.assign({}, RESUME_DEFAULTS.templates, fresh?{}:(saved.templates||{})),
+    resumes: Object.assign({}, RESUME_DEFAULTS.resumes, fresh?{}:(saved.resumes||{})),
+    lastUse: saved.lastUse||'production',
+    rv: RESUME_REV
   };
   localStorage.setItem(CL_PROFILE, JSON.stringify(p)); // persist merged so defaults stick
   $('clName').value=p.name; $('clContact').value=p.contact;
@@ -4133,6 +4141,18 @@ function useTemplateText(){
   const p=loadProfile()||{}; return ((p.templates&&p.templates[useType])||'').trim();
 }
 
+// safety net: when a job demands a language, small local models sometimes claim fluency
+// no matter what the rules say. If the letter claims a language no material backs, warn.
+function fluencyWarning(letter){
+  const m=/(?:fluent|fluency)\s+(?:in\s+)?([A-Za-z]+)/i.exec(letter||'');
+  const LANGS=/^(spanish|english|french|mandarin|cantonese|chinese|japanese|korean|tagalog|vietnamese|portuguese|german|italian|russian|arabic|hindi)$/i;
+  const lang=(m&&LANGS.test(m[1]))?m[1]:(/bilingual/i.test(letter||'')?'bilingual':null);
+  if(!lang) return false;
+  const p=loadProfile()||{};
+  const mats=[useResumeText(),RESUME_DEFAULTS.facts,p.linkedin||''].join(' ');
+  return !new RegExp(lang,'i').test(mats);
+}
+
 // shared clipboard helper (works on file:// too)
 async function copyText(t){
   try{ await navigator.clipboard.writeText(t); return true; }
@@ -4178,12 +4198,13 @@ YOUR GOAL: a SPECIFIC, tailored letter that maps HER real duties and results to 
 METHOD (do this before writing):
 1. Read the job description and pull out its key duties, responsibilities, and required skills/tools.
 2. For each important one, find the closest match in her resume and name it concretely: the ROLE and COMPANY plus the SPECIFIC task she did there. Name the ROLE and COMPANY plus the SPECIFIC task from her resume, and weave in real numbers when they exist.
-3. Group that mapped experience into 2 or 3 body paragraphs. Mirror how the STYLE EXAMPLE explicitly connects her duties to the role's needs.
+3. Pick the 2 or 3 roles from HER RESUME that genuinely fit THIS job best and build the letter around those. A teaching job leads with her teaching and youth-program roles, a production job with her production roles, an animation job with her animation work. Never default to the roles the FLOW EXAMPLE features; that was a different application.
+4. Group that mapped experience into 2 or 3 body paragraphs. Mirror how the FLOW EXAMPLE explicitly connects her duties to the role's needs.
 
 RULES:
-- TRUTH IS THE #1 RULE. Every concrete claim (task, tool, client, number, duty) must literally appear in the CANDIDATE RESUME, VERIFIED EXTRA FACTS, or EXTRA CONTEXT below. Do NOT add plausible-sounding specifics that are not written there: no invented naming conventions, version control habits, onboarding or documentation duties, "point of contact" claims, metrics, or client names. If a detail is not written below, it did not happen.
+- TRUTH IS THE #1 RULE. Every concrete claim (task, tool, client, number, duty) must literally appear in the CANDIDATE RESUME, VERIFIED EXTRA FACTS, or EXTRA CONTEXT below. Do NOT add plausible-sounding specifics that are not written there: no invented naming conventions, version control habits, onboarding or documentation duties, "point of contact" claims, metrics, client names, degrees, certifications, or language fluency (if the job wants a language and her materials do not list it, leave it unaddressed; heritage is NOT fluency, so never infer Spanish from her being Mexican-American). If a detail is not written below, it did not happen.
 - If the job asks for a skill or experience she does not have, do not claim it. Bridge honestly from the closest real thing she did, or leave it out entirely.
-- Study and imitate the STYLE EXAMPLE's approach: warm, specific, confident, plain-spoken, concrete. Do NOT copy its opening or any company-specific lines; write a fresh opening for THIS company.
+- The FLOW EXAMPLE shows how a letter should GO: the voice, the warm confident plain-spoken tone, the way each paragraph ties her real work to the job's needs. Take that shape. Do NOT take its stories: which roles to feature is decided by THIS job and her resume, and its opening and company-specific lines must never be reused.
 - Do NOT use vague filler like "I believe my skills align well," "unique blend," "fast-paced environment," "I am confident that." Replace any such urge with a real, named example.
 - Open by naming the exact role and company and ONE genuine, specific reason it fits her.
 - NEVER use em dashes or en dashes. Use commas, colons, or shorter sentences.
@@ -4198,9 +4219,9 @@ ${RESUME_DEFAULTS.facts||'(none)'}
 EXTRA CONTEXT / LINKEDIN:
 ${p.linkedin||'(none)'}
 
-STYLE EXAMPLE (a real letter Lupita wrote; every fact in it is true. Imitate its structure, voice, and duty-mapping. Do NOT copy its opening or company-specific lines):
+FLOW EXAMPLE (a real letter Lupita wrote for a different job; every fact in it is true. Follow its structure, voice, and duty-mapping. Pick roles for THIS job from the resume above, not from this example):
 ${useTemplateText()||'(none)'}`;
-  const user=`Write Lupita's cover letter for this exact job. Map her real duties to the duties and requirements below, naming specific roles, companies, and tasks. No generic filler, and nothing that is not written in her materials.
+  const user=`Write Lupita's cover letter for this exact job. Map her real duties to the duties and requirements below, naming specific roles, companies, and tasks. No generic filler, and nothing that is not written in her materials. If this job asks for a language her materials do not list, do NOT mention languages at all.
 
 JOB TITLE: ${title||'(see description)'}
 COMPANY: ${company||'(see description)'}
@@ -4239,7 +4260,10 @@ async function generate(){
     }
     $('clOutput').value=cleanLetter(out).trim();
     localStorage.setItem(CL_OUT,$('clOutput').value);
-    setStatus('clStatus','Done. Edit freely, then copy or polish. ✨','ok');
+    if(fluencyWarning($('clOutput').value))
+      setStatus('clStatus','Done, but one check: it claims a language fluency that is not on your resume. Fix or delete that line before sending. ⚠️','err');
+    else
+      setStatus('clStatus','Done. Edit freely, then copy or polish. ✨','ok');
   }catch(err){
     setStatus('clStatus','Could not reach your local AI. Make sure Ollama is running, then try again. ('+err.message+')','err');
   }finally{ btn.disabled=false; }
