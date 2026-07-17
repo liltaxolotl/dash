@@ -225,6 +225,9 @@
   #planDays .pd-row{grid-template-columns:92px 1fr; padding:6px 8px}
   #planDays .pd-desc{display:none; grid-column:1/-1; padding-top:2px}
   #planDays .pd-row.now-block .pd-desc{display:block}
+  /* the narrow 92px time column can't fit "9:00-9:15pm · now" on one line,
+     so the now tag drops to its own line instead of sliding under the name */
+  #planDays .pd-row.now-block .pd-time::after{content:"· now"; display:block}
   .phasebar{display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 16px}
   .phase{flex:1; min-width:150px; border:1px solid var(--line); border-radius:14px; padding:10px 12px; background:#fdfafe; font-size:.8rem; line-height:1.35}
   .phase b{display:block; font-size:.7rem; letter-spacing:.4px; text-transform:uppercase; color:var(--soft); margin-bottom:3px}
@@ -262,7 +265,8 @@
   .apps-btn:hover{transform:translateY(-1px)}
   .apps-btn.minus{background:var(--line); color:var(--soft); padding:4px 9px}
   .apps-sub{margin-top:6px; font-size:.78rem; font-weight:700; color:var(--soft)}
-  .pl-item{display:flex; align-items:flex-start; gap:10px; padding:8px 6px; border-bottom:1px dashed var(--line); font-size:.87rem; line-height:1.4; cursor:pointer}
+  .pl-item{display:flex; align-items:flex-start; gap:10px; padding:8px 6px; border-bottom:1px dashed var(--line); font-size:.87rem; line-height:1.4}
+  .pl-item .cbox::before{content:""; position:absolute; inset:-7px}  /* a wider invisible tap target, phone thumbs welcome */
   .pl-item:last-child{border-bottom:none}
   .pl-item.done{opacity:.5}
   .pl-item.done .txt2{text-decoration:line-through}
@@ -2458,8 +2462,7 @@ function checklist(items,cntEl,ctx){
     const sync=()=>{ cb.checked=!!done[it.id]; row.classList.toggle('done',!!done[it.id]); update(); };
     sync.el=row;
     (gpReg[it.id]=gpReg[it.id]||[]).push(sync);
-    cb.onchange=()=>gpSet(it.id,cb.checked);
-    row.onclick=e=>{ if(e.target===cb||e.target.closest('.tbs')) return; gpSet(it.id,!done[it.id]); };
+    cb.onchange=()=>gpSet(it.id,cb.checked);   // ONLY the square checks it off (a tap on the words was too easy to fat-finger)
     const tbs=document.createElement('div'); tbs.className='tbs';
     const ab=document.createElement('button'); ab.className='tb'; ab.textContent='🤖';
     ab.title=it.code?'Copy a ready prompt, then paste into Claude Code (needs your files)':'Copy a ready prompt + open Claude to do this together';
@@ -3200,8 +3203,7 @@ function hourRow(b,bid,mv){
   const sync=()=>{ cb.checked=!!done[bid]; row.classList.toggle('done',!!done[bid]); };
   sync.el=row;
   (gpReg[bid]=gpReg[bid]||[]).push(sync);
-  cb.onchange=()=>gpSet(bid,cb.checked);
-  row.onclick=e=>{ if(e.target!==cb && !e.target.closest('.tbs')) gpSet(bid,!done[bid]); };
+  cb.onchange=()=>gpSet(bid,cb.checked);   // ONLY the square checks it off, same as task rows
   row.appendChild(cb); row.appendChild(t);
   // 🧱 one of your own: ↩ takes it back off the clock, into the day's to-do list
   if(b.solo){
@@ -4060,6 +4062,9 @@ const RESUME_DEFAULTS={name:'',contact:'',linkedin:'',facts:'',templates:{produc
 RESUME_DEFAULTS.templates.animator=RESUME_DEFAULTS.templates.production;
 RESUME_DEFAULTS.templates.general=RESUME_DEFAULTS.templates.production;
 RESUME_DEFAULTS.templates.teaching=RESUME_DEFAULTS.templates.production;
+// languages a letter may claim fluency in (lowercase). Lupita understands some basic
+// Spanish but is NOT fluent: keep spanish out of this list (see scrubFluency).
+RESUME_DEFAULTS.langs=['english'];
 // bump when the baked-in resumes/templates change: stale saved copies get replaced on load
 const RESUME_REV=3;
 
@@ -4148,16 +4153,22 @@ function useTemplateText(){
   const p=loadProfile()||{}; return ((p.templates&&p.templates[useType])||'').trim();
 }
 
-// safety net: when a job demands a language, small local models sometimes claim fluency
-// no matter what the rules say. If the letter claims a language no material backs, warn.
-function fluencyWarning(letter){
-  const m=/(?:fluent|fluency)\s+(?:in\s+)?([A-Za-z]+)/i.exec(letter||'');
-  const LANGS=/^(spanish|english|french|mandarin|cantonese|chinese|japanese|korean|tagalog|vietnamese|portuguese|german|italian|russian|arabic|hindi)$/i;
-  const lang=(m&&LANGS.test(m[1]))?m[1]:(/bilingual/i.test(letter||'')?'bilingual':null);
-  if(!lang) return false;
-  const p=loadProfile()||{};
-  const mats=[useResumeText(),RESUME_DEFAULTS.facts,p.linkedin||''].join(' ');
-  return !new RegExp(lang,'i').test(mats);
+// hard ban: when a job demands a language, the local model claims fluency no matter how
+// the rules are worded (4/4 test runs). So sentences claiming a language not on the
+// allowlist are cut in code. Lupita has basic Spanish comprehension but is NOT fluent.
+const LANG_WORDS=/(spanish|french|mandarin|cantonese|chinese|japanese|korean|tagalog|vietnamese|portuguese|german|italian|russian|arabic|hindi|english)/i;
+const CLAIM_WORDS=/(fluent|fluency|fluently|bilingual|native|proficien|speaker|speaking)/i;
+function scrubFluency(letter){
+  const ok=RESUME_DEFAULTS.langs||[];
+  let removed=0;
+  const out=(letter||'').split('\n').map(par=>par.split(/(?<=[.!?])\s+/).filter(s=>{
+    if(/bilingual/i.test(s) && ok.length<2){ removed++; return false; }
+    const lang=LANG_WORDS.exec(s);
+    if(!lang || !CLAIM_WORDS.test(s)) return true;
+    if(ok.indexOf(lang[1].toLowerCase())>=0) return true;
+    removed++; return false;
+  }).join(' ')).join('\n');
+  return {out:out, removed:removed};
 }
 
 // shared clipboard helper (works on file:// too)
@@ -4265,10 +4276,11 @@ async function generate(){
         if(j.message && j.message.content){ out+=j.message.content; $('clOutput').value=noEmDash(out); }
       }
     }
-    $('clOutput').value=cleanLetter(out).trim();
-    localStorage.setItem(CL_OUT,$('clOutput').value);
-    if(fluencyWarning($('clOutput').value))
-      setStatus('clStatus','Done, but one check: it claims a language fluency that is not on your resume. Fix or delete that line before sending. ⚠️','err');
+    const fin=scrubFluency(cleanLetter(out).trim());
+    $('clOutput').value=fin.out;
+    localStorage.setItem(CL_OUT,fin.out);
+    if(fin.removed)
+      setStatus('clStatus','Done, and I cut '+fin.removed+' line'+(fin.removed>1?'s':'')+' claiming language fluency you don\'t have (the AI really wants you to be fluent in Spanish). Skim that paragraph, then copy or polish. ✂️','ok');
     else
       setStatus('clStatus','Done. Edit freely, then copy or polish. ✨','ok');
   }catch(err){
