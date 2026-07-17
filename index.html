@@ -4517,7 +4517,9 @@ document.addEventListener('keydown', e=>{
   if(!(e.ctrlKey||e.metaKey) || e.altKey) return;
   const k=(e.key||'').toLowerCase(); if(k!=='z' && k!=='y') return;
   const t=e.target;   // inside a text box, the box's own text undo wins
-  if(t && (t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable)) return;
+  // (a just-clicked checkbox keeps focus, and THAT Ctrl+Z should still be ours)
+  if(t && (t.tagName==='TEXTAREA' || t.isContentEditable ||
+    (t.tagName==='INPUT' && !/^(checkbox|radio|button|range)$/.test(t.type)))) return;
   e.preventDefault();
   if(k==='y'||e.shiftKey) doRedo(); else doUndo();
 });
