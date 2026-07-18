@@ -1920,6 +1920,7 @@ const b64enc = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
 const b64dec = s => JSON.parse(decodeURIComponent(escape(atob(s.replace(/\s/g,'')))));
 async function loadState(){
   if(!getToken()) return;
+  if(pushPending) return;   // a save is queued or in flight; pushState reconciles with the feed itself, and applying remote now could eat what she just typed
   try{
     const res=await fetch(stateUrl()+`?ref=${LEAD_FEED.branch}&t=${Date.now()}`,{headers:ghHdr(), cache:'no-store'});
     if(!res.ok) return;
@@ -1948,8 +1949,19 @@ async function loadState(){
       if(s.mailStore){ mailStore=s.mailStore; localStorage.setItem(LS_MAILSTORE, JSON.stringify(mailStore)); loadMailFromStore(); }
       if(s.jobs){ jobs=s.jobs; localStorage.setItem(LS_JOBS, JSON.stringify(jobs)); }
       if(s.myLeads){ myLeads=s.myLeads; localStorage.setItem(LS_MYLEADS, JSON.stringify(myLeads)); }
-      if(s.notes){ notes=s.notes; localStorage.setItem(LS_NOTES, JSON.stringify(notes)); }
-      if(s.proj){ proj=s.proj; proj.list=proj.list||[]; proj.items=proj.items||{}; localStorage.setItem(LS_PROJ, JSON.stringify(proj)); }
+      // notes/proj: an empty feed never beats real local data (a stale cached page
+      // once pushed a state file with no notes and every device adopted the blank)
+      if(s.notes && (s.notes.length || !notes.length)){ notes=s.notes; localStorage.setItem(LS_NOTES, JSON.stringify(notes)); }
+      if(s.proj){
+        const r={list:s.proj.list||[], items:s.proj.items||{}};
+        Object.entries(proj.items||{}).forEach(([pid,arr])=>{
+          if(arr && arr.length && !(r.items[pid]||[]).length){
+            r.items[pid]=arr;   // a bucket with real items doesn't vanish because the feed hasn't seen it yet
+            if(!r.list.some(p=>p.id===pid)){ const lp=proj.list.find(p=>p.id===pid); if(lp) r.list.push(lp); }
+          }
+        });
+        proj=r; localStorage.setItem(LS_PROJ, JSON.stringify(proj));
+      }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
       localStorage.setItem(LS_CUSTOM, JSON.stringify(custom));
       localStorage.setItem(LS_SAVEDAT, String(s.savedAt||0));
@@ -1965,25 +1977,42 @@ async function loadState(){
     }
   }catch(err){}
 }
+let pushPending=false;   // true from "save queued" until the push settles; loadState polls wait it out
 function pushStateSoon(){
   undoNote();   // every save funnels through here: remember the before-picture (works tokenless too)
   if(!getToken()) return;
+  pushPending=true;
   clearTimeout(statePushTimer);
   statePushTimer=setTimeout(pushState, 1500);
 }
+const statePayload=savedAt=>({done, custom, apps, money, arch, jobs, myLeads, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore, notes, proj, savedAt});
 async function pushState(){
-  if(!getToken()) return;
-  const savedAt=Date.now();
-  localStorage.setItem(LS_SAVEDAT, String(savedAt));
-  const payload={message:'dashboard state sync', content:b64enc({done, custom, apps, money, arch, jobs, myLeads, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore, notes, proj, savedAt}), branch:LEAD_FEED.branch};
+  if(!getToken()){ pushPending=false; return; }
   try{
+    /* Read the feed BEFORE writing, for three reasons:
+       - keys this page doesn't know about survive the write (Object.assign below);
+         an old cached copy of this page once pushed a payload with no `notes` key
+         and every device then adopted the blank
+       - rescueFromRemote() pulls back notes/project items the feed has but this
+         page never saw (fresh browser, boot race), instead of blanking them
+       - a fresh sha, so a conflict retry never blind-stomps the other device */
+    let remote=null;
+    try{
+      const g=await fetch(stateUrl()+`?ref=${LEAD_FEED.branch}&t=${Date.now()}`,{headers:ghHdr(), cache:'no-store'});
+      if(g.ok){ const j=await g.json(); stateSha=j.sha; remote=b64dec(j.content); }
+    }catch(e){}
+    if(remote) rescueFromRemote(remote);
+    const savedAt=Date.now();
+    localStorage.setItem(LS_SAVEDAT, String(savedAt));
+    const payload={message:'dashboard state sync', content:b64enc(Object.assign({}, remote||{}, statePayload(savedAt))), branch:LEAD_FEED.branch};
     if(stateSha) payload.sha=stateSha;
     let res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
     if(res.status===409||res.status===422){
-      // sha out of date (other device pushed): refresh it and retry once
+      // another device pushed between our read and write: re-read, re-merge, retry once
       const g=await fetch(stateUrl()+`?ref=${LEAD_FEED.branch}&t=${Date.now()}`,{headers:ghHdr(), cache:'no-store'});
       if(!g.ok) return;
-      payload.sha=(await g.json()).sha;
+      const j=await g.json(); payload.sha=j.sha;
+      try{ const r2=b64dec(j.content); rescueFromRemote(r2); payload.content=b64enc(Object.assign({}, r2, statePayload(Date.now()))); }catch(e){}
       res=await fetch(stateUrl(),{method:'PUT', headers:ghHdr(), body:JSON.stringify(payload)});
     }
     if(res.ok){ stateSha=(await res.json()).content.sha; }
@@ -1991,6 +2020,29 @@ async function pushState(){
       setLeadStatus('Sync token can\'t save changes. Paste a token with read AND write access to fix cross-device sync.');
     }
   }catch(err){}
+  finally{ pushPending=false; }
+}
+/* Never overwrite something with nothing. If the feed holds notes or project
+   items this page has never seen, adopt them (union by id) before pushing our
+   copy over them. Things deleted THIS session stay deleted (tombstones). */
+function rescueFromRemote(s){
+  if(!s) return;
+  if(Array.isArray(s.notes)&&s.notes.length){
+    const have=new Set(notes.map(n=>n.id));
+    const add=s.notes.filter(n=>n&&n.id&&!have.has(n.id)&&!noteTombs.has(n.id));
+    if(add.length){ notes=notes.concat(add); localStorage.setItem(LS_NOTES, JSON.stringify(notes)); renderNotes(); }
+  }
+  if(s.proj){
+    let touched=false;
+    (s.proj.list||[]).forEach(p=>{ if(p&&p.id&&!projTombs.has(p.id)&&!proj.list.some(x=>x.id===p.id)){ proj.list.push(p); touched=true; } });
+    Object.entries(s.proj.items||{}).forEach(([pid,arr])=>{
+      if(projTombs.has(pid)||!Array.isArray(arr)||!arr.length) return;
+      const cur=proj.items[pid]=proj.items[pid]||[];
+      const have=new Set(cur.map(i=>i.id));
+      arr.forEach(it=>{ if(it&&it.id&&!have.has(it.id)&&!projTombs.has(it.id)){ cur.push(it); touched=true; } });
+    });
+    if(touched){ localStorage.setItem(LS_PROJ, JSON.stringify(proj)); renderNotes(); }
+  }
 }
 // keep devices in step while the page stays open
 setInterval(()=>{ loadState(); }, 60000);
@@ -5050,6 +5102,7 @@ let notes=JSON.parse(localStorage.getItem(LS_NOTES)||'[]');   // [{id,txt,tag,at
 let proj=JSON.parse(localStorage.getItem(LS_PROJ)||'null')||{list:[],items:{}}; // list:[{id,name,arch?}], items: pid -> [{id,txt,k:'todo'|'note',done?,at}]
 const saveNotes=()=>{ localStorage.setItem(LS_NOTES,JSON.stringify(notes)); pushStateSoon(); };
 const saveProj =()=>{ localStorage.setItem(LS_PROJ, JSON.stringify(proj));  pushStateSoon(); };
+const noteTombs=new Set(), projTombs=new Set();   // deleted-this-session ids: rescueFromRemote won't resurrect them
 const pjOpen=new Set(JSON.parse(localStorage.getItem(LS_PJOPEN)||'[]'));   // which cards sit open (per device, not synced)
 const nid=p=>(p||'n')+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 const NOTE_TAGS={idea:'💡',audio:'🎵',claude:'🤖',remind:'⏰',misc:'✨'};
@@ -5119,7 +5172,7 @@ function pjRowEl(p, it){
   tx.ondblclick=()=>inlineEdit(tx, it.txt, v=>{ if(v) it.txt=v; saveProj(); renderNotes(); });
   row.appendChild(tx);
   const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove (Ctrl+Z brings it back)';
-  del.onclick=()=>{ proj.items[p.id]=pjItems(p.id).filter(x=>x!==it); saveProj(); renderNotes(); };
+  del.onclick=()=>{ projTombs.add(it.id); proj.items[p.id]=pjItems(p.id).filter(x=>x!==it); saveProj(); renderNotes(); };
   row.appendChild(del);
   return row;
 }
@@ -5174,7 +5227,7 @@ function renderProjects(){
     const back=document.createElement('button'); back.className='tb'; back.textContent='↩'; back.title='bring it back';
     back.onclick=()=>{ delete p.arch; saveProj(); renderNotes(); };
     const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='delete forever (Ctrl+Z can still save you)';
-    del.onclick=()=>{ proj.list=proj.list.filter(x=>x!==p); delete proj.items[p.id]; saveProj(); renderNotes(); };
+    del.onclick=()=>{ projTombs.add(p.id); (proj.items[p.id]||[]).forEach(i=>projTombs.add(i.id)); proj.list=proj.list.filter(x=>x!==p); delete proj.items[p.id]; saveProj(); renderNotes(); };
     row.appendChild(tx); row.appendChild(back); row.appendChild(del);
     al.appendChild(row);
   });
@@ -5204,7 +5257,7 @@ function renderNotes(){
     tx.ondblclick=()=>inlineEdit(tx, n.txt, v=>{ if(v) n.txt=v; saveNotes(); renderNotes(); });
     const wh=document.createElement('span'); wh.className='nwhen'; wh.textContent=(n.at||'').slice(5).replace('-','/');
     const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove (Ctrl+Z brings it back)';
-    del.onclick=()=>{ notes=notes.filter(x=>x!==n); saveNotes(); renderNotes(); };
+    del.onclick=()=>{ noteTombs.add(n.id); notes=notes.filter(x=>x!==n); saveNotes(); renderNotes(); };
     row.appendChild(tg); row.appendChild(tx); row.appendChild(wh); row.appendChild(del);
     listEl.appendChild(row);
   });
