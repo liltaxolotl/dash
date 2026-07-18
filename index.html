@@ -97,6 +97,9 @@
     background:#faf6ff; border:1px solid var(--line); border-radius:9px; width:fit-content; max-width:100%}
   .links a:hover{border-color:var(--lav); background:#f3ebff}
   .tag{padding:2px 8px; border-radius:99px; font-size:.7rem; font-weight:700}
+  /* the creative/life chip is a BUTTON: tap it to flip a mislabeled item */
+  button.tag{border:none; cursor:pointer; font-family:inherit; line-height:inherit}
+  button.tag:hover{transform:translateY(-1px); box-shadow:0 2px 6px rgba(180,140,200,.25)}
   .tag.work{background:#ffe3ef; color:var(--pink-deep)}
   .tag.life{background:#e8f8f1; color:var(--ok)}
   .tag.bill{background:#fff2d9; color:#c79016}
@@ -472,10 +475,8 @@
   .steps{margin:4px 0 8px; padding-left:22px; font-size:.86rem; line-height:1.55}
   .steps li{margin:3px 0}
 
-  /* ---------- 📝 notes + projects ---------- */
-  #notesPanel{max-width:1150px; margin:0 auto; flex-direction:column; gap:18px}
-  .notes-cols{display:grid; grid-template-columns:1fr 1.15fr; gap:18px; align-items:start}
-  @media(max-width:860px){.notes-cols{grid-template-columns:1fr}}
+  /* ---------- 📝 notes (projects moved to their own 🎨 tab) ---------- */
+  #notesPanel{max-width:760px; margin:0 auto; flex-direction:column; gap:18px}
   .note-add{display:flex; gap:7px; flex-wrap:wrap; align-items:center}
   .note-add input[type=text]{flex:1 1 170px; border:1px solid var(--line); border-radius:10px; padding:8px 11px; font-family:inherit; font-size:.9rem; color:var(--ink); min-width:0}
   .note-add input[type=text]:focus{outline:none; border-color:var(--lav)}
@@ -511,6 +512,43 @@
   .pj-gp .txt2{color:var(--soft)}
   /* 🌸 Personal tab: one centered column of cards */
   #mePanel{max-width:760px; margin:0 auto; flex-direction:column; gap:18px}
+  /* ---------- 🎨 Projects tab: one hub per project ---------- */
+  #projPanel{max-width:900px; margin:0 auto; flex-direction:column; gap:18px}
+  /* 👉 the next tiny step: one obvious thing, big and friendly */
+  .pj-next{border:1px solid var(--pink); border-radius:14px; background:#fff0f7; padding:9px 12px; margin:10px 0 4px}
+  .pj-next .pj-next-l{font-size:.7rem; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:var(--pink-deep); margin-bottom:2px}
+  .pj-next .pl-item{border-bottom:none}
+  .pj-next .pj-next-w{font-size:.74rem; color:var(--soft); margin:1px 2px 0}
+  .pj-next.alldone{border-color:var(--ok); background:#e8f8f1; font-size:.86rem}
+  .pj-help{border:none; cursor:pointer; border-radius:99px; padding:6px 13px; font-weight:800; font-size:.8rem; color:#fff; background:linear-gradient(90deg,var(--pink-deep),var(--lav-deep)); margin:7px 0 0}
+  .pj-help:hover{transform:translateY(-1px); box-shadow:var(--shadow)}
+  /* a project's little progress bar (plan steps done, across all 8 weeks) */
+  .pj-prog{height:7px; border-radius:99px; background:var(--line); overflow:hidden; margin:8px 2px 0}
+  .pj-prog i{display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,var(--pink-deep),var(--lav-deep)); transition:width .3s}
+  .pj-prog-t{font-size:.7rem; color:var(--soft); margin:3px 2px 0}
+  /* 🏁 big moments: the launches and deadlines at a glance */
+  .pj-big{display:flex; gap:8px; align-items:baseline; padding:4px 2px; font-size:.83rem}
+  .pj-big .wk{font-size:.68rem; font-weight:800; color:var(--lav-deep); background:#ece4ff; border-radius:99px; padding:1px 8px; white-space:nowrap}
+  .pj-big.done{opacity:.6}
+  .pj-big.done .bt{text-decoration:line-through}
+  /* 🗺️ one dropdown per week inside a project hub */
+  details.pj-week{border:1px dashed var(--line); border-radius:12px; margin:7px 0; background:#fff; overflow:hidden}
+  details.pj-week>summary{cursor:pointer; list-style:none; padding:8px 11px; font-size:.83rem; font-weight:700; display:flex; align-items:center; gap:8px; flex-wrap:wrap; user-select:none}
+  details.pj-week>summary::-webkit-details-marker{display:none}
+  details.pj-week>summary .caret{font-size:.68em; color:var(--soft); transition:transform .15s}
+  details.pj-week[open]>summary .caret{transform:rotate(90deg)}
+  details.pj-week>summary .wk-when{font-size:.7rem; color:var(--soft); font-weight:600}
+  details.pj-week>summary .pj-count{margin-left:auto; font-size:.68rem; font-weight:700; color:var(--soft); background:var(--line); padding:1px 8px; border-radius:99px; white-space:nowrap}
+  details.pj-week.now{border:1px solid var(--pink); background:#fff8fb}
+  details.pj-week.now>summary .wk-here{font-size:.68rem; font-weight:800; color:#fff; background:var(--urgent); border-radius:99px; padding:1px 8px}
+  details.pj-week.past{opacity:.72}
+  details.pj-week .pd-body{padding:0 8px 8px}
+  /* 🔁 the weekly rhythm rows (read-only: the checkboxes live on the day cards) */
+  .pj-rhy{display:flex; gap:8px; align-items:baseline; padding:3px 2px; font-size:.81rem; color:var(--soft)}
+  .pj-rhy b{color:var(--lav-deep); font-size:.72rem; white-space:nowrap}
+  /* ✅ a checked-off note keeps its done-day in the archive below */
+  .note-row.done .ntxt{text-decoration:line-through; color:var(--soft)}
+  .note-row .cbox{margin-top:2px}
   /* 📦 archive groups: date sub-headers inside each kind */
   .arch-when{font-size:.66rem; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:var(--soft); margin:9px 2px 1px}
   #archList details.projcard{background:#fff}
@@ -576,6 +614,7 @@
     <button class="tab" data-view="month">🗓️ This Month</button>
     <button class="tab" data-view="all">✨ Everything</button>
     <button class="tab" data-view="plan">🗺️ Game Plan</button>
+    <button class="tab" data-view="proj">🎨 Projects</button>
     <button class="tab" data-view="jobs">💼 Jobs</button>
     <button class="tab" data-view="notes">📝 Notes</button>
     <button class="tab" data-view="me">🌸 Personal</button>
@@ -1126,6 +1165,8 @@
           <option value="groceries">groceries</option>
           <option value="eating out">eating out</option>
           <option value="gas">gas</option>
+          <option value="car">car</option>
+          <option value="health">health</option>
           <option value="art supplies">art supplies</option>
           <option value="subscriptions">subscriptions</option>
           <option value="other expense">other expense</option>
@@ -1146,43 +1187,45 @@
     </div>
   </section>
 
-  <!-- 📝 NOTES + PROJECTS -->
+  <!-- 🎨 PROJECTS: one hub per project. The full game plan arc (week 1 to 8, with
+       dates and this-week highlighted), the next tiny step, big moments, her own
+       to-dos + ideas + research. Pulls live from the same GUIDE_STEPS/done stores
+       as the plan tab, so a box ticked here is ticked everywhere. -->
+  <section id="projPanel" style="display:none">
+    <div class="card">
+      <h2>🎨 Projects <span class="pill">every project's whole home</span></h2>
+      <p class="cl-lead" style="margin-top:0">One hub per project: your next tiny step, the week-by-week plan with its dates, big launch moments, and a place for your own to-dos, ideas, links, and research. Tick a box here and it's ticked on the Game Plan too. Double-click anything to reword it. 🌷</p>
+      <div class="note-add">
+        <input id="projName" type="text" maxlength="80" placeholder="start a new project...">
+        <button class="apps-btn" id="projAdd">+ project</button>
+      </div>
+      <!-- NOT projList: the home tab's Active Projects card already owns that id,
+           and a duplicate id made these cards render into the WRONG (hidden) div -->
+      <div id="pjList"></div>
+      <details id="projArchWrap" class="projcard" style="display:none"><summary><span class="caret">▶</span>📦 archived projects</summary><div class="pj-body" id="projArch"></div></details>
+    </div>
+  </section>
+
+  <!-- 📝 NOTES -->
   <section id="notesPanel" style="display:none">
-    <div class="notes-cols">
-      <div class="col">
-        <div class="card">
-          <h2>📝 Quick notes <span class="pill">brain dump, sorted for you</span></h2>
-          <p class="cl-lead" style="margin-top:0">Video ideas, songs you found, "have Claude build this", stuff to add later. Park it here before it wanders off. 🫙 Links become clickable.</p>
-          <div class="note-add">
-            <input id="noteTxt" type="text" maxlength="500" placeholder="write it down... (paste links right in)">
-            <select id="noteTag" title="where to file it">
-              <option value="auto">🪄 auto</option>
-              <option value="idea">💡 idea</option>
-              <option value="audio">🎵 audio</option>
-              <option value="claude">🤖 for Claude</option>
-              <option value="remind">⏰ reminder</option>
-              <option value="misc">✨ misc</option>
-            </select>
-            <button class="apps-btn" id="noteAdd">+ note</button>
-          </div>
-          <div class="chips" id="noteFilters" style="margin-top:10px"></div>
-          <div id="noteList"></div>
-        </div>
+    <div class="card">
+      <h2>📝 Quick notes <span class="pill">brain dump, sorted for you</span></h2>
+      <p class="cl-lead" style="margin-top:0">Video ideas, songs you found, "have Claude build this", stuff to add later. Park it here before it wanders off. 🫙 Links become clickable. Check one off when it's handled: it tucks into ✅ below with the day.</p>
+      <div class="note-add">
+        <input id="noteTxt" type="text" maxlength="500" placeholder="write it down... (paste links right in)">
+        <select id="noteTag" title="where to file it">
+          <option value="auto">🪄 auto</option>
+          <option value="idea">💡 idea</option>
+          <option value="audio">🎵 audio</option>
+          <option value="claude">🤖 for Claude</option>
+          <option value="remind">⏰ reminder</option>
+          <option value="misc">✨ misc</option>
+        </select>
+        <button class="apps-btn" id="noteAdd">+ note</button>
       </div>
-      <div class="col">
-        <div class="card">
-          <h2>🎨 Projects <span class="pill">done · to-do · research</span></h2>
-          <p class="cl-lead" style="margin-top:0">One little home per project: what's done, what's next, and the links and notes that belong to it. Double-click anything to reword it.</p>
-          <div class="note-add">
-            <input id="projName" type="text" maxlength="80" placeholder="start a new project...">
-            <button class="apps-btn" id="projAdd">+ project</button>
-          </div>
-          <!-- NOT projList: the home tab's Active Projects card already owns that id,
-               and a duplicate id made these cards render into the WRONG (hidden) div -->
-          <div id="pjList"></div>
-          <details id="projArchWrap" class="projcard" style="display:none"><summary><span class="caret">▶</span>📦 archived projects</summary><div class="pj-body" id="projArch"></div></details>
-        </div>
-      </div>
+      <div class="chips" id="noteFilters" style="margin-top:10px"></div>
+      <div id="noteList"></div>
+      <details id="noteArchWrap" class="projcard" style="display:none"><summary><span class="caret">▶</span>✅ done notes <span class="pj-count" id="noteArchCount"></span></summary><div class="pj-body" id="noteArch"></div></details>
     </div>
   </section>
 
@@ -1325,6 +1368,10 @@ let jobs = JSON.parse(localStorage.getItem(LS_JOBS) || '{}');
 // both lead lists and go through the exact same applied / passed flow.
 const LS_MYLEADS = 'lupita-myleads-v1';
 let myLeads = JSON.parse(localStorage.getItem(LS_MYLEADS) || '[]');
+// 🎨/🌱 the creative-or-life chip, when Lupita flips it herself (tap the chip).
+// id -> 'work'|'life', an override layered over the item's own tag at render time.
+const LS_TAGS = 'lupita-tags-v1';
+let tags = JSON.parse(localStorage.getItem(LS_TAGS) || '{}');
 let view = 'today';
 const saveDone = () => { localStorage.setItem(LS_DONE, JSON.stringify(done)); pushStateSoon(); };
 const saveCustom = () => { localStorage.setItem(LS_CUSTOM, JSON.stringify(custom)); pushStateSoon(); };
@@ -1344,6 +1391,7 @@ const saveBlockDescs = () => { localStorage.setItem(LS_BLOCKDESCS, JSON.stringif
 const saveJobs = () => { localStorage.setItem(LS_JOBS, JSON.stringify(jobs)); pushStateSoon(); };
 const saveMyLeads = () => { localStorage.setItem(LS_MYLEADS, JSON.stringify(myLeads)); pushStateSoon(); };
 const saveDoneAt = () => { localStorage.setItem(LS_DONEAT, JSON.stringify(doneAt)); };  // rides along with saveDone's push
+const saveTags = () => { localStorage.setItem(LS_TAGS, JSON.stringify(tags)); pushStateSoon(); };
 // Leads checked off before the Jobs tab existed lived in the home tab's general
 // archive: move them over once so the tracker holds the whole history. Runs at
 // boot AND after a remote loadState apply (the other device may still send the
@@ -1517,7 +1565,17 @@ function itemRow(it, kind, deletable){
       t.textContent='in '+n+' day'+(n===1?'':'s'); meta.appendChild(t);
     }
   }
-  if(it.tag){ const t=document.createElement('span'); t.className='tag '+it.tag; t.textContent=(it.tag==='work'?'creative':'life'); meta.appendChild(t); }
+  // 🎨/🌱 the creative-or-life chip. The auto-guess gets it wrong sometimes
+  // (CVS meds are not "creative"), so the chip is a button: tap it to flip.
+  const tagV=tags[it.id]||it.tag;
+  if(tagV){ const t=document.createElement('button'); t.className='tag '+tagV; t.textContent=(tagV==='work'?'creative':'life');
+    t.title='tap to flip creative ↔ life';
+    t.onclick=()=>{ const nv=tagV==='work'?'life':'work';
+      const mine=custom.find(c=>c.id===it.id);
+      if(mine){ mine.tag=nv; delete tags[it.id]; saveTags(); saveCustom(); }
+      else { if(nv===it.tag) delete tags[it.id]; else tags[it.id]=nv; saveTags(); }
+      render(); };
+    meta.appendChild(t); }
   if(kind==='bill'){ const t=document.createElement('span'); t.className='tag bill'; t.textContent='bill'; meta.appendChild(t); }
   if(kind==='appt'){ const t=document.createElement('span'); t.className='tag appt'; t.textContent='appt'; meta.appendChild(t); }
   if(it.moved){
@@ -2011,6 +2069,7 @@ async function loadState(){
       if(s.arch){ arch=s.arch; localStorage.setItem(LS_ARCH, JSON.stringify(arch)); }
       if(s.moved){ moved=s.moved; localStorage.setItem(LS_MOVED, JSON.stringify(moved)); }
       if(s.edits){ edits=s.edits; localStorage.setItem(LS_EDITS, JSON.stringify(edits)); }
+      if(s.tags){ tags=s.tags; localStorage.setItem(LS_TAGS, JSON.stringify(tags)); }
       if(s.slotted){ slotted=s.slotted; localStorage.setItem(LS_SLOT, JSON.stringify(slotted)); }
       if(s.blockMods){ blockMods=s.blockMods; localStorage.setItem(LS_BLOCKMODS, JSON.stringify(blockMods)); }
       if(s.food){ food=s.food; food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[]; localStorage.setItem(LS_FOOD, JSON.stringify(food)); }
@@ -2062,7 +2121,7 @@ async function loadState(){
       rebuildWeeks();   // the phone may have added or moved a to-do: redraw its day card
       // refresh every game-plan checkbox/count + the counters
       Object.values(gpReg).forEach(fns=>fns.forEach(f=>f()));
-      renderApps(); renderMoney(); renderFood(); renderFriends(); renderMail(); updateMailStatus(); renderNotes(); renderMe();
+      renderApps(); renderMoney(); renderFood(); renderFriends(); renderMail(); updateMailStatus(); renderNotes(); renderProjects(); renderMe();
       if(view==='plan') renderPlan();   // another device may have slid today's blocks around
       undoBaseline();   // remote state landed: undo measures from here, not from before the sync
     }
@@ -2076,7 +2135,7 @@ function pushStateSoon(){
   clearTimeout(statePushTimer);
   statePushTimer=setTimeout(pushState, 1500);
 }
-const statePayload=savedAt=>({done, doneAt, custom, apps, money, arch, jobs, myLeads, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore, notes, proj, me, savedAt});
+const statePayload=savedAt=>({done, doneAt, custom, apps, money, arch, jobs, myLeads, moved, edits, tags, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore, notes, proj, me, savedAt});
 async function pushState(){
   if(!getToken()){ pushPending=false; return; }
   try{
@@ -2132,7 +2191,7 @@ function rescueFromRemote(s){
       const have=new Set(cur.map(i=>i.id));
       arr.forEach(it=>{ if(it&&it.id&&!have.has(it.id)&&!projTombs.has(it.id)){ cur.push(it); touched=true; } });
     });
-    if(touched){ localStorage.setItem(LS_PROJ, JSON.stringify(proj)); renderNotes(); }
+    if(touched){ localStorage.setItem(LS_PROJ, JSON.stringify(proj)); renderProjects(); }
   }
   if(s.me){
     let touched=false;
@@ -2170,7 +2229,7 @@ async function fetchPlan(){
     g.innerHTML=''; delete g.dataset.built;
     Object.keys(gpReg).forEach(k=>delete gpReg[k]);
     if(view==='plan') renderPlan();
-    renderNotes();   // project cards seed from the guides + show their finished steps
+    renderProjects();   // project hubs seed from the guides + draw their timelines
   }catch(err){}
 }
 
@@ -2276,18 +2335,20 @@ document.getElementById('tabs').addEventListener('click',e=>{
   applyLayout();
   if(view==='jobs'){ render(); loadModels(); } // fresh listings + tracker, and re-check the local AI each time the tab is opened
   else if(view==='plan') renderPlan();
+  else if(view==='proj') renderProjects();
   else if(view==='notes') renderNotes();
   else if(view==='me') renderMe();
   else render();
 });
 // swap between the schedule grid and the full-width panels (jobs / game plan / food / friends / notes / personal)
 function applyLayout(){
-  const isJobs = view==='jobs', isPlan = view==='plan', isFood = view==='food', isBudget = view==='budget', isFriends = view==='friends', isNotes = view==='notes', isMe = view==='me';
-  const full = isJobs||isPlan||isFood||isBudget||isFriends||isNotes||isMe;
+  const isJobs = view==='jobs', isPlan = view==='plan', isProj = view==='proj', isFood = view==='food', isBudget = view==='budget', isFriends = view==='friends', isNotes = view==='notes', isMe = view==='me';
+  const full = isJobs||isPlan||isProj||isFood||isBudget||isFriends||isNotes||isMe;
   document.querySelector('.grid').style.display = full ? 'none' : '';
   document.querySelector('.progress-card').style.display = full ? 'none' : '';
   document.getElementById('jobsPanel').style.display = isJobs ? 'block' : 'none';
   document.getElementById('planPanel').style.display = isPlan ? 'flex' : 'none';
+  document.getElementById('projPanel').style.display = isProj ? 'block' : 'none';
   document.getElementById('foodPanel').style.display = isFood ? 'flex' : 'none';
   document.getElementById('budgetPanel').style.display = isBudget ? 'flex' : 'none';
   document.getElementById('friendsPanel').style.display = isFriends ? 'flex' : 'none';
@@ -2321,7 +2382,8 @@ function clockFor(n,dk,def){
   // stay on THIS day even when they run past midnight, because a block's time is
   // minutes on the 11am-to-11am day (12:20am on Monday night = 1460, still Monday).
   const owns=(blocksOwn['w'+n+'-'+dk]||[])
-    .map(b=>({k:b.k, s:b.s, e:b.e, n:b.n, d:b.d||'your own block', t:fmtRange(b.s,b.e), own:true}));
+    // d:'' is real: a backspaced-empty note STAYS empty (only a missing d gets the default)
+    .map(b=>({k:b.k, s:b.s, e:b.e, n:b.n, d:b.d!=null?b.d:'your own block', t:fmtRange(b.s,b.e), own:true}));
   if(owns.length) base=base.concat(owns);
   // 🧱 your own blocks (a to-do promoted onto the clock) sit in the day right
   // alongside the plan's blocks, in clock order
@@ -2992,8 +3054,19 @@ document.getElementById('spendAdd').onclick=()=>logMoney('out');
    Checking off "Pay rent" drops the payment straight into the budget. A $ amount
    in the wording logs silently; otherwise a little card asks once, prefilled with
    what the same bill cost last time. Unchecking takes the entry back out. */
-const BILL_CATS=[[/rent/i,'rent'],[/insur/i,'car insurance'],[/credit/i,'credit card'],[/grocer/i,'groceries'],[/\bgas\b/i,'gas'],[/smog|mechanic|oil change|car wash/i,'car'],[/subscri/i,'subscriptions']]; // leakcheck-allow (generic budget categories, same as the dropdown)
+const BILL_CATS=[[/rent/i,'rent'],[/insur/i,'car insurance'],[/credit/i,'credit card'],[/grocer/i,'groceries'],[/\bgas\b/i,'gas'],[/smog|mechanic|oil change|car wash|parking|toll/i,'car'],[/subscri/i,'subscriptions'],[/mcdonald|burger|taco|pizza|boba|coffee|cafe|starbucks|restaurant|takeout|take.?out|drive.?thru|fast food|\bate\b|\bfood\b|snack/i,'eating out'],[/pharmacy|cvs|walgreens|prescription|\bmeds?\b|copay|co.?pay|\bdoctor\b|dentist|urgent care/i,'health'],[/art suppl|blick|michaels|procreate|brushes/i,'art supplies']]; // leakcheck-allow (generic budget categories, same as the dropdown)
 function billCat(t){ const hit=BILL_CATS.find(c=>c[0].test(t)); return hit?hit[1]:'other expense'; }
+/* a price in the wording: "$40", "$12.50", or a bare "5.80" (two decimals reads as
+   money; bare whole numbers stay ambiguous: "8 fast applies" is not eight dollars) */
+function priceIn(txt){
+  let m=/\$\s?(\d[\d,]*(?:\.\d{1,2})?)/.exec(txt||'');
+  if(!m) m=/(?:^|[^\d.vV])(\d[\d,]*\.\d{2})(?!\d)/.exec(txt||'');
+  return m?parseFloat(m[1].replace(/,/g,'')):null;
+}
+/* wordings that smell like money left the building even with no number written
+   (a car-care errand, a pharmacy run, a grocery trip): checking one off opens the
+   little ask-card, prefilled with what it cost last time. Skip = nothing logged. */
+const SPEND_ASK=/smog|mechanic|oil change|car wash|grocer|pharmacy|cvs|walgreens|prescription|\bmeds?\b|copay|co.?pay|mcdonald|burger|taco|pizza|boba|takeout|take.?out|drive.?thru|fast food|haircut|salon|nails|art suppl|parking|\b(buy|bought|order(ed)?|purchase[d]?)\b/i; // leakcheck-allow: generic budget keywords
 // next month's bill has a new id but the same words, so "last time" matches on the
 // words (with amounts and "(due 8/7)" tails stripped off)
 function billNorm(t){ return t.toLowerCase().replace(/\(due[^)]*\)/g,'').replace(/\$?\d[\d,.]*/g,'').replace(/\s+/g,' ').trim(); }
@@ -3012,21 +3085,24 @@ function billAutoLog(it, on){
     localStorage.setItem(LS_MONEY,JSON.stringify(money)); pushStateSoon(); renderMoney();
     undoToast('💵 −'+fmt$(amt)+' '+src+' · logged in the budget');
   };
-  const m=/\$\s?(\d[\d,]*(?:\.\d{1,2})?)/.exec(txt);
-  if(m){ log(parseFloat(m[1].replace(/,/g,'')), billCat(txt)); return; }
+  const amt=priceIn(txt);
+  if(amt!=null){ log(amt, billCat(txt)); return; }
   const prev=money.slice().reverse().find(e=>!isIn(e)&&e.bill===norm);
   billPop(txt, prev?prev.amt:'', billCat(txt), log);
 }
 /* ---- 💵 ...and not just bills ----
-   Any to-do or appointment with a $ amount in its wording ("$40 car errand",
-   "$25 co-pay") logs itself as an expense the moment it's checked off. No $ in
-   the words = nothing happens (this path never opens the little ask-card), and
-   unchecking always takes back whatever the item logged. */
+   Any to-do or appointment with a price in its wording ("$40 errand", "ate out
+   5.80") logs itself as an expense the moment it's checked off, no $ sign
+   required. A task that SOUNDS like spending but has no number (a car-care
+   errand, a pharmacy run) asks once with the little card instead of silently
+   logging nothing. Unchecking always takes back whatever the item logged. */
 function moneyAutoLog(it, kind, on){
   if(kind==='bill') return billAutoLog(it, on);
   if(kind!=='task'&&kind!=='appt') return;
   if(!on) return billAutoLog(it, false);
-  if(/\$\s?\d/.test(it.text||'')) billAutoLog(it, true);
+  const txt=it.text||'';
+  if(priceIn(txt)!=null) return billAutoLog(it, true);
+  if(kind==='task' && SPEND_ASK.test(txt)) billAutoLog(it, true);
 }
 function billPop(txt, amt0, src0, onLog){
   closeTimePop();
@@ -3195,7 +3271,10 @@ function checklist(items,cntEl,ctx){
     const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox';
     // your wording wins over the plan's, always (double-click the words to change it)
     const t=document.createElement('div'); t.className='txt2'; t.textContent=edits[it.id]||it.txt;
-    const sync=()=>{ cb.checked=!!done[it.id]; row.classList.toggle('done',!!done[it.id]); update(); };
+    // "✓ 7/15": a finished step remembers the day it happened, everywhere it renders
+    const wn=document.createElement('span'); wn.className='pj-when'; t.appendChild(wn);
+    const sync=()=>{ cb.checked=!!done[it.id]; row.classList.toggle('done',!!done[it.id]);
+      wn.textContent=(done[it.id]&&doneAt[it.id])?('✓ '+doneAt[it.id].slice(5).replace('-','/')):''; update(); };
     sync.el=row;
     (gpReg[it.id]=gpReg[it.id]||[]).push(sync);
     cb.onchange=()=>gpSet(it.id,cb.checked);   // ONLY the square checks it off (a tap on the words was too easy to fat-finger)
@@ -4023,6 +4102,13 @@ function buildGuides(){
     e.textContent='Guides load with your sprint plan once your token is saved. 🌸';
     wrap.appendChild(e); return;
   }
+  // the guides grew real homes: point at the hub where the whole arc + her own
+  // notes/ideas/research live (same checkboxes, so nothing forks)
+  const hubBtn=document.createElement('button'); hubBtn.className='cl-btn'; hubBtn.style.margin='2px 0 8px';
+  hubBtn.textContent='🎨 every project also has a full hub now: next step, weeks 1-8, your notes → open Projects';
+  hubBtn.onclick=()=>{ view='proj'; applyLayout(); renderProjects();
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.view==='proj')); };
+  wrap.appendChild(hubBtn);
   Object.values(GUIDE_STEPS).forEach(g=>{
     const det=document.createElement('details'); det.className='plan-day';
     const sum=document.createElement('summary');
@@ -4379,6 +4465,17 @@ function detectKind(text){
   if(APPT_WORDS.test(text)) return 'appt';
   return 'task';
 }
+/* 🎨 or 🌱: is a to-do creative work or life admin? Life words win (a "cvs meds
+   pickup" is not creative, no matter what else is in the sentence), creative words
+   come second, and anything unrecognized files under life. The chip on the item is
+   tappable, so a wrong guess costs one tap. */
+const LIFE_WORDS=/\b(meds?|medicine|pharmacy|cvs|walgreens|prescription|refill|copay|co-pay|grocer(y|ies)|costco|errands?|clean(ing)?|laundry|dishes|trash|vacuum|smog|mechanic|oil change|car wash|dmv|bank|deposit|post office|package|mail|return|pick ?up|drop ?off|shower|cook(ing)?|dinner|lunch|breakfast|cats?|dogs?|litter|plants?|dishes|call|text back|fold|tidy|sweep|mop)\b/i; // leakcheck-allow: generic parser keywords
+const CREATIVE_WORDS=/\b(draw(ing)?|sketch|paint(ing)?|animate|animation|animatic|illustrat\w*|render|storyboard|boards?|rig(ging)?|lineup|character|commission|portfolio|reel|edit(ing)?|film(ing)?|post|video|content|tiktok|instagram|youtube|shorts?|thumbnail|design|website|art|print|inprnt|client|tutoring|essay|script|record|vo|blender|procreate|toon\s?boom|tvpaint)\b/i;
+function detectTag(text){
+  if(LIFE_WORDS.test(text)) return 'life';
+  if(CREATIVE_WORDS.test(text)) return 'work';
+  return 'life';
+}
 const WD_IDX={sun:0,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6};
 const MO_IDX={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 function parseWhen(text){
@@ -4417,7 +4514,8 @@ function previewAdd(){
   if(!v){ showAddHint(''); return; }
   const kind=sel==='auto'?detectKind(v):sel;
   const w=parseWhen(v);
-  showAddHint('will file under '+KIND_HOME[kind]+' · '+fmtWhen(w.date||iso(today))+(w.time?(' '+w.time):''), true);
+  const tagHint=kind==='task'?(' · '+(detectTag(v)==='work'?'🎨 creative':'🌱 life')):'';
+  showAddHint('will file under '+KIND_HOME[kind]+' · '+fmtWhen(w.date||iso(today))+(w.time?(' '+w.time):'')+tagHint, true);
 }
 function addTask(){
   const inp=document.getElementById('newTask'); const v=inp.value.trim(); if(!v) return;
@@ -4426,7 +4524,7 @@ function addTask(){
   const w=parseWhen(v);
   const it={id:'c-'+Date.now(), text:v, date:w.date||iso(today), kind, custom:true};
   if(w.time) it.time=w.time;
-  if(kind==='task') it.tag='work';
+  if(kind==='task') it.tag=detectTag(v);   // creative or life, guessed from the words (the chip flips it)
   custom.push(it);
   saveCustom(); inp.value=''; sel.value='auto'; render(); rebuildWeeks();
   let msg='Filed under '+KIND_HOME[kind]+' · '+fmtWhen(it.date)+(it.time?(' '+it.time):'')+' ✓';
@@ -5327,10 +5425,20 @@ function projSeed(){
   proj.list.forEach(p=>{ if(p.goal==null){ const g=PJ_GOALS[pjKey(p.name)]; if(g) p.goal=g; } });
 }
 // which sprint guide belongs to a card ('Website Redesign' ↔ the Website guide)
-function guideFor(name){
+function guideKeyFor(name){
   const k=pjKey(name); if(!k) return null;
-  return Object.values(GUIDE_STEPS).find(g=>{ const gk=pjKey(g.title||''); return gk&&(k.includes(gk)||gk.includes(k)); })||null;
+  const hit=Object.entries(GUIDE_STEPS).find(kv=>{ const gk=pjKey(kv[1].title||''); return gk&&(k.includes(gk)||gk.includes(k)); });
+  return hit?hit[0]:null;
 }
+function guideFor(name){ const k=guideKeyFor(name); return k?GUIDE_STEPS[k]:null; }
+// where are we in the sprint? 0 = before it starts, 1-8 = that week, 9+ = after
+// (function declarations, not const arrows: the test harness reaches these)
+function wkNow(){ const d=Math.floor((parse(isoLocal(planToday))-parse(PLAN_START))/86400000);
+  return d<0?0:(Math.floor(d/7)+1); }
+function fmtMD(d){ return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+function wkRange(n){ const a=dayDate(n,0), b=dayDate(n,6);
+  return fmtMD(a)+' - '+(a.getMonth()===b.getMonth()?b.getDate():fmtMD(b)); }
+function guideSteps(g){ return [].concat.apply([],g.steps||[]).filter(s=>s&&s.id&&!taskOff[s.id]); }
 function addNote(){
   const inp=document.getElementById('noteTxt'), sel=document.getElementById('noteTag');
   const v=(inp.value||'').trim(); if(!v){ inp.focus(); return; }
@@ -5341,18 +5449,20 @@ function addNote(){
 function addProject(){
   const inp=document.getElementById('projName'); const v=(inp.value||'').trim(); if(!v){ inp.focus(); return; }
   const p={id:nid('pj'), name:v}; proj.list.push(p); pjOpen.add(p.id); inp.value='';
-  saveProj(); renderNotes();
+  saveProj(); renderProjects();
 }
 /* ---- one card list, two homes ----
    The 🎨 Projects column and the 🌸 Personal tab are the same machinery wired to
    different stores. A ctx bundles a store {list,items} with its DOM ids, save fn,
    tombstones, open-state, and re-render, plus optional extra sections. */
-const PJ_CTX={ store:()=>proj, save:saveProj, tombs:projTombs, redraw:()=>renderNotes(),
+const PJ_CTX={ store:()=>proj, save:saveProj, tombs:projTombs, redraw:()=>renderProjects(),
   listId:'pjList', archWrapId:'projArchWrap', archId:'projArch',
   open:pjOpen, openKey:LS_PJOPEN,
   empty:'No projects yet. Name one below and give it a home. 🌱',
   archTitle:'archive this project (it moves to 📦 below, nothing is lost)',
-  top:(p,body)=>pjGoalLine(p,body), mid:(p,body)=>pjGpSection(p,body) };
+  ideas:true,
+  top:(p,body)=>{ pjGoalLine(p,body); pjNextStep(p,body); },
+  mid:(p,body)=>{ pjTimeline(p,body); pjRhythm(p,body); } };
 const ME_CTX={ store:()=>me, save:saveMe, tombs:meTombs, redraw:()=>renderMe(),
   listId:'meList', archWrapId:'meArchWrap', archId:'meArch',
   open:meOpen, openKey:LS_MEOPEN,
@@ -5367,7 +5477,7 @@ function pjRowEl(ctx,p,it){
       else { delete it.done; delete it.doneAt; } ctx.save(); ctx.redraw(); };
     row.appendChild(cb);
   } else {
-    const dot=document.createElement('span'); dot.textContent='🔍'; dot.style.fontSize='.85rem'; dot.title='note'; row.appendChild(dot);
+    const dot=document.createElement('span'); dot.textContent=it.k==='idea'?'💡':'🔍'; dot.style.fontSize='.85rem'; dot.title=it.k==='idea'?'idea':'note'; row.appendChild(dot);
   }
   const tx=document.createElement('div'); tx.className='txt2'; linkifyInto(tx, it.txt);
   tx.title='double-click to reword';
@@ -5400,40 +5510,119 @@ function pjGoalLine(p, body){
   const gt=document.createElement('span'); gt.className='pj-goal-t'+(p.goal?'':' unset');
   gt.textContent=p.goal||'double-click to give this one a goal 🌱';
   gt.title='double-click to set or reword the goal';
-  gt.ondblclick=()=>inlineEdit(gt, p.goal||'', v=>{ if(v) p.goal=v; else delete p.goal; saveProj(); renderNotes(); });
+  gt.ondblclick=()=>inlineEdit(gt, p.goal||'', v=>{ if(v) p.goal=v; else delete p.goal; saveProj(); renderProjects(); });
   gl.appendChild(ico); gl.appendChild(gt); body.appendChild(gl);
 }
-/* 🗺️ what the sprint has already finished for this project: the matching guide's
-   checked-off steps, each with the day it was checked (older checks predate the
-   date store and just show a ✓). Read-only here; the boxes live on the plan. */
-function pjGpSection(p, body){
+/* ---- 🎨 the hub sections: hold-my-hand mode ----
+   Each project card leads with the ONE next thing (a live checkbox + a ready
+   "do this with me" Claude button), then the deadlines, then the whole 8-week
+   arc as week dropdowns with real dates and the same checkboxes as the plan
+   tab (one done store; tick it anywhere, it's ticked everywhere). */
+// 👉 the one next tiny step: the first unchecked plan step, in week order
+function pjNextStep(p, body){
   const g=guideFor(p.name); if(!g) return;
-  const steps=[].concat(...(g.steps||[])).filter(s=>s&&s.id&&!taskOff[s.id]);
-  if(!steps.length) return;
-  const fin=steps.filter(s=>done[s.id]);
-  const sec=document.createElement('div'); sec.className='pj-sec';
-  sec.textContent='🗺️ finished in the game plan · '+fin.length+' of '+steps.length+' steps';
-  body.appendChild(sec);
-  if(!fin.length){
-    const e=document.createElement('div'); e.className='empty'; e.style.padding='4px 2px';
-    e.textContent='Nothing checked off yet. The steps live on the 🗺️ Game Plan tab.';
-    body.appendChild(e); return;
+  const steps=guideSteps(g);
+  const box=document.createElement('div');
+  const nxt=steps.find(s=>!done[s.id]);
+  if(!nxt){
+    if(steps.length){ const d=document.createElement('div'); d.className='pj-next alldone';
+      d.textContent='🏁 every plan step for this one is DONE. Anything left lives in your own list below.';
+      box.appendChild(d); }
+  } else {
+    const sec=document.createElement('div'); sec.className='pj-next';
+    const l=document.createElement('div'); l.className='pj-next-l'; l.textContent='👉 your next tiny step'; sec.appendChild(l);
+    sec.appendChild(checklist([nxt], null));
+    const wk=+((nxt.id.match(/-w(\d+)-/)||[])[1]||0);
+    const w=document.createElement('div'); w.className='pj-next-w';
+    w.textContent=(wk?('Week '+wk+' · '+wkRange(wk)+' · '):'')+g.dayName+'s are '+g.title.toLowerCase()+' day'
+      +(wk===wkNow()?' · this week!':(wk&&wk<wkNow()?' · from an earlier week, still open (no guilt)':''));
+    sec.appendChild(w);
+    box.appendChild(sec);
+    // ✨ one button that sets Claude up to do this exact step WITH her
+    const hb=document.createElement('button'); hb.className='pj-help'; hb.textContent='✨ do this step with me';
+    hb.onclick=()=>pjHelp(p, g, nxt, hb);
+    box.appendChild(hb);
   }
-  const box=document.createElement('div'); box.className='pj-gp';
-  fin.forEach(s=>{
-    const row=document.createElement('div'); row.className='pl-item done';
-    const ck=document.createElement('span'); ck.textContent='✅'; ck.style.fontSize='.78rem';
-    const tx=document.createElement('div'); tx.className='txt2';
-    const words=gpText(s);
-    tx.textContent=words.length>110?words.slice(0,108)+'…':words;
-    tx.title=words;
-    row.appendChild(ck); row.appendChild(tx);
-    const w=document.createElement('span'); w.className='pj-when';
-    w.textContent=doneAt[s.id]?('✓ '+doneAt[s.id].slice(5).replace('-','/')):'✓';
-    row.appendChild(w);
-    box.appendChild(row);
-  });
+  if(steps.length){
+    const fin=steps.filter(s=>done[s.id]).length;
+    const pr=document.createElement('div'); pr.className='pj-prog';
+    const i=document.createElement('i'); i.style.width=Math.round(fin/steps.length*100)+'%'; pr.appendChild(i);
+    box.appendChild(pr);
+    const pt=document.createElement('div'); pt.className='pj-prog-t';
+    pt.textContent=fin+' of '+steps.length+' plan steps done'+(fin===steps.length&&fin?' 🎉':'');
+    box.appendChild(pt);
+  }
   body.appendChild(box);
+  // the moment the next step is checked (here OR on the plan tab), the spotlight moves on
+  if(nxt){ const adv=()=>renderProjects(); adv.el=box; (gpReg[nxt.id]=gpReg[nxt.id]||[]).push(adv); }
+}
+// ✨ "do this with me": a ready hand-holding prompt for the step, straight into Claude
+function pjHelp(p, g, nxt, btn){
+  const goal=p.goal?('The goal: '+p.goal+'. '):'';
+  const extra=nxt.ai?('Use this brief: '+nxt.ai):'Walk me through it step by step and produce as much of the deliverable as you can yourself.';
+  const prompt=AI_PREFIX+'We are working on my project "'+(g.icon?g.icon+' ':'')+g.title+'". '+goal
+    +'My next step is: "'+gpText(nxt)+'". '+extra
+    +' Break it into the tiniest possible pieces, start with a 2-minute first move, keep me company through each piece, and celebrate every little win. Zero judgment if I am tired or behind.';
+  copyText(prompt).then(ok=>{
+    btn.textContent='✓ copied!'; setTimeout(()=>{ btn.textContent='✨ do this step with me'; },1600);
+    if(!nxt.code) window.open('https://claude.ai/new','_blank');
+    else alert('Prompt copied! Paste it (Ctrl+V) into a Claude Code chat in your workspace: it needs your files.');
+  });
+}
+// 🏁 + 🗺️ deadlines first, then the whole arc as week dropdowns with real dates
+function pjTimeline(p, body){
+  const g=guideFor(p.name); if(!g) return;
+  const cur=wkNow();
+  const big=[];
+  (g.steps||[]).forEach((wkSteps,i)=>(wkSteps||[]).forEach(s=>{
+    if(s&&s.id&&!taskOff[s.id]&&/\b(LAUNCH|DEPLOY|DROP|LIVE|PUBLISH|PREMIERE)\b/.test(s.txt||'')) big.push({wk:i+1,s});
+  }));
+  if(big.length){
+    const sec=document.createElement('div'); sec.className='pj-sec'; sec.textContent='🏁 big moments · so the deadlines never sneak up'; body.appendChild(sec);
+    big.forEach(bm=>{
+      const row=document.createElement('div'); row.className='pj-big'+(done[bm.s.id]?' done':'');
+      const w=document.createElement('span'); w.className='wk'; w.textContent='wk '+bm.wk+' · '+wkRange(bm.wk); row.appendChild(w);
+      const t=document.createElement('span'); t.className='bt'; const words=gpText(bm.s);
+      t.textContent=(done[bm.s.id]?'✓ ':'')+(words.length>84?words.slice(0,82)+'…':words); t.title=words; row.appendChild(t);
+      body.appendChild(row);
+    });
+  }
+  const steps=guideSteps(g); if(!steps.length) return;
+  const sec=document.createElement('div'); sec.className='pj-sec';
+  sec.textContent='🗺️ week by week · same checkboxes as the game plan'; body.appendChild(sec);
+  (g.steps||[]).forEach((wkSteps,i)=>{
+    const st=(wkSteps||[]).filter(x=>x&&x.id&&!taskOff[x.id]); if(!st.length) return;
+    const n=i+1;
+    const det=document.createElement('details'); det.className='pj-week'+(n===cur?' now':(n<cur?' past':''));
+    det.open=(n===cur);   // this week greets you already open
+    const sum=document.createElement('summary');
+    if(WEEK_TITLES[i]) sum.title='this week\'s theme: '+WEEK_TITLES[i];
+    const car=document.createElement('span'); car.className='caret'; car.textContent='▶'; sum.appendChild(car);
+    const ttl=document.createElement('span'); ttl.textContent='Week '+n; sum.appendChild(ttl);
+    const wh=document.createElement('span'); wh.className='wk-when'; wh.textContent=wkRange(n)+' · '+g.dayName; sum.appendChild(wh);
+    if(n===cur){ const h=document.createElement('span'); h.className='wk-here'; h.textContent='you are here'; sum.appendChild(h); }
+    const cnt=document.createElement('span'); cnt.className='pj-count'; sum.appendChild(cnt);
+    det.appendChild(sum);
+    const bd=document.createElement('div'); bd.className='pd-body';
+    bd.appendChild(checklist(st, cnt));
+    det.appendChild(bd);
+    body.appendChild(det);
+  });
+}
+/* 🔁 what this project asks for on repeat: the content engine has daily beats
+   woven into the day cards; everything else has its one theme day a week */
+const CONTENT_REC=['trend','film','edit','eng','wip','post','batch'];
+function pjRhythm(p, body){
+  if(guideKeyFor(p.name)!=='content') return;
+  const rows=[];
+  DAY_DEFS.forEach(dd=>{ recTasks(2,dd.dk).forEach(t=>{   // week 2 = the canonical shape (week 1 had a one-off slide)
+    if(CONTENT_REC.indexOf(t.id.split('-').pop())>=0) rows.push([dd.name.slice(0,3), t.txt]); }); });
+  if(!rows.length) return;
+  const sec=document.createElement('div'); sec.className='pj-sec'; sec.textContent='🔁 the daily beats · already on your day cards'; body.appendChild(sec);
+  rows.forEach(r=>{ const row=document.createElement('div'); row.className='pj-rhy';
+    const b=document.createElement('b'); b.textContent=r[0]; row.appendChild(b);
+    const t=document.createElement('span'); t.textContent=r[1]; row.appendChild(t);
+    body.appendChild(row); });
 }
 function renderCardList(ctx){
   const wrap=document.getElementById(ctx.listId); if(!wrap) return;
@@ -5459,10 +5648,15 @@ function renderCardList(ctx){
     d.appendChild(sum);
     const body=document.createElement('div'); body.className='pj-body';
     if(ctx.top) ctx.top(p, body);
-    const s1=document.createElement('div'); s1.className='pj-sec'; s1.textContent='📋 to-do · checked ones sink and stay'; body.appendChild(s1);
+    const s1=document.createElement('div'); s1.className='pj-sec'; s1.textContent='📋 your own to-dos · checked ones sink and stay'; body.appendChild(s1);
     tds.filter(i=>!i.done).concat(tds.filter(i=>i.done)).forEach(it=>body.appendChild(pjRowEl(ctx,p,it)));
-    body.appendChild(pjAddRow(ctx,p,'todo','add a step...'));
+    body.appendChild(pjAddRow(ctx,p,'todo','add a step of your own...'));
     if(ctx.mid) ctx.mid(p, body);
+    if(ctx.ideas){
+      const si=document.createElement('div'); si.className='pj-sec'; si.textContent='💡 ideas · sparks and maybes, zero commitment'; body.appendChild(si);
+      items.filter(i=>i.k==='idea').forEach(it=>body.appendChild(pjRowEl(ctx,p,it)));
+      body.appendChild(pjAddRow(ctx,p,'idea','park an idea before it wanders off...'));
+    }
     const s2=document.createElement('div'); s2.className='pj-sec'; s2.textContent='🔍 notes · links · research'; body.appendChild(s2);
     items.filter(i=>i.k==='note').forEach(it=>body.appendChild(pjRowEl(ctx,p,it)));
     body.appendChild(pjAddRow(ctx,p,'note','park a link, a phone number, a thought...'));
@@ -5482,13 +5676,38 @@ function renderCardList(ctx){
     al.appendChild(row);
   });
 }
-function renderProjects(){ renderCardList(PJ_CTX); }
+function renderProjects(){
+  const wrap=document.getElementById('pjList'); if(!wrap) return;
+  projSeed();
+  gpPrune(wrap);   // the hub re-registers its live plan checkboxes on every draw
+  renderCardList(PJ_CTX);
+}
+/* one note row, in the live list or the ✅ archive: same checkbox both places
+   (check = tuck it below with today's date, uncheck = bring it back) */
+function noteRow(n, isDone){
+  const row=document.createElement('div'); row.className='note-row'+(isDone?' done':'');
+  const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox'; cb.checked=!!n.done;
+  cb.title=isDone?'uncheck to bring it back to the list':'handled? it tucks into ✅ below with today\'s date';
+  cb.onchange=()=>{ if(cb.checked){ n.done=1; n.doneAt=iso(new Date()); confetti(10); }
+    else { delete n.done; delete n.doneAt; } saveNotes(); renderNotes(); };
+  const tg=document.createElement('span'); tg.className='ntag'; tg.textContent=NOTE_TAGS[n.tag]||'✨'; tg.title=NOTE_LBL[n.tag]||'misc';
+  const tx=document.createElement('div'); tx.className='ntxt'; linkifyInto(tx, n.txt);
+  tx.title='double-click to reword';
+  tx.ondblclick=()=>inlineEdit(tx, n.txt, v=>{ if(v) n.txt=v; saveNotes(); renderNotes(); });
+  const wh=document.createElement('span'); wh.className='nwhen';
+  wh.textContent=isDone?('✓ '+(n.doneAt||'').slice(5).replace('-','/')):(n.at||'').slice(5).replace('-','/');
+  wh.title=isDone?('checked off '+(n.doneAt||'')):('written '+(n.at||''));
+  const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove (Ctrl+Z brings it back)';
+  del.onclick=()=>{ noteTombs.add(n.id); notes=notes.filter(x=>x!==n); saveNotes(); renderNotes(); };
+  row.appendChild(cb); row.appendChild(tg); row.appendChild(tx); row.appendChild(wh); row.appendChild(del);
+  return row;
+}
 function renderNotes(){
   const listEl=document.getElementById('noteList'); if(!listEl) return;
-  projSeed();
+  const live=notes.filter(n=>!n.done), doneN=notes.filter(n=>n.done);
   const ft=document.getElementById('noteFilters'); ft.innerHTML='';
-  const counts={all:notes.length};
-  notes.forEach(n=>counts[n.tag]=(counts[n.tag]||0)+1);
+  const counts={all:live.length};
+  live.forEach(n=>counts[n.tag]=(counts[n.tag]||0)+1);
   [['all','🗂 all']].concat(Object.keys(NOTE_LBL).map(k=>[k,NOTE_LBL[k]])).forEach(kv=>{
     const k=kv[0];
     if(k!=='all'&&!counts[k]) return;
@@ -5498,21 +5717,17 @@ function renderNotes(){
     ft.appendChild(c);
   });
   listEl.innerHTML='';
-  const shown=notes.filter(n=>noteFilter==='all'||n.tag===noteFilter).slice().reverse();   // newest on top
+  const shown=live.filter(n=>noteFilter==='all'||n.tag===noteFilter).slice().reverse();   // newest on top
   if(!shown.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Nothing parked here yet. Future you says thanks in advance. 🌷'; listEl.appendChild(e); }
-  shown.forEach(n=>{
-    const row=document.createElement('div'); row.className='note-row';
-    const tg=document.createElement('span'); tg.className='ntag'; tg.textContent=NOTE_TAGS[n.tag]||'✨'; tg.title=NOTE_LBL[n.tag]||'misc';
-    const tx=document.createElement('div'); tx.className='ntxt'; linkifyInto(tx, n.txt);
-    tx.title='double-click to reword';
-    tx.ondblclick=()=>inlineEdit(tx, n.txt, v=>{ if(v) n.txt=v; saveNotes(); renderNotes(); });
-    const wh=document.createElement('span'); wh.className='nwhen'; wh.textContent=(n.at||'').slice(5).replace('-','/');
-    const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove (Ctrl+Z brings it back)';
-    del.onclick=()=>{ noteTombs.add(n.id); notes=notes.filter(x=>x!==n); saveNotes(); renderNotes(); };
-    row.appendChild(tg); row.appendChild(tx); row.appendChild(wh); row.appendChild(del);
-    listEl.appendChild(row);
-  });
-  renderProjects();
+  shown.forEach(n=>listEl.appendChild(noteRow(n,false)));
+  // ✅ what got handled, newest first, each with the day it happened
+  const aw=document.getElementById('noteArchWrap'), al=document.getElementById('noteArch');
+  if(aw&&al){
+    aw.style.display=doneN.length?'':'none';
+    const ac=document.getElementById('noteArchCount'); if(ac) ac.textContent=doneN.length;
+    al.innerHTML='';
+    doneN.slice().sort((a,b)=>String(b.doneAt||'').localeCompare(String(a.doneAt||''))).forEach(n=>al.appendChild(noteRow(n,true)));
+  }
 }
 document.getElementById('noteAdd').onclick=addNote;
 document.getElementById('noteTxt').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); addNote(); } });
@@ -5558,7 +5773,7 @@ document.getElementById('meName').addEventListener('keydown',e=>{ if(e.key==='En
    time (deleted tasks, moved blocks, rewordings, check-offs, all of it), and
    Ctrl+Shift+Z / ↪ walks forward again. Snapshots live in memory only, so a
    refresh starts clean; the walked-back state itself syncs like any change. */
-function undoSnapAll(){ return JSON.stringify({done, doneAt, custom, apps, money, arch, jobs, myLeads, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore, notes, proj, me}); }
+function undoSnapAll(){ return JSON.stringify({done, doneAt, custom, apps, money, arch, jobs, myLeads, moved, edits, tags, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore, notes, proj, me}); }
 var undoStack=[], redoStack=[], undoCur=null, undoQuiet=false, undoToastTimer=null;
 function undoBaseline(){ undoCur=undoSnapAll(); }
 function undoBtns(){ document.getElementById('redoBtn').style.display=redoStack.length?'':'none'; }
@@ -5581,7 +5796,7 @@ function undoApply(snap){
   undoQuiet=true;
   try{
     done=o.done||{}; doneAt=o.doneAt||{}; custom=o.custom||[]; apps=o.apps||{}; money=o.money||[];
-    arch=o.arch||{}; jobs=o.jobs||{}; myLeads=o.myLeads||[]; moved=o.moved||{}; edits=o.edits||{}; slotted=o.slotted||{};
+    arch=o.arch||{}; jobs=o.jobs||{}; myLeads=o.myLeads||[]; moved=o.moved||{}; edits=o.edits||{}; tags=o.tags||{}; slotted=o.slotted||{};
     blockMods=o.blockMods||{}; blockOff=o.blockOff||{}; blocksOwn=o.blocksOwn||{};
     taskOff=o.taskOff||{}; blockNames=o.blockNames||{}; blockDescs=o.blockDescs||{};
     mine=o.mine||[]; solo=o.solo||{}; tmoved=o.tmoved||{}; mailDone=o.mailDone||{}; mailStore=o.mailStore||{};
@@ -5590,7 +5805,7 @@ function undoApply(snap){
     notes=o.notes||[]; proj=o.proj||{list:[],items:{}}; proj.list=proj.list||[]; proj.items=proj.items||{};
     me=o.me||{list:[],items:{}}; me.list=me.list||[]; me.items=me.items||{};
     [[LS_DONE,done],[LS_DONEAT,doneAt],[LS_CUSTOM,custom],[LS_APPS,apps],[LS_MONEY,money],[LS_ARCH,arch],[LS_JOBS,jobs],[LS_MYLEADS,myLeads],[LS_MOVED,moved],
-     [LS_EDITS,edits],[LS_SLOT,slotted],[LS_BLOCKMODS,blockMods],[LS_BLOCKOFF,blockOff],[LS_BLOCKSOWN,blocksOwn],
+     [LS_EDITS,edits],[LS_TAGS,tags],[LS_SLOT,slotted],[LS_BLOCKMODS,blockMods],[LS_BLOCKOFF,blockOff],[LS_BLOCKSOWN,blocksOwn],
      [LS_TASKOFF,taskOff],[LS_BLOCKNAMES,blockNames],[LS_BLOCKDESCS,blockDescs],[LS_FOOD,food],[LS_FRIENDS,friends],
      [LS_MINE,mine],[LS_SOLO,solo],[LS_TMOVED,tmoved],[LS_MAILDONE,mailDone],[LS_MAILSTORE,mailStore],
      [LS_NOTES,notes],[LS_PROJ,proj],[LS_ME,me]]
@@ -5598,7 +5813,7 @@ function undoApply(snap){
     loadMailFromStore();
     render(); rebuildWeeks();
     Object.values(gpReg).forEach(fns=>fns.forEach(f=>f()));
-    renderApps(); renderMoney(); renderFood(); renderFriends(); renderMail(); updateMailStatus(); renderNotes(); renderMe();
+    renderApps(); renderMoney(); renderFood(); renderFriends(); renderMail(); updateMailStatus(); renderNotes(); renderProjects(); renderMe();
     if(view==='plan') renderPlan();
   } finally{ undoQuiet=false; }
   pushStateSoon();   // the other device hears about it too (no new snapshot: state matches undoCur)
@@ -5632,6 +5847,7 @@ undoBaseline();  // undo measures from what just loaded, not from an empty page
 applyLayout();
 renderFood();
 renderNotes();
+renderProjects();
 renderMe();
 fetchLeads();
 fetchData();
