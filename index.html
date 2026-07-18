@@ -513,6 +513,24 @@
   .pj-gp .txt2{color:var(--soft)}
   /* 🌸 Personal tab: one centered column of cards */
   #mePanel{max-width:760px; margin:0 auto; flex-direction:column; gap:18px}
+  /* 🔴🟠🟡 the urgency dot on a personal to-do (tap to cycle) */
+  .urgb{border:none; background:none; cursor:pointer; font-size:.72rem; padding:0 2px; line-height:1.6}
+  .urgb:hover{transform:scale(1.25)}
+  /* 🔁 a repeating to-do: resting rows dim until their next round wakes them */
+  .pl-item.rep.asleep{opacity:.55}
+  .rep-chip{border:none; cursor:pointer; font-size:.68rem; font-weight:800; border-radius:99px; padding:2px 9px; background:var(--line); color:var(--soft); white-space:nowrap}
+  .rep-chip.soon{background:#ffe3ef; color:var(--pink-deep)}
+  .rep-chip.over{background:var(--urgent); color:#fff}
+  .rep-edit{border:1px solid var(--lav); border-radius:99px; padding:2px 9px; font-size:.72rem; font-family:inherit; width:86px}
+  .rep-sel{border:1px dashed var(--line); border-radius:9px; font-family:inherit; font-size:.76rem; color:var(--soft); background:#fff; padding:4px 4px}
+  /* 📜 the little record of every past check-off */
+  .rep-log{margin:2px 0 4px 30px; font-size:.74rem; color:var(--soft); line-height:1.6}
+  /* 📎 a to-do's research pocket: its own notes, links, and search buttons */
+  .tb.rs{font-size:.72rem; padding:2px 6px}
+  .tb.rs.on{border-color:var(--lav); background:#f3ebff}
+  .pj-sub{margin:0 0 6px 26px; border-left:2px solid var(--line); padding:2px 0 4px 10px}
+  .pj-sub .pl-item{padding:5px 4px; font-size:.82rem}
+  .pj-rsrch{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
   /* ---------- 🎨 Projects tab: one hub per project ---------- */
   #projPanel{max-width:900px; margin:0 auto; flex-direction:column; gap:18px}
   /* 👉 the next tiny step: one obvious thing, big and friendly */
@@ -1236,7 +1254,7 @@
   <section id="mePanel" style="display:none">
     <div class="card">
       <h2>🌸 Personal <span class="pill">car · health · home · life admin</span></h2>
-      <p class="cl-lead" style="margin-top:0">The life stuff that isn't work: shop phone numbers, due-date rhythms, little errands. Each card keeps its own to-dos and notes. Double-click anything to reword it.</p>
+      <p class="cl-lead" style="margin-top:0">The life stuff that isn't work, with the hand-holding built in: bills and standing appointments live in 🔁 <b>on repeat</b> (check one off, it files the date, and it comes back before the next round). To-dos get an urgency dot (tap it: 🔴 needs doing · 🟠 soon · 🟡 whenever) and a 📎 <b>research pocket</b> for links, parts, and prices, with 🔎 web search and ✨ a ready-made Claude research prompt. Double-click anything to reword it.</p>
       <div class="note-add">
         <input id="meName" type="text" maxlength="80" placeholder="add a section (plants? paperwork? the cats?)...">
         <button class="apps-btn" id="meAdd">+ section</button>
@@ -3183,14 +3201,16 @@ function gpSet(id,val){
     moneyAutoLog({id, text:edits[id]||sch.text}, sch.kind, val);   // 💵 paid = logged, from the day card too
     saveArch(); render();
   }
-  /* 🧱 a block of your OWN checked off: its name (+ note) goes through the same
-     money reader as a to-do, so "Errand run $40" logs itself and a spend-sounding
-     name with no number asks with the little card. Unchecking takes it back out.
-     (A promoted to-do's block already rides the item path above: same id.) */
-  const ob=id.match(/^gpb-w(\d+)-([a-z]+)-(own-.+)$/);
+  /* 🧱 ANY block checked off runs its DISPLAYED name + note through the same
+     money reader as a to-do: a block of your own ("Errand run $40"), but also a
+     PLAN block renamed into an errand with the cost in its note (that rename
+     lives in blockNames/blockDescs, so the block's plan id alone says nothing).
+     A spend-sounding block with no number asks with the little card; unchecking
+     takes it back out. (A promoted to-do's block rides the item path above.) */
+  const ob=id.match(/^gpb-w(\d+)-([a-z]+)-(.+)$/);
   if(ob){
-    const blk=(blocksOwn['w'+ob[1]+'-'+ob[2]]||[]).find(x=>x.k===ob[3]);
-    if(blk) moneyAutoLog({id, text:blk.n+((blk.d&&blk.d!=='your own block')?(' '+blk.d):'')}, 'task', val);
+    const blk=clockOf(+ob[1],ob[2]).find(x=>x.k===ob[3]);
+    if(blk&&!blk.solo) moneyAutoLog({id, text:blk.n+((blk.d&&blk.d!=='your own block')?(' '+blk.d):'')}, 'task', val);
   }
 }
 /* drop the sync callbacks belonging to DOM we are about to throw away, so a
@@ -5377,6 +5397,7 @@ let me=JSON.parse(localStorage.getItem(LS_ME)||'null')||{list:[],items:{}};
 const saveMe=()=>{ localStorage.setItem(LS_ME, JSON.stringify(me)); pushStateSoon(); };
 const meTombs=new Set();
 const meOpen=new Set(JSON.parse(localStorage.getItem(LS_MEOPEN)||'[]'));
+const subOpen=new Set();   // which 📎 pockets / 📜 logs sit open (this session, this device)
 const nid=p=>(p||'n')+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 const NOTE_TAGS={idea:'💡',audio:'🎵',claude:'🤖',remind:'⏰',misc:'✨'};
 const NOTE_LBL={idea:'💡 ideas',audio:'🎵 audio',claude:'🤖 for Claude',remind:'⏰ reminders',misc:'✨ misc'};
@@ -5478,14 +5499,18 @@ const PJ_CTX={ store:()=>proj, save:saveProj, tombs:projTombs, redraw:()=>render
   open:pjOpen, openKey:LS_PJOPEN,
   empty:'No projects yet. Name one below and give it a home. 🌱',
   archTitle:'archive this project (it moves to 📦 below, nothing is lost)',
-  ideas:true,
+  ideas:true, research:true,
   top:(p,body)=>{ pjGoalLine(p,body); pjNextStep(p,body); },
   mid:(p,body)=>{ pjTimeline(p,body); pjRhythm(p,body); } };
 const ME_CTX={ store:()=>me, save:saveMe, tombs:meTombs, redraw:()=>renderMe(),
   listId:'meList', archWrapId:'meArchWrap', archId:'meArch',
   open:meOpen, openKey:LS_MEOPEN,
   empty:'Nothing here yet. Add a section below: car, health, plants, paperwork... 🌱',
-  archTitle:'archive this section (it moves to 📦 below, nothing is lost)' };
+  archTitle:'archive this section (it moves to 📦 below, nothing is lost)',
+  urg:true, sub:true, rep:true, research:true,
+  tdHead:'📋 to-dos & fix-its · the dot is urgency, 📎 is its research pocket',
+  tdPh:'add a to-do (the dropdown makes it repeat)...',
+  top:(p,body)=>meRepeats(p,body) };
 function pjItems(ctx,pid){ const st=ctx.store(); return st.items[pid]=st.items[pid]||[]; }
 function pjRowEl(ctx,p,it){
   const row=document.createElement('div'); row.className='pl-item'+(it.done?' done':'');
@@ -5494,6 +5519,13 @@ function pjRowEl(ctx,p,it){
     cb.onchange=()=>{ if(cb.checked){ it.done=1; it.doneAt=iso(new Date()); confetti(12); }
       else { delete it.done; delete it.doneAt; } ctx.save(); ctx.redraw(); };
     row.appendChild(cb);
+    // 🔴🟠🟡 how much this one is breathing down your neck (tap to cycle)
+    if(ctx.urg&&!it.done){
+      const ub=document.createElement('button'); ub.className='urgb'; ub.textContent=['⚪','🔴','🟠','🟡'][it.urg||0];
+      ub.title='urgency, tap to cycle: 🔴 needs doing · 🟠 soon · 🟡 whenever';
+      ub.onclick=()=>{ const n=((it.urg||0)+1)%4; if(n) it.urg=n; else delete it.urg; ctx.save(); ctx.redraw(); };
+      row.appendChild(ub);
+    }
   } else {
     const dot=document.createElement('span'); dot.textContent=it.k==='idea'?'💡':'🔍'; dot.style.fontSize='.85rem'; dot.title=it.k==='idea'?'idea':'note'; row.appendChild(dot);
   }
@@ -5504,22 +5536,227 @@ function pjRowEl(ctx,p,it){
   // a finished step keeps the day you finished it ("✓ 7/15")
   if(it.done&&it.doneAt){ const w=document.createElement('span'); w.className='pj-when';
     w.textContent='✓ '+it.doneAt.slice(5).replace('-','/'); row.appendChild(w); }
+  // 🔎✨ a note can go straight to research: the web, or Claude with a ready prompt
+  if(ctx.research&&it.k==='note'){
+    const q=(it.txt||'').replace(/https?:\/\/\S+/g,'').trim();
+    if(q){ const ws=document.createElement('button'); ws.className='tb rs'; ws.textContent='🔎';
+      ws.title='search the web for this'; ws.onclick=()=>webSearch(q); row.appendChild(ws); }
+    const ai=document.createElement('button'); ai.className='tb rs'; ai.textContent='✨';
+    ai.title='research it with Claude (copies a ready prompt + opens a chat)';
+    ai.onclick=()=>pjResearch(p,it,ai); row.appendChild(ai);
+  }
+  // 📎 a to-do's research pocket (what part? who fixes it? how much?)
+  if(ctx.sub&&it.k==='todo'){
+    const k='sub:'+it.id, pc=(it.sub||[]).length;
+    const cl=document.createElement('button'); cl.className='tb rs'+(subOpen.has(k)?' on':''); cl.textContent='📎'+(pc||'');
+    cl.title='its research pocket: links, parts, shops, prices';
+    cl.onclick=()=>{ if(subOpen.has(k)) subOpen.delete(k); else subOpen.add(k); ctx.redraw(); };
+    row.appendChild(cl);
+  }
   const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove (Ctrl+Z brings it back)';
   del.onclick=()=>{ ctx.tombs.add(it.id); ctx.store().items[p.id]=pjItems(ctx,p.id).filter(x=>x!==it); ctx.save(); ctx.redraw(); };
   row.appendChild(del);
   return row;
 }
+// a row plus, when its 📎 pocket is open, the pocket right under it
+function pjAppendRow(ctx,p,it,body){
+  body.appendChild(pjRowEl(ctx,p,it));
+  if(ctx.sub&&it.k==='todo'&&subOpen.has('sub:'+it.id)) body.appendChild(pjSubDrawer(ctx,p,it));
+}
+function webSearch(q){ window.open('https://www.google.com/search?q='+encodeURIComponent(q), '_blank', 'noopener'); }
+// ✨ a ready research prompt: what is it, where to buy it, who can fix it, fair price
+function pjResearch(p, it, btn){
+  const prompt=AI_PREFIX+'A research errand from the "'+p.name+'" card of my dashboard. The item: "'+it.txt+'". '
+    +'Figure out what this actually needs (if something is broken, name the likely part or fix). Then give me: real links to buy or book the right thing at a fair price, whether it is realistically DIY-able, how to find someone trustworthy nearby to handle it (ask me for my area), typical prices so I do not overpay, and any watch-outs. End with your recommendation and the tiniest first step.';
+  copyText(prompt).then(()=>{
+    const t0=btn.textContent; btn.textContent='✓ copied!';
+    setTimeout(()=>{ btn.textContent=t0; },1600);
+    window.open('https://claude.ai/new','_blank');
+  });
+}
+function pjSubDrawer(ctx,p,it){
+  const d=document.createElement('div'); d.className='pj-sub';
+  (it.sub||[]).forEach(s=>{
+    const r=document.createElement('div'); r.className='pl-item';
+    const dot=document.createElement('span'); dot.textContent='↳'; dot.style.color='var(--soft)'; r.appendChild(dot);
+    const tx=document.createElement('div'); tx.className='txt2'; linkifyInto(tx, s.txt);
+    tx.title='double-click to reword';
+    tx.ondblclick=()=>inlineEdit(tx, s.txt, v=>{ if(v) s.txt=v; ctx.save(); ctx.redraw(); });
+    r.appendChild(tx);
+    const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove (Ctrl+Z brings it back)';
+    del.onclick=()=>{ it.sub=(it.sub||[]).filter(x=>x!==s); ctx.save(); ctx.redraw(); };
+    r.appendChild(del);
+    d.appendChild(r);
+  });
+  const add=document.createElement('div'); add.className='pj-add';
+  const inp=document.createElement('input'); inp.type='text'; inp.maxLength=300; inp.placeholder='park a link, a part number, a shop, a price...';
+  const go=document.createElement('button'); go.className='tb'; go.textContent='＋'; go.title='add it';
+  const doAdd=()=>{ const v=inp.value.trim(); if(!v) return;
+    it.sub=it.sub||[]; it.sub.push({id:nid('ps'), txt:v, at:iso(new Date())}); ctx.save(); ctx.redraw(); };
+  go.onclick=doAdd;
+  inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); doAdd(); } };
+  add.appendChild(inp); add.appendChild(go); d.appendChild(add);
+  const rr=document.createElement('div'); rr.className='pj-rsrch';
+  const ws=document.createElement('button'); ws.className='tb'; ws.textContent='🔎 search the web';
+  ws.onclick=()=>webSearch(it.txt);
+  const ai=document.createElement('button'); ai.className='tb'; ai.textContent='✨ research it with Claude';
+  ai.title='copies a ready research prompt (what part, where to buy, who can fix it, fair prices) + opens a chat';
+  ai.onclick=()=>pjResearch(p,it,ai);
+  rr.appendChild(ws); rr.appendChild(ai); d.appendChild(rr);
+  return d;
+}
 function pjAddRow(ctx,p, kind, ph){
   const w=document.createElement('div'); w.className='pj-add';
   const inp=document.createElement('input'); inp.type='text'; inp.maxLength=300; inp.placeholder=ph;
+  // 🔁 the little "does this one come back?" dropdown (personal to-dos only)
+  let sel=null;
+  if(kind==='todo'&&ctx.rep){
+    sel=document.createElement('select'); sel.className='rep-sel'; sel.title='does this one come back?';
+    [['','once'],['month','every month'],['week','every week'],['year','every year']].forEach(o=>{
+      const op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; sel.appendChild(op); });
+  }
   const go=document.createElement('button'); go.className='tb'; go.textContent='＋'; go.title='add it';
   const add=()=>{ const v=inp.value.trim(); if(!v) return;
-    pjItems(ctx,p.id).push({id:nid('pi'), txt:v, k:kind, at:iso(new Date())});
+    const it={id:nid('pi'), txt:v, k:kind, at:iso(new Date())};
+    if(sel&&sel.value){ it.every=sel.value;
+      const fd=firstDue(it.every, v, iso(today)); it.due=fd.due; if(fd.dom) it.dom=fd.dom; }
+    pjItems(ctx,p.id).push(it);
+    if(sel) sel.value='';
     ctx.save(); ctx.redraw(); };
   go.onclick=add;
   inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); add(); } };
-  w.appendChild(inp); w.appendChild(go);
+  w.appendChild(inp); if(sel) w.appendChild(sel); w.appendChild(go);
   return w;
+}
+/* ---- 🔁 repeating to-dos: the little date engine ----
+   A repeat carries every ('month'|'week'|'year'), due (next date, ISO), dom (day
+   of month it aims for, so Jan 31 -> Feb 28 -> Mar 31 never drifts), and hist
+   (every past check-off: [{on, due}], the record that "archives" each round).
+   Checking one files today's date into hist and rolls due forward; the row then
+   RESTS (dim, checked) until the next round gets close, when it wakes back up
+   on its own. Unchecking pops the last round back out, no harm done. */
+function repClamp(y,m,day){ const last=new Date(y,m+1,0).getDate(); const d=new Date(y,m,Math.min(day,last)); d.setHours(0,0,0,0); return d; }
+function advanceDue(dueISO, every, dom){
+  const d=parse(dueISO);
+  if(every==='week'){ d.setDate(d.getDate()+7); return iso(d); }
+  if(every==='year') return iso(repClamp(d.getFullYear()+1, d.getMonth(), dom||d.getDate()));
+  return iso(repClamp(d.getFullYear(), d.getMonth()+1, dom||d.getDate()));
+}
+// how many days before its date a resting repeat wakes back up
+function repLead(every){ return every==='week'?4:(every==='year'?21:7); }
+function repAwake(it, todayISO){
+  if(!it.due) return true;
+  const w=parse(it.due); w.setDate(w.getDate()-repLead(it.every));
+  return parse(todayISO)>=w;
+}
+// the first due date for a fresh repeat: reads "the 1st" or a weekday from the
+// wording when there is one, else starts from today's date
+function firstDue(every, txt, fromISO, dom){
+  const from=parse(fromISO);
+  if(every==='week'){
+    const m=/\b(sun|mon|tue|wed|thu|fri|sat)/i.exec(txt||'');
+    const want=m?WD_IDX[m[1].toLowerCase()]:from.getDay();
+    let off=(want-from.getDay()+7)%7; if(!off&&!m) off=7;
+    const d=new Date(from); d.setDate(d.getDate()+off); return {due:iso(d), dom:null};
+  }
+  if(!dom){ const dm=/\b(\d{1,2})(?:st|nd|rd|th)?\b/.exec(txt||''); dom=dm?+dm[1]:from.getDate(); }
+  if(!(dom>=1&&dom<=31)) dom=from.getDate();
+  if(every==='year'){
+    const pw=(parseWhen(txt||'')||{}).date;
+    let d=pw?parse(pw):repClamp(from.getFullYear()+1, from.getMonth(), dom);
+    if(d<from) d=repClamp(d.getFullYear()+1, d.getMonth(), d.getDate());
+    return {due:iso(d), dom:d.getDate()};
+  }
+  let d=repClamp(from.getFullYear(), from.getMonth(), dom);
+  if(d<from) d=repClamp(from.getFullYear(), from.getMonth()+1, dom);
+  return {due:iso(d), dom};
+}
+// which repeats are BILLS: their check-off asks/logs money like a real bill row
+const REP_BILL=/\bpay\b|\bbill\b|\brent\b|insurance|credit|loan|subscription|membership|\btax/i; // leakcheck-allow: generic bill words
+function repCheck(it, on){
+  it.hist=it.hist||[];
+  if(on){
+    const covered=it.due||iso(new Date());
+    it.hist.push({on:iso(new Date()), due:covered});
+    it.due=advanceDue(covered, it.every, it.dom);
+    if(REP_BILL.test(it.txt||'')||priceIn(it.txt||'')!=null||SPEND_ASK.test(it.txt||''))
+      billAutoLog({id:'rep-'+it.id+'@'+covered, text:it.txt}, true);
+  } else {
+    const last=it.hist.pop();
+    if(last){ if(last.due) it.due=last.due;
+      billAutoLog({id:'rep-'+it.id+'@'+(last.due||''), text:it.txt}, false); }
+  }
+}
+function ord(n){ return n+(n%10===1&&n%100!==11?'st':n%10===2&&n%100!==12?'nd':n%10===3&&n%100!==13?'rd':'th'); }
+function repChipText(it, awake){
+  if(!it.due) return '↻';
+  const d=parse(it.due);
+  const md=(it.every==='week'?(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]+' '):'')+fmtMD(d);
+  if(awake) return (it.due<iso(today)?'was due ':'due ')+md;
+  const h=(it.hist||[])[(it.hist||[]).length-1];
+  const w=new Date(d); w.setDate(w.getDate()-repLead(it.every));
+  return h?('✓ '+(h.on||'').slice(5).replace('-','/')+' · back '+fmtMD(w)):('starts '+md);
+}
+function repRowEl(ctx,p,it){
+  const awake=repAwake(it, iso(today));
+  const row=document.createElement('div'); row.className='pl-item rep'+(awake?'':' asleep');
+  const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox'; cb.checked=!awake;
+  cb.title=awake?'done for this round? it files today\'s date and comes back for the next one'
+              :'resting until the next round · uncheck if that was a mistake';
+  cb.onchange=()=>{ repCheck(it, cb.checked); if(cb.checked) confetti(12); ctx.save(); ctx.redraw(); };
+  row.appendChild(cb);
+  const tx=document.createElement('div'); tx.className='txt2'; linkifyInto(tx, it.txt);
+  tx.title='double-click to reword';
+  tx.ondblclick=()=>inlineEdit(tx, it.txt, v=>{ if(v) it.txt=v; ctx.save(); ctx.redraw(); });
+  row.appendChild(tx);
+  // when it's due · tap to type a different date ("8/1")
+  const chip=document.createElement('button');
+  chip.className='rep-chip'+(awake?(it.due&&it.due<iso(today)?' over':' soon'):'');
+  chip.textContent=repChipText(it, awake);
+  chip.title='every '+(it.every||'month')+(it.dom?(' on the '+ord(it.dom)):'')+' · tap to change the date';
+  chip.onclick=()=>{
+    const inp=document.createElement('input'); inp.type='text'; inp.className='rep-edit'; inp.placeholder='8/1';
+    row.replaceChild(inp, chip); inp.focus();
+    const fin=()=>{ const v=inp.value.trim();
+      if(v){ const pw=parseWhen(v)||{};
+        if(pw.date){ it.due=pw.date; if(it.every!=='week') it.dom=parse(pw.date).getDate(); ctx.save(); } }
+      ctx.redraw(); };
+    inp.onblur=fin;
+    inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } if(e.key==='Escape'){ inp.value=''; inp.blur(); } };
+  };
+  row.appendChild(chip);
+  if((it.hist||[]).length){
+    const k='log:'+it.id;
+    const lg=document.createElement('button'); lg.className='tb rs'+(subOpen.has(k)?' on':''); lg.textContent='📜'+it.hist.length;
+    lg.title='the record: every time you checked this one off';
+    lg.onclick=()=>{ if(subOpen.has(k)) subOpen.delete(k); else subOpen.add(k); ctx.redraw(); };
+    row.appendChild(lg);
+  }
+  const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove (Ctrl+Z brings it back)';
+  del.onclick=()=>{ ctx.tombs.add(it.id); ctx.store().items[p.id]=pjItems(ctx,p.id).filter(x=>x!==it); ctx.save(); ctx.redraw(); };
+  row.appendChild(del);
+  return row;
+}
+function repLogEl(it){
+  const d=document.createElement('div'); d.className='rep-log';
+  (it.hist||[]).slice().reverse().forEach(h=>{
+    const r=document.createElement('div');
+    r.textContent='✓ '+(h.on||'').slice(5).replace('-','/')+(h.due?(' · the '+(h.due||'').slice(5).replace('-','/')+' round'):'');
+    d.appendChild(r);
+  });
+  return d;
+}
+// 🔁 the card's on-repeat section (bills, standing appointments), soonest first
+function meRepeats(p, body){
+  const reps=pjItems(ME_CTX,p.id).filter(i=>i.every);
+  if(!reps.length) return;
+  const sec=document.createElement('div'); sec.className='pj-sec';
+  sec.textContent='🔁 on repeat · check it off, it files the date and comes back next round';
+  body.appendChild(sec);
+  reps.slice().sort((a,b)=>String(a.due||'').localeCompare(String(b.due||''))).forEach(it=>{
+    body.appendChild(repRowEl(ME_CTX,p,it));
+    if(subOpen.has('log:'+it.id)) body.appendChild(repLogEl(it));
+  });
 }
 // 🎯 the one-line goal at the top of a project card
 function pjGoalLine(p, body){
@@ -5656,7 +5893,7 @@ function renderCardList(ctx){
     const car=document.createElement('span'); car.className='caret'; car.textContent='▶';
     const nm=document.createElement('span'); nm.textContent=p.name; nm.title='double-click to rename';
     nm.ondblclick=e=>{ e.preventDefault(); inlineEdit(nm, p.name, v=>{ if(v) p.name=v; ctx.save(); ctx.redraw(); }); };
-    const items=pjItems(ctx,p.id), tds=items.filter(i=>i.k==='todo');
+    const items=pjItems(ctx,p.id), tds=items.filter(i=>i.k==='todo'&&!i.every);
     const ct=document.createElement('span'); ct.className='pj-count';
     ct.textContent=tds.length ? (tds.filter(i=>i.done).length+' / '+tds.length+' done') : 'fresh';
     const ab=document.createElement('button'); ab.className='tb'; ab.textContent='📦';
@@ -5666,9 +5903,11 @@ function renderCardList(ctx){
     d.appendChild(sum);
     const body=document.createElement('div'); body.className='pj-body';
     if(ctx.top) ctx.top(p, body);
-    const s1=document.createElement('div'); s1.className='pj-sec'; s1.textContent='📋 your own to-dos · checked ones sink and stay'; body.appendChild(s1);
-    tds.filter(i=>!i.done).concat(tds.filter(i=>i.done)).forEach(it=>body.appendChild(pjRowEl(ctx,p,it)));
-    body.appendChild(pjAddRow(ctx,p,'todo','add a step of your own...'));
+    const s1=document.createElement('div'); s1.className='pj-sec'; s1.textContent=ctx.tdHead||'📋 your own to-dos · checked ones sink and stay'; body.appendChild(s1);
+    const open=tds.filter(i=>!i.done);
+    if(ctx.urg) open.sort((a,b)=>(a.urg||9)-(b.urg||9));   // 🔴 floats to the top, untagged keep their order
+    open.concat(tds.filter(i=>i.done)).forEach(it=>pjAppendRow(ctx,p,it,body));
+    body.appendChild(pjAddRow(ctx,p,'todo',ctx.tdPh||'add a step of your own...'));
     if(ctx.mid) ctx.mid(p, body);
     if(ctx.ideas){
       const si=document.createElement('div'); si.className='pj-sec'; si.textContent='💡 ideas · sparks and maybes, zero commitment'; body.appendChild(si);
@@ -5759,6 +5998,14 @@ document.getElementById('projName').addEventListener('keydown',e=>{ if(e.key==='
    ids ('me-car'), so two devices seeding the same card can't create twins, and
    `seeded` remembers what was offered so a deleted card stays deleted. */
 const ME_SEED=[];
+/* round 2 of the seed: the standing rhythms become 🔁 REPEATING to-dos on the
+   right cards (they used to sit around as plain reference notes). Item-level
+   markers ('i:<id>') in me.seeded keep a deleted one deleted, and the shell
+   ships this list EMPTY (desktop seeds, the phone hears about it via sync). */
+const ME_SEED_REP=[];
+// [card key, item index in ME_SEED] of the old reference notes those repeats
+// replace; matched against the seed wording, so a note she reworded stays hers
+const ME_SEED_DROP=[['car',1],['health',1],['admin',0]];
 function meSeed(){
   me.seeded=me.seeded||[];
   ME_SEED.forEach(c=>{
@@ -5769,6 +6016,26 @@ function meSeed(){
       if(c.items.length)
         me.items['me-'+c.key]=c.items.map((it,i)=>({id:'me-'+c.key+'-'+i, txt:it.txt, k:it.k, at:iso(new Date())}));
     }
+  });
+  ME_SEED_REP.forEach(sd=>{
+    const mk='i:'+sd.id;
+    if(me.seeded.includes(mk)) return;
+    me.seeded.push(mk);
+    const pid='me-'+sd.card;
+    if(!me.list.some(p=>p.id===pid&&!p.arch)) return;   // card gone or shelved: her call wins
+    const arr=me.items[pid]=me.items[pid]||[];
+    if(arr.some(x=>x.id===sd.id)) return;
+    const fd=firstDue(sd.every, sd.txt, iso(today), sd.dom);
+    const it={id:sd.id, txt:sd.txt, k:'todo', every:sd.every, due:fd.due, at:iso(new Date())};
+    if(fd.dom) it.dom=fd.dom;
+    arr.push(it);
+  });
+  ME_SEED_DROP.forEach(cd=>{
+    const c=ME_SEED.find(x=>x.key===cd[0]); if(!c||!c.items[cd[1]]) return;
+    const pid='me-'+cd[0], iid=pid+'-'+cd[1], arr=me.items[pid]; if(!arr) return;
+    const want=(c.items[cd[1]].txt||'').slice(0,14);
+    const i=arr.findIndex(x=>x.id===iid&&(x.txt||'').slice(0,14)===want);
+    if(i>=0){ meTombs.add(iid); arr.splice(i,1); }
   });
 }
 function renderMe(){
