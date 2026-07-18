@@ -102,6 +102,7 @@
   button.tag:hover{transform:translateY(-1px); box-shadow:0 2px 6px rgba(180,140,200,.25)}
   .tag.work{background:#ffe3ef; color:var(--pink-deep)}
   .tag.life{background:#e8f8f1; color:var(--ok)}
+  .tag.job{background:#dceeff; color:#2b7bc7}
   .tag.bill{background:#fff2d9; color:#c79016}
   .tag.appt{background:#ece4ff; color:var(--lav-deep)}
   .tag.today{background:var(--urgent); color:#fff}
@@ -1565,12 +1566,13 @@ function itemRow(it, kind, deletable){
       t.textContent='in '+n+' day'+(n===1?'':'s'); meta.appendChild(t);
     }
   }
-  // 🎨/🌱 the creative-or-life chip. The auto-guess gets it wrong sometimes
-  // (CVS meds are not "creative"), so the chip is a button: tap it to flip.
+  // 🎨/💼/🌱 the category chip. The auto-guess gets it wrong sometimes (CVS meds
+  // are not "creative"), so the chip is a button: each tap cycles creative →
+  // work → life. TAG_LBL maps the stored value to what the chip says.
   const tagV=tags[it.id]||it.tag;
-  if(tagV){ const t=document.createElement('button'); t.className='tag '+tagV; t.textContent=(tagV==='work'?'creative':'life');
-    t.title='tap to flip creative ↔ life';
-    t.onclick=()=>{ const nv=tagV==='work'?'life':'work';
+  if(tagV){ const t=document.createElement('button'); t.className='tag '+tagV; t.textContent=TAG_LBL[tagV]||tagV;
+    t.title='tap to change: creative → work → life';
+    t.onclick=()=>{ const nv=TAG_ORDER[(TAG_ORDER.indexOf(tagV)+1)%TAG_ORDER.length];
       const mine=custom.find(c=>c.id===it.id);
       if(mine){ mine.tag=nv; delete tags[it.id]; saveTags(); saveCustom(); }
       else { if(nv===it.tag) delete tags[it.id]; else tags[it.id]=nv; saveTags(); }
@@ -3181,6 +3183,15 @@ function gpSet(id,val){
     moneyAutoLog({id, text:edits[id]||sch.text}, sch.kind, val);   // 💵 paid = logged, from the day card too
     saveArch(); render();
   }
+  /* 🧱 a block of your OWN checked off: its name (+ note) goes through the same
+     money reader as a to-do, so "Errand run $40" logs itself and a spend-sounding
+     name with no number asks with the little card. Unchecking takes it back out.
+     (A promoted to-do's block already rides the item path above: same id.) */
+  const ob=id.match(/^gpb-w(\d+)-([a-z]+)-(own-.+)$/);
+  if(ob){
+    const blk=(blocksOwn['w'+ob[1]+'-'+ob[2]]||[]).find(x=>x.k===ob[3]);
+    if(blk) moneyAutoLog({id, text:blk.n+((blk.d&&blk.d!=='your own block')?(' '+blk.d):'')}, 'task', val);
+  }
 }
 /* drop the sync callbacks belonging to DOM we are about to throw away, so a
    rebuilt week doesn't leave ghosts updating detached rows */
@@ -4465,17 +4476,24 @@ function detectKind(text){
   if(APPT_WORDS.test(text)) return 'appt';
   return 'task';
 }
-/* 🎨 or 🌱: is a to-do creative work or life admin? Life words win (a "cvs meds
-   pickup" is not creative, no matter what else is in the sentence), creative words
-   come second, and anything unrecognized files under life. The chip on the item is
-   tappable, so a wrong guess costs one tap. */
+/* 🎨, 💼, or 🌱: is a to-do creative making, work admin (job hunt, emails,
+   invoices), or life stuff? Life words win (a "cvs meds pickup" is not creative,
+   no matter what else is in the sentence), then work words, then creative words,
+   and anything unrecognized files under life. The chip on the item is tappable
+   and cycles through all three, so a wrong guess costs one tap. Internal values:
+   'work' = 🎨 creative (historical), 'job' = 💼 work, 'life' = 🌱 life. */
 const LIFE_WORDS=/\b(meds?|medicine|pharmacy|cvs|walgreens|prescription|refill|copay|co-pay|grocer(y|ies)|costco|errands?|clean(ing)?|laundry|dishes|trash|vacuum|smog|mechanic|oil change|car wash|dmv|bank|deposit|post office|package|mail|return|pick ?up|drop ?off|shower|cook(ing)?|dinner|lunch|breakfast|cats?|dogs?|litter|plants?|dishes|call|text back|fold|tidy|sweep|mop)\b/i; // leakcheck-allow: generic parser keywords
+const JOB_WORDS=/\b(jobs?|apply|applies|application[s]?|resume|cover letter|interview|linkedin|indeed|recruiter|hiring|listing|posting|follow.?up|emails?|inbox|dms?|invoice|invoicing|taxes|tax|paperwork|onboarding|freelance|gig|contract)\b/i;
 const CREATIVE_WORDS=/\b(draw(ing)?|sketch|paint(ing)?|animate|animation|animatic|illustrat\w*|render|storyboard|boards?|rig(ging)?|lineup|character|commission|portfolio|reel|edit(ing)?|film(ing)?|post|video|content|tiktok|instagram|youtube|shorts?|thumbnail|design|website|art|print|inprnt|client|tutoring|essay|script|record|vo|blender|procreate|toon\s?boom|tvpaint)\b/i;
 function detectTag(text){
   if(LIFE_WORDS.test(text)) return 'life';
+  if(JOB_WORDS.test(text)) return 'job';
   if(CREATIVE_WORDS.test(text)) return 'work';
   return 'life';
 }
+const TAG_LBL={work:'creative', job:'work', life:'life'};
+const TAG_HINT={work:'🎨 creative', job:'💼 work', life:'🌱 life'};
+const TAG_ORDER=['work','job','life'];   // what a tap on the chip cycles through
 const WD_IDX={sun:0,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6};
 const MO_IDX={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 function parseWhen(text){
@@ -4514,7 +4532,7 @@ function previewAdd(){
   if(!v){ showAddHint(''); return; }
   const kind=sel==='auto'?detectKind(v):sel;
   const w=parseWhen(v);
-  const tagHint=kind==='task'?(' · '+(detectTag(v)==='work'?'🎨 creative':'🌱 life')):'';
+  const tagHint=kind==='task'?(' · '+TAG_HINT[detectTag(v)]):'';
   showAddHint('will file under '+KIND_HOME[kind]+' · '+fmtWhen(w.date||iso(today))+(w.time?(' '+w.time):'')+tagHint, true);
 }
 function addTask(){
