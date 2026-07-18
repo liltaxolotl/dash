@@ -815,14 +815,14 @@
         </div>
 
         <div class="card">
-          <h2>🪄 Log a job you applied to <span class="pill">auto-fill + keep a copy</span></h2>
+          <h2>✨ Log a job you applied to <span class="pill">auto-fill + keep a copy</span></h2>
           <p class="cl-lead" style="margin-bottom:8px">Applied somewhere yourself? Paste the whole posting and your local AI (runs on your PC, zero Claude credits) pulls the company and title, and saves the full text, so you keep a record even if the posting gets taken down later. Then it drops straight into your tracker. 🌸</p>
           <div class="cl-field">
             <label>Paste the full job posting <span class="hint">on the job page: Ctrl+A, then Ctrl+C, then paste here</span></label>
             <textarea id="logJobText" rows="6" placeholder="Paste the whole posting here: title, company, description, all of it..."></textarea>
           </div>
           <div class="cl-actions">
-            <button class="cl-btn" id="logJobRead">🪄 Read it</button>
+            <button class="cl-btn" id="logJobRead">✨ Read it</button>
             <span class="cl-status" id="logJobStatus"></span>
           </div>
           <div class="cl-row">
@@ -1040,7 +1040,7 @@
         <div class="card">
           <h2>📚 Project Guides <span class="pill">each project's full 8-week arc · same checkboxes as the weeks</span></h2>
           <div id="planGuides"></div>
-          <p class="plan-note">🛟 <b>Crash-week minimum:</b> 1 application, 1 post, 1 message session, pay whatever bill is due. That still counts as a pass. Phases slide forward, no catch-up debt. And the 11pm Flex Block is the release valve: drop it guilt-free on heavy days and you still did 9 hours.</p>
+          <p class="plan-note">🪂 <b>Crash-week minimum:</b> 1 application, 1 post, 1 message session, pay whatever bill is due. That still counts as a pass. Phases slide forward, no catch-up debt. And the 11pm Flex Block is the release valve: drop it guilt-free on heavy days and you still did 9 hours.</p>
         </div>
       </div>
     </div>
@@ -1229,11 +1229,11 @@
   <section id="notesPanel" style="display:none">
     <div class="card">
       <h2>📝 Quick notes <span class="pill">brain dump, sorted for you</span></h2>
-      <p class="cl-lead" style="margin-top:0">Video ideas, songs you found, "have Claude build this", stuff to add later. Park it here before it wanders off. 🫙 Links become clickable. Check one off when it's handled: it tucks into ✅ below with the day.</p>
+      <p class="cl-lead" style="margin-top:0">Video ideas, songs you found, "have Claude build this", stuff to add later. Park it here before it wanders off. 🍯 Links become clickable. Check one off when it's handled: it tucks into ✅ below with the day.</p>
       <div class="note-add">
         <input id="noteTxt" type="text" maxlength="500" placeholder="write it down... (paste links right in)">
         <select id="noteTag" title="where to file it">
-          <option value="auto">🪄 auto</option>
+          <option value="auto">✨ auto</option>
           <option value="idea">💡 idea</option>
           <option value="audio">🎵 audio</option>
           <option value="claude">🤖 for Claude</option>
@@ -1511,7 +1511,7 @@ function withEdit(it){
 }
 const layerOn = it => withEdit(withMove(it));
 
-/* ---------- 🫧 PUSHED, NOT GONE ----------
+/* ---------- ✨ PUSHED, NOT GONE ----------
    Something that was due today (or was already overdue) and got pushed to a later
    day keeps showing on today's list until it's actually done. The due date really
    is the new day, it just refuses to disappear off today's screen in the meantime. */
@@ -1964,7 +1964,7 @@ function jobRow(id, j){
     });
     body.appendChild(chips);
   }
-  // 📄 the archived posting text (from 🪄 Log a job): kept so a deleted listing still has a record
+  // 📄 the archived posting text (from ✨ Log a job): kept so a deleted listing still has a record
   if(j.desc){
     const dd=document.createElement('details'); dd.className='jobdesc';
     const ds=document.createElement('summary'); ds.textContent='📄 saved posting';
@@ -4201,7 +4201,7 @@ const BASE_RECIPES=[
   steps:['Half a cup of oats + enough milk to cover, in a jar or cup.','Spoonful of peanut butter, sliced banana, one stir.','Fridge overnight. Breakfast already exists when you wake up.']},
  {id:'f-smoothie', name:'Fruit smoothie', icon:'🥤', time:'5 min', effort:'zero', ings:['frozen fruit','banana','milk'],
   steps:['Blender: a big handful of frozen fruit, a banana, milk to cover.','Blend. Drink. That was a whole meal, be proud.']},
- {id:'f-quesadilla', name:'Quesadilla', icon:'🫓', time:'7 min', effort:'low', ings:['tortillas','cheese'],
+ {id:'f-quesadilla', name:'Quesadilla', icon:'🧀', time:'7 min', effort:'low', ings:['tortillas','cheese'],
   steps:['Tortilla in a dry pan on medium, cheese on one half.','Fold, flip once when golden, about 2 minutes a side.','Salsa or hot sauce if around. Beans inside turn it into dinner.']},
  {id:'f-taco', name:'Black bean tacos', icon:'🌮', time:'10 min', effort:'low', ings:['tortillas','canned black beans','cheese','salsa'],
   steps:['Beans in the microwave 90 seconds with a pinch of seasoning.','Warm the tortillas in a pan.','Beans + cheese + salsa. Three of these is a real dinner.']},
@@ -4685,7 +4685,7 @@ function addMyJob(){
 document.getElementById('myJobAdd').onclick=addMyJob;
 ['myJobLink','myJobTitle'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') addMyJob(); }));
 
-/* 🪄 LOG A JOB YOU APPLIED TO — paste the posting, the local model (same Ollama as the
+/* ✨ LOG A JOB YOU APPLIED TO — paste the posting, the local model (same Ollama as the
    cover letters, zero Claude credits) pulls company + title, and the FULL text is archived
    on the tracked application so a record survives even if the listing is deleted. */
 function logModel(){ const m=document.getElementById('clModel'); const v=m&&m.value;
@@ -5401,7 +5401,7 @@ const subOpen=new Set();   // which 📎 pockets / 📜 logs sit open (this sess
 const nid=p=>(p||'n')+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 const NOTE_TAGS={idea:'💡',audio:'🎵',claude:'🤖',remind:'⏰',misc:'✨'};
 const NOTE_LBL={idea:'💡 ideas',audio:'🎵 audio',claude:'🤖 for Claude',remind:'⏰ reminders',misc:'✨ misc'};
-// 🪄 auto: read the note, file it under the right tag
+// ✨ auto: read the note, file it under the right tag
 function detectNoteTag(t){
   if(/\bclaude\b|\bcode\b|dashboard|\bapp\b|\bbuild\b|\bfix\b|\bfeature\b/i.test(t)) return 'claude';
   if(/\bsong\b|\baudio\b|music|\btrack\b|\bsound\b|spotify|\bbeat\b|\bplaylist\b/i.test(t)) return 'audio';
@@ -5466,6 +5466,9 @@ function projSeed(){
 // which sprint guide belongs to a card ('Website Redesign' ↔ the Website guide)
 function guideKeyFor(name){
   const k=pjKey(name); if(!k) return null;
+  // a card can be one PIECE of a guide's project (Ugly Dolls is the YouTube track)
+  const ALIAS={uglydollsvideoessay:'ugly'};
+  if(ALIAS[k] && GUIDE_STEPS[ALIAS[k]]) return ALIAS[k];
   const hit=Object.entries(GUIDE_STEPS).find(kv=>{ const gk=pjKey(kv[1].title||''); return gk&&(k.includes(gk)||gk.includes(k)); });
   return hit?hit[0]:null;
 }
@@ -5954,8 +5957,13 @@ function noteRow(n, isDone){
   const wh=document.createElement('span'); wh.className='nwhen';
   wh.textContent=isDone?('✓ '+(n.doneAt||'').slice(5).replace('-','/')):(n.at||'').slice(5).replace('-','/');
   wh.title=isDone?('checked off '+(n.doneAt||'')):('written '+(n.at||''));
-  const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove (Ctrl+Z brings it back)';
-  del.onclick=()=>{ noteTombs.add(n.id); notes=notes.filter(x=>x!==n); saveNotes(); renderNotes(); };
+  /* ✕ on a live note = handled: it tucks into ✅ done below, nothing is lost.
+     Only the ✕ inside the ✅ list deletes for real. */
+  const del=document.createElement('button'); del.className='del'; del.textContent='✕';
+  del.title=isDone?'delete for real (Ctrl+Z brings it back)':'done with this: it tucks into ✅ below';
+  del.onclick=()=>{ if(!isDone){ n.done=1; n.doneAt=iso(new Date()); }
+    else { noteTombs.add(n.id); notes=notes.filter(x=>x!==n); }
+    saveNotes(); renderNotes(); };
   row.appendChild(cb); row.appendChild(tg); row.appendChild(tx); row.appendChild(wh); row.appendChild(del);
   return row;
 }
