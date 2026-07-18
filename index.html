@@ -501,6 +501,20 @@
   .pj-add{display:flex; gap:6px; margin-top:7px}
   .pj-add input{flex:1; border:1px dashed var(--line); border-radius:9px; padding:6px 10px; font-size:.84rem; font-family:inherit; color:var(--ink); min-width:0; background:#fff}
   .pj-add input:focus{outline:none; border-color:var(--lav); border-style:solid}
+  /* 🎯 a project card's one-line goal (double-click to set or reword) */
+  .pj-goal{display:flex; gap:7px; align-items:baseline; margin:8px 2px 2px; font-size:.86rem}
+  .pj-goal .pj-goal-t{overflow-wrap:anywhere}
+  .pj-goal .unset{color:var(--soft); font-style:italic}
+  /* the little "✓ 7/15" date on a finished step */
+  .pj-when{margin-left:auto; font-size:.68rem; color:var(--soft); white-space:nowrap; padding-left:8px}
+  /* 🗺️ steps finished in the game plan, listed read-only on the project's card */
+  .pj-gp .txt2{color:var(--soft)}
+  /* 🌸 Personal tab: one centered column of cards */
+  #mePanel{max-width:760px; margin:0 auto; flex-direction:column; gap:18px}
+  /* 📦 archive groups: date sub-headers inside each kind */
+  .arch-when{font-size:.66rem; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:var(--soft); margin:9px 2px 1px}
+  #archList details.projcard{background:#fff}
+  #archList ul.list{list-style:none; margin:0; padding:0}
 
   /* 💵 the "log this bill in the budget?" mini-card, parked bottom-center */
   .tpop.billpop{left:50%; top:auto; bottom:24px; transform:translateX(-50%); width:min(340px,calc(100vw - 20px))}
@@ -564,6 +578,7 @@
     <button class="tab" data-view="plan">🗺️ Game Plan</button>
     <button class="tab" data-view="jobs">💼 Jobs</button>
     <button class="tab" data-view="notes">📝 Notes</button>
+    <button class="tab" data-view="me">🌸 Personal</button>
   </div>
 
   <div class="grid">
@@ -693,8 +708,8 @@
           📦 Archive <span class="pill" id="archCount"></span>
         </h2>
         <div id="archBody" style="display:none">
-          <div class="note" style="margin:0 0 8px">Checked-off to-dos, bills, and appointments land here with the day you finished them, so the active lists stay clean. ↩ puts one back. (Jobs you applied to or passed on live in the 💼 Jobs tab's tracker now.)</div>
-          <ul class="list" id="archList"></ul>
+          <div class="note" style="margin:0 0 8px">Checked-off to-dos, bills, and appointments land here with the day you finished them, grouped by kind and newest first. ↩ puts one back. (Jobs you applied to or passed on live in the 💼 Jobs tab's tracker now.)</div>
+          <div id="archList"></div>
         </div>
       </div>
     </div>
@@ -1162,10 +1177,28 @@
             <input id="projName" type="text" maxlength="80" placeholder="start a new project...">
             <button class="apps-btn" id="projAdd">+ project</button>
           </div>
-          <div id="projList"></div>
+          <!-- NOT projList: the home tab's Active Projects card already owns that id,
+               and a duplicate id made these cards render into the WRONG (hidden) div -->
+          <div id="pjList"></div>
           <details id="projArchWrap" class="projcard" style="display:none"><summary><span class="caret">▶</span>📦 archived projects</summary><div class="pj-body" id="projArch"></div></details>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- 🌸 PERSONAL (hidden until its tab is picked): the not-work side of life.
+       One card per corner (car, health, home, life admin), each with its own
+       to-dos + reference notes, same machinery as the project cards. -->
+  <section id="mePanel" style="display:none">
+    <div class="card">
+      <h2>🌸 Personal <span class="pill">car · health · home · life admin</span></h2>
+      <p class="cl-lead" style="margin-top:0">The life stuff that isn't work: shop phone numbers, due-date rhythms, little errands. Each card keeps its own to-dos and notes. Double-click anything to reword it.</p>
+      <div class="note-add">
+        <input id="meName" type="text" maxlength="80" placeholder="add a section (plants? paperwork? the cats?)...">
+        <button class="apps-btn" id="meAdd">+ section</button>
+      </div>
+      <div id="meList"></div>
+      <details id="meArchWrap" class="projcard" style="display:none"><summary><span class="caret">▶</span>📦 archived sections</summary><div class="pj-body" id="meArch"></div></details>
     </div>
   </section>
 
@@ -1276,6 +1309,11 @@ let taskOff = JSON.parse(localStorage.getItem(LS_TASKOFF) || '{}');
 let blockNames = JSON.parse(localStorage.getItem(LS_BLOCKNAMES) || '{}');
 // ...and the little note after the name ("shower, real food, no work yet") reworded the same way
 let blockDescs = JSON.parse(localStorage.getItem(LS_BLOCKDESCS) || '{}');
+// 📆 WHEN a checkbox got checked. id -> 'YYYY-MM-DD', written by gpSet alongside
+// done, so a project card can say not just "you finished this" but "on the 15th".
+// Checks from before this store existed simply have no date, which is fine.
+const LS_DONEAT = 'lupita-doneat-v1';
+let doneAt = JSON.parse(localStorage.getItem(LS_DONEAT) || '{}');
 // 💼 the application tracker on the Jobs tab. A lead leaves the listings the moment
 // it lands here. id -> {t, link, ty, at:'YYYY-MM-DD', s:'applied'|'passed',
 // r:'wait'|'int'|'offer'|'rej'|'ghost', rAt}. r = what happened after applying
@@ -1305,6 +1343,7 @@ const saveBlockNames = () => { localStorage.setItem(LS_BLOCKNAMES, JSON.stringif
 const saveBlockDescs = () => { localStorage.setItem(LS_BLOCKDESCS, JSON.stringify(blockDescs)); pushStateSoon(); };
 const saveJobs = () => { localStorage.setItem(LS_JOBS, JSON.stringify(jobs)); pushStateSoon(); };
 const saveMyLeads = () => { localStorage.setItem(LS_MYLEADS, JSON.stringify(myLeads)); pushStateSoon(); };
+const saveDoneAt = () => { localStorage.setItem(LS_DONEAT, JSON.stringify(doneAt)); };  // rides along with saveDone's push
 // Leads checked off before the Jobs tab existed lived in the home tab's general
 // archive: move them over once so the tracker holds the whole history. Runs at
 // boot AND after a remote loadState apply (the other device may still send the
@@ -1447,15 +1486,15 @@ function itemRow(it, kind, deletable){
   cb.onchange=()=>{
     const archivable=(kind==='task'||kind==='bill'||kind==='appt');
     if(cb.checked){
-      done[it.id]=true;
-      if(kind==='bill') billAutoLog(it, true);   // 💵 a paid bill files itself in the budget
+      done[it.id]=true; doneAt[it.id]=iso(new Date()); saveDoneAt();
+      moneyAutoLog(it, kind, true);   // 💵 a paid bill (or a "$40 ..." to-do) files itself in the budget
       if(archivable){
         // log the completion date, show the ✓ for a beat, then tuck it into the Archive
         arch[it.id]={t:it.text, k:kind, at:iso(new Date())}; saveArch();
         li.classList.add('done'); saveDone(); syncGp(it.id); setTimeout(render,900); return;
       }
-    } else { delete done[it.id]; if(arch[it.id]){ delete arch[it.id]; saveArch(); }
-      if(kind==='bill') billAutoLog(it, false); }
+    } else { delete done[it.id]; delete doneAt[it.id]; saveDoneAt(); if(arch[it.id]){ delete arch[it.id]; saveArch(); }
+      moneyAutoLog(it, kind, false); }
     saveDone(); syncGp(it.id); render();
   };
   const body=document.createElement('div'); body.className='body';
@@ -1592,26 +1631,65 @@ function fillList(el, items, kind, deletable){
   vis.forEach(it=>el.appendChild(itemRow(it,kind,deletable||!!it.custom)));
 }
 
-/* ---------- 📦 ARCHIVE ---------- */
+/* ---------- 📦 ARCHIVE ----------
+   Grouped by kind (to-dos / bills / appointments), newest first inside each,
+   with little "today / this week / ..." date headers so a month of finished
+   things reads like a story instead of one long pile. */
 const KIND_LBL={task:'to-do', bill:'bill', appt:'appt', lead:'lead'};
+const ARCH_GROUPS=[['task','📌 to-dos'],['bill','💸 bills'],['appt','🩺 appointments'],['other','🗃️ everything else']];
+const LS_ARCHOPEN='lupita-arch-open-v1';
+const archOpen=new Set(JSON.parse(localStorage.getItem(LS_ARCHOPEN)||'["task","bill","appt","other"]'));
+function archBucket(at){
+  if(!at) return 'sometime';
+  const diff=Math.round((today-parse(at))/86400000);
+  if(diff<=0) return 'today';
+  if(diff<7) return 'this week';
+  if(diff<30) return 'this month';
+  return 'a while back';
+}
+function archRow(id,a){
+  const li=document.createElement('li'); li.className='item done';
+  const body=document.createElement('div'); body.className='body';
+  const txt=document.createElement('div'); txt.className='txt'; txt.textContent=a.t;
+  const meta=document.createElement('div'); meta.className='meta';
+  const w=document.createElement('span'); w.className='when'; w.textContent='✓ '+(a.at||''); meta.appendChild(w);
+  const t=document.createElement('span'); t.className='tag '+(a.k==='lead'?'work':(a.k==='bill'?'bill':a.k==='appt'?'appt':'life')); t.textContent=KIND_LBL[a.k]||a.k; meta.appendChild(t);
+  body.appendChild(txt); body.appendChild(meta);
+  const back=document.createElement('button'); back.className='del'; back.textContent='↩'; back.title='put it back on the active list';
+  back.onclick=()=>{ delete arch[id]; delete done[id]; saveArch(); saveDone(); render(); };
+  li.appendChild(body); li.appendChild(back);
+  return li;
+}
 function renderArchive(){
-  const entries=Object.entries(arch).sort((a,b)=>(b[1].at||'').localeCompare(a[1].at||''));
+  const entries=Object.entries(arch);
   document.getElementById('archCount').textContent=entries.length?entries.length+' done':'';
-  const ul=document.getElementById('archList'); ul.innerHTML='';
-  if(!entries.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Nothing archived yet. Finish something and it lands here. 🌱'; ul.appendChild(e); return; }
-  entries.slice(0,60).forEach(([id,a])=>{
-    const li=document.createElement('li'); li.className='item done';
-    const body=document.createElement('div'); body.className='body';
-    const txt=document.createElement('div'); txt.className='txt'; txt.textContent=a.t;
-    const meta=document.createElement('div'); meta.className='meta';
-    const w=document.createElement('span'); w.className='when'; w.textContent='✓ '+(a.at||''); meta.appendChild(w);
-    const t=document.createElement('span'); t.className='tag '+(a.k==='lead'?'work':(a.k==='bill'?'bill':a.k==='appt'?'appt':'life')); t.textContent=KIND_LBL[a.k]||a.k; meta.appendChild(t);
-    body.appendChild(txt); body.appendChild(meta);
-    const back=document.createElement('button'); back.className='del'; back.textContent='↩'; back.title='put it back on the active list';
-    back.onclick=()=>{ delete arch[id]; delete done[id]; saveArch(); saveDone(); render(); };
-    li.appendChild(body); li.appendChild(back); ul.appendChild(li);
+  const wrap=document.getElementById('archList'); wrap.innerHTML='';
+  if(!entries.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Nothing archived yet. Finish something and it lands here. 🌱'; wrap.appendChild(e); return; }
+  ARCH_GROUPS.forEach(([gk,lbl])=>{
+    const es=entries
+      .filter(([id,a])=>gk==='other' ? !(a.k==='task'||a.k==='bill'||a.k==='appt') : a.k===gk)
+      .sort((a,b)=>(b[1].at||'').localeCompare(a[1].at||''));
+    if(!es.length) return;
+    const det=document.createElement('details'); det.className='projcard'; det.open=archOpen.has(gk);
+    det.addEventListener('toggle',()=>{ if(det.open) archOpen.add(gk); else archOpen.delete(gk);
+      localStorage.setItem(LS_ARCHOPEN, JSON.stringify([...archOpen])); });
+    const sum=document.createElement('summary');
+    const car=document.createElement('span'); car.className='caret'; car.textContent='▶';
+    const nm=document.createElement('span'); nm.textContent=lbl;
+    const ct=document.createElement('span'); ct.className='pj-count'; ct.textContent=es.length;
+    sum.appendChild(car); sum.appendChild(nm); sum.appendChild(ct); det.appendChild(sum);
+    const body=document.createElement('div'); body.className='pj-body';
+    const ul=document.createElement('ul'); ul.className='list';
+    let bucket=null;
+    es.slice(0,80).forEach(([id,a])=>{
+      const b=archBucket(a.at);
+      if(b!==bucket){ bucket=b;
+        const h=document.createElement('div'); h.className='arch-when'; h.textContent=b; ul.appendChild(h); }
+      ul.appendChild(archRow(id,a));
+    });
+    if(es.length>80){ const e=document.createElement('div'); e.className='empty'; e.textContent='…and '+(es.length-80)+' more, kept safe.'; ul.appendChild(e); }
+    body.appendChild(ul); det.appendChild(body); wrap.appendChild(det);
   });
-  if(entries.length>60){ const e=document.createElement('div'); e.className='empty'; e.textContent='…and '+(entries.length-60)+' more, kept safe.'; ul.appendChild(e); }
 }
 const archBodyEl=document.getElementById('archBody'), archCaretEl=document.getElementById('archCaret');
 document.getElementById('archToggle').addEventListener('click',()=>{
@@ -1949,11 +2027,13 @@ async function loadState(){
       if(s.mailStore){ mailStore=s.mailStore; localStorage.setItem(LS_MAILSTORE, JSON.stringify(mailStore)); loadMailFromStore(); }
       if(s.jobs){ jobs=s.jobs; localStorage.setItem(LS_JOBS, JSON.stringify(jobs)); }
       if(s.myLeads){ myLeads=s.myLeads; localStorage.setItem(LS_MYLEADS, JSON.stringify(myLeads)); }
-      // notes/proj: an empty feed never beats real local data (a stale cached page
+      if(s.doneAt){ doneAt=s.doneAt; localStorage.setItem(LS_DONEAT, JSON.stringify(doneAt)); }
+      // notes/proj/me: an empty feed never beats real local data (a stale cached page
       // once pushed a state file with no notes and every device adopted the blank)
       if(s.notes && (s.notes.length || !notes.length)){ notes=s.notes; localStorage.setItem(LS_NOTES, JSON.stringify(notes)); }
       if(s.proj){
-        const r={list:s.proj.list||[], items:s.proj.items||{}};
+        const r={list:s.proj.list||[], items:s.proj.items||{},
+          seeded:(s.proj.seeded&&s.proj.seeded.length)?s.proj.seeded:(proj.seeded||[])};
         Object.entries(proj.items||{}).forEach(([pid,arr])=>{
           if(arr && arr.length && !(r.items[pid]||[]).length){
             r.items[pid]=arr;   // a bucket with real items doesn't vanish because the feed hasn't seen it yet
@@ -1961,6 +2041,17 @@ async function loadState(){
           }
         });
         proj=r; localStorage.setItem(LS_PROJ, JSON.stringify(proj));
+      }
+      if(s.me){
+        const r={list:s.me.list||[], items:s.me.items||{},
+          seeded:(s.me.seeded&&s.me.seeded.length)?s.me.seeded:(me.seeded||[])};
+        Object.entries(me.items||{}).forEach(([pid,arr])=>{
+          if(arr && arr.length && !(r.items[pid]||[]).length){
+            r.items[pid]=arr;
+            if(!r.list.some(p=>p.id===pid)){ const lp=me.list.find(p=>p.id===pid); if(lp) r.list.push(lp); }
+          }
+        });
+        me=r; localStorage.setItem(LS_ME, JSON.stringify(me));
       }
       localStorage.setItem(LS_DONE, JSON.stringify(done));
       localStorage.setItem(LS_CUSTOM, JSON.stringify(custom));
@@ -1971,7 +2062,7 @@ async function loadState(){
       rebuildWeeks();   // the phone may have added or moved a to-do: redraw its day card
       // refresh every game-plan checkbox/count + the counters
       Object.values(gpReg).forEach(fns=>fns.forEach(f=>f()));
-      renderApps(); renderMoney(); renderFood(); renderFriends(); renderMail(); updateMailStatus(); renderNotes();
+      renderApps(); renderMoney(); renderFood(); renderFriends(); renderMail(); updateMailStatus(); renderNotes(); renderMe();
       if(view==='plan') renderPlan();   // another device may have slid today's blocks around
       undoBaseline();   // remote state landed: undo measures from here, not from before the sync
     }
@@ -1985,7 +2076,7 @@ function pushStateSoon(){
   clearTimeout(statePushTimer);
   statePushTimer=setTimeout(pushState, 1500);
 }
-const statePayload=savedAt=>({done, custom, apps, money, arch, jobs, myLeads, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore, notes, proj, savedAt});
+const statePayload=savedAt=>({done, doneAt, custom, apps, money, arch, jobs, myLeads, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore, notes, proj, me, savedAt});
 async function pushState(){
   if(!getToken()){ pushPending=false; return; }
   try{
@@ -2043,6 +2134,17 @@ function rescueFromRemote(s){
     });
     if(touched){ localStorage.setItem(LS_PROJ, JSON.stringify(proj)); renderNotes(); }
   }
+  if(s.me){
+    let touched=false;
+    (s.me.list||[]).forEach(p=>{ if(p&&p.id&&!meTombs.has(p.id)&&!me.list.some(x=>x.id===p.id)){ me.list.push(p); touched=true; } });
+    Object.entries(s.me.items||{}).forEach(([pid,arr])=>{
+      if(meTombs.has(pid)||!Array.isArray(arr)||!arr.length) return;
+      const cur=me.items[pid]=me.items[pid]||[];
+      const have=new Set(cur.map(i=>i.id));
+      arr.forEach(it=>{ if(it&&it.id&&!have.has(it.id)&&!meTombs.has(it.id)){ cur.push(it); touched=true; } });
+    });
+    if(touched){ localStorage.setItem(LS_ME, JSON.stringify(me)); renderMe(); }
+  }
 }
 // keep devices in step while the page stays open
 setInterval(()=>{ loadState(); }, 60000);
@@ -2068,6 +2170,7 @@ async function fetchPlan(){
     g.innerHTML=''; delete g.dataset.built;
     Object.keys(gpReg).forEach(k=>delete gpReg[k]);
     if(view==='plan') renderPlan();
+    renderNotes();   // project cards seed from the guides + show their finished steps
   }catch(err){}
 }
 
@@ -2174,12 +2277,13 @@ document.getElementById('tabs').addEventListener('click',e=>{
   if(view==='jobs'){ render(); loadModels(); } // fresh listings + tracker, and re-check the local AI each time the tab is opened
   else if(view==='plan') renderPlan();
   else if(view==='notes') renderNotes();
+  else if(view==='me') renderMe();
   else render();
 });
-// swap between the schedule grid and the full-width panels (jobs / game plan / food / friends / notes)
+// swap between the schedule grid and the full-width panels (jobs / game plan / food / friends / notes / personal)
 function applyLayout(){
-  const isJobs = view==='jobs', isPlan = view==='plan', isFood = view==='food', isBudget = view==='budget', isFriends = view==='friends', isNotes = view==='notes';
-  const full = isJobs||isPlan||isFood||isBudget||isFriends||isNotes;
+  const isJobs = view==='jobs', isPlan = view==='plan', isFood = view==='food', isBudget = view==='budget', isFriends = view==='friends', isNotes = view==='notes', isMe = view==='me';
+  const full = isJobs||isPlan||isFood||isBudget||isFriends||isNotes||isMe;
   document.querySelector('.grid').style.display = full ? 'none' : '';
   document.querySelector('.progress-card').style.display = full ? 'none' : '';
   document.getElementById('jobsPanel').style.display = isJobs ? 'block' : 'none';
@@ -2188,6 +2292,7 @@ function applyLayout(){
   document.getElementById('budgetPanel').style.display = isBudget ? 'flex' : 'none';
   document.getElementById('friendsPanel').style.display = isFriends ? 'flex' : 'none';
   document.getElementById('notesPanel').style.display = isNotes ? 'flex' : 'none';
+  document.getElementById('mePanel').style.display = isMe ? 'block' : 'none';
 }
 
 /* ---------- 🗺️ GAME PLAN (8-week intensive, night-owl clock) ----------
@@ -2367,6 +2472,32 @@ function agSolo(id, blocks){
   solo[id]={s, e:s+60};
   delete slotted[id]; saveSlotted();          // it IS a block now, it can't also sit inside one
   saveSolo(); soloModsSync(id);
+  render(); rebuildWeeks(); if(view==='plan') renderPlan();
+}
+/* 🗑 on a promoted block: the block goes AND the to-do behind it goes with it
+   (before this, the only way out was ↩, which just turned the block back into a
+   to-do — "deleting" it left a thing on the list). One you typed yourself is
+   deleted for good; a real bill or appointment tucks into the Archive instead,
+   so nothing you might still need is ever truly gone. */
+function delSoloBlock(id){
+  delete solo[id];
+  unslotKey('solo:'+id); // tasks parked inside it go back to no set time
+  let modsTouched=false;
+  Object.keys(blockMods).forEach(day=>{
+    const nv=blockMods[day].filter(m=>m.k!=='solo:'+id);
+    if(nv.length!==blockMods[day].length){ blockMods[day]=nv; modsTouched=true; }
+  });
+  if(modsTouched) saveBlockMods();
+  if(custom.some(c=>c.id===id)){
+    custom=custom.filter(c=>c.id!==id);
+    delete done[id]; delete moved[id]; delete edits[id];
+    saveCustom(); saveMoved(); saveEdits();
+  } else {
+    const info=AGENDA_INDEX[id]||{};
+    done[id]=true; arch[id]={t:info.text||'', k:info.kind||'task', at:iso(new Date())};
+    saveArch();
+  }
+  saveDone(); saveSlotted(); saveSolo();
   render(); rebuildWeeks(); if(view==='plan') renderPlan();
 }
 /* a day that's already been reshuffled keeps its own copy of every block's time,
@@ -2861,7 +2992,7 @@ document.getElementById('spendAdd').onclick=()=>logMoney('out');
    Checking off "Pay rent" drops the payment straight into the budget. A $ amount
    in the wording logs silently; otherwise a little card asks once, prefilled with
    what the same bill cost last time. Unchecking takes the entry back out. */
-const BILL_CATS=[[/rent/i,'rent'],[/insur/i,'car insurance'],[/credit/i,'credit card'],[/grocer/i,'groceries'],[/\bgas\b/i,'gas'],[/subscri/i,'subscriptions']]; // leakcheck-allow (generic budget categories, same as the dropdown)
+const BILL_CATS=[[/rent/i,'rent'],[/insur/i,'car insurance'],[/credit/i,'credit card'],[/grocer/i,'groceries'],[/\bgas\b/i,'gas'],[/smog|mechanic|oil change|car wash/i,'car'],[/subscri/i,'subscriptions']]; // leakcheck-allow (generic budget categories, same as the dropdown)
 function billCat(t){ const hit=BILL_CATS.find(c=>c[0].test(t)); return hit?hit[1]:'other expense'; }
 // next month's bill has a new id but the same words, so "last time" matches on the
 // words (with amounts and "(due 8/7)" tails stripped off)
@@ -2885,6 +3016,17 @@ function billAutoLog(it, on){
   if(m){ log(parseFloat(m[1].replace(/,/g,'')), billCat(txt)); return; }
   const prev=money.slice().reverse().find(e=>!isIn(e)&&e.bill===norm);
   billPop(txt, prev?prev.amt:'', billCat(txt), log);
+}
+/* ---- 💵 ...and not just bills ----
+   Any to-do or appointment with a $ amount in its wording ("$40 car errand",
+   "$25 co-pay") logs itself as an expense the moment it's checked off. No $ in
+   the words = nothing happens (this path never opens the little ask-card), and
+   unchecking always takes back whatever the item logged. */
+function moneyAutoLog(it, kind, on){
+  if(kind==='bill') return billAutoLog(it, on);
+  if(kind!=='task'&&kind!=='appt') return;
+  if(!on) return billAutoLog(it, false);
+  if(/\$\s?\d/.test(it.text||'')) billAutoLog(it, true);
 }
 function billPop(txt, amt0, src0, onLog){
   closeTimePop();
@@ -2951,8 +3093,8 @@ function copyPrompt(it,btn){
    every copy of a task (week view + guide view) in sync. */
 const gpReg={};
 function gpSet(id,val){
-  if(val) done[id]=true; else delete done[id];
-  saveDone(); (gpReg[id]||[]).forEach(f=>f());
+  if(val){ done[id]=true; doneAt[id]=iso(new Date()); } else { delete done[id]; delete doneAt[id]; }
+  saveDoneAt(); saveDone(); (gpReg[id]||[]).forEach(f=>f());
   if(id.slice(0,4)==='gpd-'){ if(val) confetti(30); renderApps(); } // day checked: celebrate + refresh streak
   // a real-life item ticked on a day card: file it home exactly like the home tab
   // would (checked = tucked into the Archive, unchecked = back on the list)
@@ -2960,7 +3102,7 @@ function gpSet(id,val){
   if(sch){
     if(val) arch[id]={t:sch.text, k:sch.kind, at:iso(new Date())};
     else delete arch[id];
-    if(sch.kind==='bill') billAutoLog({id, text:edits[id]||sch.text}, val);   // 💵 paid = logged, from the day card too
+    moneyAutoLog({id, text:edits[id]||sch.text}, sch.kind, val);   // 💵 paid = logged, from the day card too
     saveArch(); render();
   }
 }
@@ -3828,13 +3970,21 @@ function hourRow(b,bid,mv){
   (gpReg[bid]=gpReg[bid]||[]).push(sync);
   cb.onchange=()=>gpSet(bid,cb.checked);   // ONLY the square checks it off, same as task rows
   row.appendChild(cb); row.appendChild(t);
-  // 🧱 one of your own: ↩ takes it back off the clock, into the day's to-do list
+  // 🧱 one of your own: ↩ takes it back off the clock, into the day's to-do list,
+  // and 🗑 deletes the block AND the to-do behind it (delete means delete)
   if(b.solo){
     const tbs=document.createElement('div'); tbs.className='tbs';
     const back=document.createElement('button'); back.className='tb'; back.textContent='↩';
     back.title='Put this back in the list (it stops being its own block)';
     back.onclick=e=>{ e.stopPropagation(); agSolo(b.id); };
-    tbs.appendChild(back); row.appendChild(tbs);
+    tbs.appendChild(back);
+    const del=document.createElement('button'); del.className='tb'; del.textContent='🗑';
+    del.title='Delete this block and its to-do (one of yours goes for good; a real bill or appt tucks into the Archive)';
+    del.onclick=e=>{ e.stopPropagation();
+      if(confirm('Delete your "'+b.n+'" block?\n\nThe to-do behind it goes too: one you typed is gone for good (Ctrl+Z can still save you), a real bill or appointment tucks into the Archive instead.'))
+        delSoloBlock(b.id);
+    };
+    tbs.appendChild(del); row.appendChild(tbs);
   }
   // 🧱 a block you made: 🗑 deletes it for real (it was never the plan's to keep)
   else if(b.own && mv){
@@ -5099,11 +5249,18 @@ $('clPdf').onclick=makePdf;
    in state.json so the phone and the desktop share one brain. */
 const LS_NOTES='lupita-notes-v1', LS_PROJ='lupita-proj-v1', LS_PJOPEN='lupita-pjopen-v1';
 let notes=JSON.parse(localStorage.getItem(LS_NOTES)||'[]');   // [{id,txt,tag,at}]
-let proj=JSON.parse(localStorage.getItem(LS_PROJ)||'null')||{list:[],items:{}}; // list:[{id,name,arch?}], items: pid -> [{id,txt,k:'todo'|'note',done?,at}]
+let proj=JSON.parse(localStorage.getItem(LS_PROJ)||'null')||{list:[],items:{}}; // list:[{id,name,goal?,arch?}], items: pid -> [{id,txt,k:'todo'|'note',done?,doneAt?,at}], seeded:[namekeys]
 const saveNotes=()=>{ localStorage.setItem(LS_NOTES,JSON.stringify(notes)); pushStateSoon(); };
 const saveProj =()=>{ localStorage.setItem(LS_PROJ, JSON.stringify(proj));  pushStateSoon(); };
 const noteTombs=new Set(), projTombs=new Set();   // deleted-this-session ids: rescueFromRemote won't resurrect them
 const pjOpen=new Set(JSON.parse(localStorage.getItem(LS_PJOPEN)||'[]'));   // which cards sit open (per device, not synced)
+/* 🌸 the Personal tab: same card machinery, its own synced store (car, health,
+   home, life admin — the corners of life that aren't projects) */
+const LS_ME='lupita-me-v1', LS_MEOPEN='lupita-meopen-v1';
+let me=JSON.parse(localStorage.getItem(LS_ME)||'null')||{list:[],items:{}};
+const saveMe=()=>{ localStorage.setItem(LS_ME, JSON.stringify(me)); pushStateSoon(); };
+const meTombs=new Set();
+const meOpen=new Set(JSON.parse(localStorage.getItem(LS_MEOPEN)||'[]'));
 const nid=p=>(p||'n')+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 const NOTE_TAGS={idea:'💡',audio:'🎵',claude:'🤖',remind:'⏰',misc:'✨'};
 const NOTE_LBL={idea:'💡 ideas',audio:'🎵 audio',claude:'🤖 for Claude',remind:'⏰ reminders',misc:'✨ misc'};
@@ -5129,21 +5286,50 @@ function linkifyInto(el, txt){
   if(last<txt.length) el.appendChild(document.createTextNode(txt.slice(last)));
 }
 var noteFilter='all';
-/* first visit: the project cards start with EVERYTHING currently in motion: the
-   homepage project list plus the sprint's project guides, deduped (Website
-   Redesign absorbs Website). In-memory only; saved the moment she touches it. */
+/* the project cards start with EVERYTHING currently in motion: the homepage
+   project list plus the sprint's project guides, deduped (Website Redesign
+   absorbs Website). Re-runs on every draw and only ADDS what's new — `seeded`
+   (inside the synced store) remembers every name ever offered, so a card you
+   deleted stays deleted. Seed ids come from the name ('pj-website'), so two
+   devices seeding the same card can't create twins. Known projects also start
+   with a 🎯 goal; yours always wins once you touch it. */
+const pjKey=nm=>(nm||'').toLowerCase().replace(/[^a-z]/g,'');
+const PJ_GOALS={
+  commissions:'Tiers + terms live, slots open, first paid commission in 💰',
+  contentengine:'Something posted every single week, on every channel',
+  websiteredesign:'Redesigned site LIVE, with every bio pointing at it',
+  website:'Redesigned site LIVE, with every bio pointing at it',
+  portfoliopieces:'New best-work set: acting shot, boards, lineup, 2 print-ready pieces',
+  portfolioreel:'Reel finished, published, and pinned everywhere',
+  printshop:'INPRNT shop live with 6-10 prints',
+  tutoring:'Tutoring offer live + the first session booked',
+  youtubevideos:'Ugly Dolls video essay published',
+  uglydollsvideoessay:'Ugly Dolls video essay published',
+  timetrio:'The next Time Trio piece finished and shared',
+  animationprojects:'Pick the next short + break it into steps',
+};
 function projSeed(){
-  if(proj.list.length||Object.keys(proj.items).length) return;
+  proj.seeded=proj.seeded||[];
+  // a store from before `seeded` existed: whatever it already holds counts as offered
+  if(!proj.seeded.length && proj.list.length)
+    proj.list.forEach(p=>{ const k=pjKey(p.name); if(k) proj.seeded.push(k); });
   const names=[];
   (((REMOTE||{}).projects)||PROJECTS).forEach(p=>names.push(p.name));
   Object.values(GUIDE_STEPS).forEach(g=>{ if(g.title) names.push((g.icon?g.icon+' ':'')+g.title); });
-  const seen=[];
   names.forEach(nm=>{
-    const key=nm.toLowerCase().replace(/[^a-z]/g,'');
-    if(!key || seen.some(s=>key.includes(s)||s.includes(key))) return;
-    seen.push(key);
-    proj.list.push({id:'pj'+seen.length, name:nm});
+    const k=pjKey(nm); if(!k) return;
+    if(proj.seeded.some(s=>k.includes(s)||s.includes(k))) return;
+    proj.seeded.push(k);
+    if(!proj.list.some(p=>{ const pk=pjKey(p.name); return pk&&(pk.includes(k)||k.includes(pk)); }))
+      proj.list.push({id:'pj-'+k, name:nm, goal:PJ_GOALS[k]});
   });
+  // cards from before goals existed pick theirs up (only while the line is empty)
+  proj.list.forEach(p=>{ if(p.goal==null){ const g=PJ_GOALS[pjKey(p.name)]; if(g) p.goal=g; } });
+}
+// which sprint guide belongs to a card ('Website Redesign' ↔ the Website guide)
+function guideFor(name){
+  const k=pjKey(name); if(!k) return null;
+  return Object.values(GUIDE_STEPS).find(g=>{ const gk=pjKey(g.title||''); return gk&&(k.includes(gk)||gk.includes(k)); })||null;
 }
 function addNote(){
   const inp=document.getElementById('noteTxt'), sel=document.getElementById('noteTag');
@@ -5157,81 +5343,146 @@ function addProject(){
   const p={id:nid('pj'), name:v}; proj.list.push(p); pjOpen.add(p.id); inp.value='';
   saveProj(); renderNotes();
 }
-function pjItems(pid){ return proj.items[pid]=proj.items[pid]||[]; }
-function pjRowEl(p, it){
+/* ---- one card list, two homes ----
+   The 🎨 Projects column and the 🌸 Personal tab are the same machinery wired to
+   different stores. A ctx bundles a store {list,items} with its DOM ids, save fn,
+   tombstones, open-state, and re-render, plus optional extra sections. */
+const PJ_CTX={ store:()=>proj, save:saveProj, tombs:projTombs, redraw:()=>renderNotes(),
+  listId:'pjList', archWrapId:'projArchWrap', archId:'projArch',
+  open:pjOpen, openKey:LS_PJOPEN,
+  empty:'No projects yet. Name one below and give it a home. 🌱',
+  archTitle:'archive this project (it moves to 📦 below, nothing is lost)',
+  top:(p,body)=>pjGoalLine(p,body), mid:(p,body)=>pjGpSection(p,body) };
+const ME_CTX={ store:()=>me, save:saveMe, tombs:meTombs, redraw:()=>renderMe(),
+  listId:'meList', archWrapId:'meArchWrap', archId:'meArch',
+  open:meOpen, openKey:LS_MEOPEN,
+  empty:'Nothing here yet. Add a section below: car, health, plants, paperwork... 🌱',
+  archTitle:'archive this section (it moves to 📦 below, nothing is lost)' };
+function pjItems(ctx,pid){ const st=ctx.store(); return st.items[pid]=st.items[pid]||[]; }
+function pjRowEl(ctx,p,it){
   const row=document.createElement('div'); row.className='pl-item'+(it.done?' done':'');
   if(it.k==='todo'){
     const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox'; cb.checked=!!it.done;
-    cb.onchange=()=>{ if(cb.checked){ it.done=1; confetti(12); } else delete it.done; saveProj(); renderNotes(); };
+    cb.onchange=()=>{ if(cb.checked){ it.done=1; it.doneAt=iso(new Date()); confetti(12); }
+      else { delete it.done; delete it.doneAt; } ctx.save(); ctx.redraw(); };
     row.appendChild(cb);
   } else {
     const dot=document.createElement('span'); dot.textContent='🔍'; dot.style.fontSize='.85rem'; dot.title='note'; row.appendChild(dot);
   }
   const tx=document.createElement('div'); tx.className='txt2'; linkifyInto(tx, it.txt);
   tx.title='double-click to reword';
-  tx.ondblclick=()=>inlineEdit(tx, it.txt, v=>{ if(v) it.txt=v; saveProj(); renderNotes(); });
+  tx.ondblclick=()=>inlineEdit(tx, it.txt, v=>{ if(v) it.txt=v; ctx.save(); ctx.redraw(); });
   row.appendChild(tx);
+  // a finished step keeps the day you finished it ("✓ 7/15")
+  if(it.done&&it.doneAt){ const w=document.createElement('span'); w.className='pj-when';
+    w.textContent='✓ '+it.doneAt.slice(5).replace('-','/'); row.appendChild(w); }
   const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove (Ctrl+Z brings it back)';
-  del.onclick=()=>{ projTombs.add(it.id); proj.items[p.id]=pjItems(p.id).filter(x=>x!==it); saveProj(); renderNotes(); };
+  del.onclick=()=>{ ctx.tombs.add(it.id); ctx.store().items[p.id]=pjItems(ctx,p.id).filter(x=>x!==it); ctx.save(); ctx.redraw(); };
   row.appendChild(del);
   return row;
 }
-function pjAddRow(p, kind, ph){
+function pjAddRow(ctx,p, kind, ph){
   const w=document.createElement('div'); w.className='pj-add';
   const inp=document.createElement('input'); inp.type='text'; inp.maxLength=300; inp.placeholder=ph;
   const go=document.createElement('button'); go.className='tb'; go.textContent='＋'; go.title='add it';
   const add=()=>{ const v=inp.value.trim(); if(!v) return;
-    pjItems(p.id).push({id:nid('pi'), txt:v, k:kind, at:iso(new Date())});
-    saveProj(); renderNotes(); };
+    pjItems(ctx,p.id).push({id:nid('pi'), txt:v, k:kind, at:iso(new Date())});
+    ctx.save(); ctx.redraw(); };
   go.onclick=add;
   inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); add(); } };
   w.appendChild(inp); w.appendChild(go);
   return w;
 }
-function renderProjects(){
-  const wrap=document.getElementById('projList'); if(!wrap) return;
+// 🎯 the one-line goal at the top of a project card
+function pjGoalLine(p, body){
+  const gl=document.createElement('div'); gl.className='pj-goal';
+  const ico=document.createElement('span'); ico.textContent='🎯';
+  const gt=document.createElement('span'); gt.className='pj-goal-t'+(p.goal?'':' unset');
+  gt.textContent=p.goal||'double-click to give this one a goal 🌱';
+  gt.title='double-click to set or reword the goal';
+  gt.ondblclick=()=>inlineEdit(gt, p.goal||'', v=>{ if(v) p.goal=v; else delete p.goal; saveProj(); renderNotes(); });
+  gl.appendChild(ico); gl.appendChild(gt); body.appendChild(gl);
+}
+/* 🗺️ what the sprint has already finished for this project: the matching guide's
+   checked-off steps, each with the day it was checked (older checks predate the
+   date store and just show a ✓). Read-only here; the boxes live on the plan. */
+function pjGpSection(p, body){
+  const g=guideFor(p.name); if(!g) return;
+  const steps=[].concat(...(g.steps||[])).filter(s=>s&&s.id&&!taskOff[s.id]);
+  if(!steps.length) return;
+  const fin=steps.filter(s=>done[s.id]);
+  const sec=document.createElement('div'); sec.className='pj-sec';
+  sec.textContent='🗺️ finished in the game plan · '+fin.length+' of '+steps.length+' steps';
+  body.appendChild(sec);
+  if(!fin.length){
+    const e=document.createElement('div'); e.className='empty'; e.style.padding='4px 2px';
+    e.textContent='Nothing checked off yet. The steps live on the 🗺️ Game Plan tab.';
+    body.appendChild(e); return;
+  }
+  const box=document.createElement('div'); box.className='pj-gp';
+  fin.forEach(s=>{
+    const row=document.createElement('div'); row.className='pl-item done';
+    const ck=document.createElement('span'); ck.textContent='✅'; ck.style.fontSize='.78rem';
+    const tx=document.createElement('div'); tx.className='txt2';
+    const words=gpText(s);
+    tx.textContent=words.length>110?words.slice(0,108)+'…':words;
+    tx.title=words;
+    row.appendChild(ck); row.appendChild(tx);
+    const w=document.createElement('span'); w.className='pj-when';
+    w.textContent=doneAt[s.id]?('✓ '+doneAt[s.id].slice(5).replace('-','/')):'✓';
+    row.appendChild(w);
+    box.appendChild(row);
+  });
+  body.appendChild(box);
+}
+function renderCardList(ctx){
+  const wrap=document.getElementById(ctx.listId); if(!wrap) return;
   wrap.innerHTML='';
-  const live=proj.list.filter(p=>!p.arch), dead=proj.list.filter(p=>p.arch);
-  if(!live.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='No projects yet. Name one below and give it a home. 🌱'; wrap.appendChild(e); }
+  const st=ctx.store();
+  const live=st.list.filter(p=>!p.arch), dead=st.list.filter(p=>p.arch);
+  if(!live.length){ const e=document.createElement('div'); e.className='empty'; e.textContent=ctx.empty; wrap.appendChild(e); }
   live.forEach(p=>{
-    const d=document.createElement('details'); d.className='projcard'; d.open=pjOpen.has(p.id);
-    d.addEventListener('toggle',()=>{ if(d.open) pjOpen.add(p.id); else pjOpen.delete(p.id);
-      localStorage.setItem(LS_PJOPEN, JSON.stringify([...pjOpen])); });
+    const d=document.createElement('details'); d.className='projcard'; d.open=ctx.open.has(p.id);
+    d.addEventListener('toggle',()=>{ if(d.open) ctx.open.add(p.id); else ctx.open.delete(p.id);
+      localStorage.setItem(ctx.openKey, JSON.stringify([...ctx.open])); });
     const sum=document.createElement('summary');
     const car=document.createElement('span'); car.className='caret'; car.textContent='▶';
     const nm=document.createElement('span'); nm.textContent=p.name; nm.title='double-click to rename';
-    nm.ondblclick=e=>{ e.preventDefault(); inlineEdit(nm, p.name, v=>{ if(v) p.name=v; saveProj(); renderNotes(); }); };
-    const items=pjItems(p.id), tds=items.filter(i=>i.k==='todo');
+    nm.ondblclick=e=>{ e.preventDefault(); inlineEdit(nm, p.name, v=>{ if(v) p.name=v; ctx.save(); ctx.redraw(); }); };
+    const items=pjItems(ctx,p.id), tds=items.filter(i=>i.k==='todo');
     const ct=document.createElement('span'); ct.className='pj-count';
     ct.textContent=tds.length ? (tds.filter(i=>i.done).length+' / '+tds.length+' done') : 'fresh';
     const ab=document.createElement('button'); ab.className='tb'; ab.textContent='📦';
-    ab.title='archive this project (it moves to 📦 below, nothing is lost)';
-    ab.onclick=e=>{ e.preventDefault(); e.stopPropagation(); p.arch=1; saveProj(); renderNotes(); };
+    ab.title=ctx.archTitle;
+    ab.onclick=e=>{ e.preventDefault(); e.stopPropagation(); p.arch=1; ctx.save(); ctx.redraw(); };
     sum.appendChild(car); sum.appendChild(nm); sum.appendChild(ct); sum.appendChild(ab);
     d.appendChild(sum);
     const body=document.createElement('div'); body.className='pj-body';
+    if(ctx.top) ctx.top(p, body);
     const s1=document.createElement('div'); s1.className='pj-sec'; s1.textContent='📋 to-do · checked ones sink and stay'; body.appendChild(s1);
-    tds.filter(i=>!i.done).concat(tds.filter(i=>i.done)).forEach(it=>body.appendChild(pjRowEl(p,it)));
-    body.appendChild(pjAddRow(p,'todo','add a step...'));
+    tds.filter(i=>!i.done).concat(tds.filter(i=>i.done)).forEach(it=>body.appendChild(pjRowEl(ctx,p,it)));
+    body.appendChild(pjAddRow(ctx,p,'todo','add a step...'));
+    if(ctx.mid) ctx.mid(p, body);
     const s2=document.createElement('div'); s2.className='pj-sec'; s2.textContent='🔍 notes · links · research'; body.appendChild(s2);
-    items.filter(i=>i.k==='note').forEach(it=>body.appendChild(pjRowEl(p,it)));
-    body.appendChild(pjAddRow(p,'note','park a link, a song, a thought...'));
+    items.filter(i=>i.k==='note').forEach(it=>body.appendChild(pjRowEl(ctx,p,it)));
+    body.appendChild(pjAddRow(ctx,p,'note','park a link, a phone number, a thought...'));
     d.appendChild(body);
     wrap.appendChild(d);
   });
-  const aw=document.getElementById('projArchWrap'), al=document.getElementById('projArch');
+  const aw=document.getElementById(ctx.archWrapId), al=document.getElementById(ctx.archId);
   aw.style.display=dead.length?'':'none'; al.innerHTML='';
   dead.forEach(p=>{
     const row=document.createElement('div'); row.className='pl-item';
     const tx=document.createElement('div'); tx.className='txt2'; tx.textContent=p.name;
     const back=document.createElement('button'); back.className='tb'; back.textContent='↩'; back.title='bring it back';
-    back.onclick=()=>{ delete p.arch; saveProj(); renderNotes(); };
+    back.onclick=()=>{ delete p.arch; ctx.save(); ctx.redraw(); };
     const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='delete forever (Ctrl+Z can still save you)';
-    del.onclick=()=>{ projTombs.add(p.id); (proj.items[p.id]||[]).forEach(i=>projTombs.add(i.id)); proj.list=proj.list.filter(x=>x!==p); delete proj.items[p.id]; saveProj(); renderNotes(); };
+    del.onclick=()=>{ const s=ctx.store(); ctx.tombs.add(p.id); (s.items[p.id]||[]).forEach(i=>ctx.tombs.add(i.id)); s.list=s.list.filter(x=>x!==p); delete s.items[p.id]; ctx.save(); ctx.redraw(); };
     row.appendChild(tx); row.appendChild(back); row.appendChild(del);
     al.appendChild(row);
   });
 }
+function renderProjects(){ renderCardList(PJ_CTX); }
 function renderNotes(){
   const listEl=document.getElementById('noteList'); if(!listEl) return;
   projSeed();
@@ -5268,13 +5519,46 @@ document.getElementById('noteTxt').addEventListener('keydown',e=>{ if(e.key==='E
 document.getElementById('projAdd').onclick=addProject;
 document.getElementById('projName').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); addProject(); } });
 
+/* ---------- 🌸 PERSONAL ----------
+   Starter sections with the reference info that keeps getting asked for (shop
+   phone numbers, due-date rhythms). Desktop-only seed: the public shell ships
+   this list EMPTY and the cards arrive through state sync instead. Deterministic
+   ids ('me-car'), so two devices seeding the same card can't create twins, and
+   `seeded` remembers what was offered so a deleted card stays deleted. */
+const ME_SEED=[];
+function meSeed(){
+  me.seeded=me.seeded||[];
+  ME_SEED.forEach(c=>{
+    if(me.seeded.includes(c.key)) return;
+    me.seeded.push(c.key);
+    if(!me.list.some(p=>p.id==='me-'+c.key)){
+      me.list.push({id:'me-'+c.key, name:c.name});
+      if(c.items.length)
+        me.items['me-'+c.key]=c.items.map((it,i)=>({id:'me-'+c.key+'-'+i, txt:it.txt, k:it.k, at:iso(new Date())}));
+    }
+  });
+}
+function renderMe(){
+  if(!document.getElementById('meList')) return;
+  meSeed();
+  renderCardList(ME_CTX);
+}
+function addMeSection(){
+  const inp=document.getElementById('meName'); const v=(inp.value||'').trim(); if(!v){ inp.focus(); return; }
+  const p={id:nid('me'), name:v}; me.list.push(p); meOpen.add(p.id); inp.value='';
+  localStorage.setItem(LS_MEOPEN, JSON.stringify([...meOpen]));
+  saveMe(); renderMe();
+}
+document.getElementById('meAdd').onclick=addMeSection;
+document.getElementById('meName').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); addMeSection(); } });
+
 /* ---------- UNDO (Ctrl+Z, or the ↩ up top) ----------
    Every change already funnels through pushStateSoon(), so that's where the
    before-picture gets taken (undoNote). Ctrl+Z / ↩ walks back one change at a
    time (deleted tasks, moved blocks, rewordings, check-offs, all of it), and
    Ctrl+Shift+Z / ↪ walks forward again. Snapshots live in memory only, so a
    refresh starts clean; the walked-back state itself syncs like any change. */
-function undoSnapAll(){ return JSON.stringify({done, custom, apps, money, arch, jobs, myLeads, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore, notes, proj}); }
+function undoSnapAll(){ return JSON.stringify({done, doneAt, custom, apps, money, arch, jobs, myLeads, moved, edits, slotted, blockMods, blockOff, blocksOwn, taskOff, blockNames, blockDescs, food, friends, mine, solo, tmoved, mailDone, mailStore, notes, proj, me}); }
 var undoStack=[], redoStack=[], undoCur=null, undoQuiet=false, undoToastTimer=null;
 function undoBaseline(){ undoCur=undoSnapAll(); }
 function undoBtns(){ document.getElementById('redoBtn').style.display=redoStack.length?'':'none'; }
@@ -5296,7 +5580,7 @@ function undoApply(snap){
   const o=JSON.parse(snap);
   undoQuiet=true;
   try{
-    done=o.done||{}; custom=o.custom||[]; apps=o.apps||{}; money=o.money||[];
+    done=o.done||{}; doneAt=o.doneAt||{}; custom=o.custom||[]; apps=o.apps||{}; money=o.money||[];
     arch=o.arch||{}; jobs=o.jobs||{}; myLeads=o.myLeads||[]; moved=o.moved||{}; edits=o.edits||{}; slotted=o.slotted||{};
     blockMods=o.blockMods||{}; blockOff=o.blockOff||{}; blocksOwn=o.blocksOwn||{};
     taskOff=o.taskOff||{}; blockNames=o.blockNames||{}; blockDescs=o.blockDescs||{};
@@ -5304,16 +5588,17 @@ function undoApply(snap){
     food=o.food||{}; food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[];
     friends=o.friends||{}; friends.people=friends.people||[]; friends.log=friends.log||[];
     notes=o.notes||[]; proj=o.proj||{list:[],items:{}}; proj.list=proj.list||[]; proj.items=proj.items||{};
-    [[LS_DONE,done],[LS_CUSTOM,custom],[LS_APPS,apps],[LS_MONEY,money],[LS_ARCH,arch],[LS_JOBS,jobs],[LS_MYLEADS,myLeads],[LS_MOVED,moved],
+    me=o.me||{list:[],items:{}}; me.list=me.list||[]; me.items=me.items||{};
+    [[LS_DONE,done],[LS_DONEAT,doneAt],[LS_CUSTOM,custom],[LS_APPS,apps],[LS_MONEY,money],[LS_ARCH,arch],[LS_JOBS,jobs],[LS_MYLEADS,myLeads],[LS_MOVED,moved],
      [LS_EDITS,edits],[LS_SLOT,slotted],[LS_BLOCKMODS,blockMods],[LS_BLOCKOFF,blockOff],[LS_BLOCKSOWN,blocksOwn],
      [LS_TASKOFF,taskOff],[LS_BLOCKNAMES,blockNames],[LS_BLOCKDESCS,blockDescs],[LS_FOOD,food],[LS_FRIENDS,friends],
      [LS_MINE,mine],[LS_SOLO,solo],[LS_TMOVED,tmoved],[LS_MAILDONE,mailDone],[LS_MAILSTORE,mailStore],
-     [LS_NOTES,notes],[LS_PROJ,proj]]
+     [LS_NOTES,notes],[LS_PROJ,proj],[LS_ME,me]]
       .forEach(p=>localStorage.setItem(p[0], JSON.stringify(p[1])));
     loadMailFromStore();
     render(); rebuildWeeks();
     Object.values(gpReg).forEach(fns=>fns.forEach(f=>f()));
-    renderApps(); renderMoney(); renderFood(); renderFriends(); renderMail(); updateMailStatus(); renderNotes();
+    renderApps(); renderMoney(); renderFood(); renderFriends(); renderMail(); updateMailStatus(); renderNotes(); renderMe();
     if(view==='plan') renderPlan();
   } finally{ undoQuiet=false; }
   pushStateSoon();   // the other device hears about it too (no new snapshot: state matches undoCur)
@@ -5347,6 +5632,7 @@ undoBaseline();  // undo measures from what just loaded, not from an empty page
 applyLayout();
 renderFood();
 renderNotes();
+renderMe();
 fetchLeads();
 fetchData();
 fetchMail();
