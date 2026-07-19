@@ -499,6 +499,23 @@
   details.projcard>summary .pj-count{margin-left:auto; font-size:.7rem; font-weight:700; color:var(--soft); background:var(--line); padding:2px 9px; border-radius:99px; white-space:nowrap}
   .pj-body{padding:2px 13px 13px}
   .pj-sec{font-size:.7rem; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:var(--soft); margin:10px 2px 2px}
+  /* 🌸 personal cards: the little section pills (one section at a time, no more towering pile) */
+  .me-pills{display:flex; flex-wrap:wrap; gap:6px; margin:2px 0 8px}
+  .me-pill{border:1px solid var(--line); background:#fff; color:var(--soft); font:inherit; font-size:.74rem; font-weight:700;
+    border-radius:99px; padding:4px 11px; cursor:pointer; line-height:1.2}
+  .me-pill i{font-style:normal; font-weight:800; font-size:.68rem; background:var(--line); border-radius:99px; padding:0 6px; margin-left:3px}
+  .me-pill.on{background:var(--pink-deep); border-color:var(--pink-deep); color:#fff}
+  .me-pill.on i{background:rgba(255,255,255,.25); color:#fff}
+  .me-pill.hot:not(.on){border-color:var(--pink-deep); color:var(--pink-deep)}
+  .me-pill.hot:not(.on) i{background:var(--pink-deep); color:#fff}
+  .me-panel{min-height:40px}
+  /* 🗂 a family of projects (all the YouTube videos) folded into one dropdown */
+  .pj-group{border:1px solid var(--line); border-radius:14px; margin:10px 0; background:#fffafd}
+  .pj-group>summary{cursor:pointer; list-style:none; padding:10px 14px; font-weight:800; display:flex; align-items:center; gap:8px}
+  .pj-group>summary::-webkit-details-marker{display:none}
+  .pj-group[open]>summary .caret{transform:rotate(90deg)}
+  .pj-group .projcard{margin:6px 10px}
+  .pj-when.late{color:var(--pink-deep); font-weight:800}
   .pj-body .txt2{overflow-wrap:anywhere}
   .pj-add{display:flex; gap:6px; margin-top:7px}
   .pj-add input{flex:1; border:1px dashed var(--line); border-radius:9px; padding:6px 10px; font-size:.84rem; font-family:inherit; color:var(--ink); min-width:0; background:#fff}
@@ -1223,7 +1240,14 @@
       <h2>🎨 Projects <span class="pill">every project's whole home</span></h2>
       <p class="cl-lead" style="margin-top:0">One hub per project: your next tiny step, the week-by-week plan with its dates, big launch moments, and a place for your own to-dos, ideas, links, and research. Tick a box here and it's ticked on the Game Plan too. Double-click anything to reword it. 🌷</p>
       <div class="note-add">
-        <input id="projName" type="text" maxlength="80" placeholder="start a new project...">
+        <input id="projName" type="text" maxlength="80" placeholder="start a new project ('Ugly Dolls part 2')...">
+        <select id="projKind" class="rep-sel" title="pick a shape and the project arrives with its own steps, week by week, plus a target date">
+          <option value="">✨ blank</option>
+          <option value="yt">🎥 YouTube video</option>
+          <option value="comm">🖼 Commission</option>
+          <option value="anim">🎬 Animation short</option>
+        </select>
+        <input id="projDue" type="date" class="ag-date" title="target date (optional: the steps space themselves out to land on it)">
         <button class="apps-btn" id="projAdd">+ project</button>
       </div>
       <!-- NOT projList: the home tab's Active Projects card already owns that id,
@@ -2477,6 +2501,46 @@ function migrateSeam(sync){
   // stale copy over newer edits, so only the post-sync pass writes to the feed.
   if(sync) pushStateSoon();
 }
+/* ---- 📅 SEND A WHOLE BLOCK TO ANOTHER DAY ----
+   "Job applications are happening tomorrow instead." The block leaves this day
+   (the plan's own blocks the same way 🗑 takes them off, so ↺ still works; your
+   🧱 ones really move) and lands on the target day as one of your own blocks,
+   same name, note and hours. Everything parked inside rides along: sprint tasks
+   hop days and re-park in the moved block, movable to-dos too. Bills and
+   appointments keep their real date, they just lose the block. */
+function isoToPlanDay(iso){
+  for(let n=1;n<=8;n++) for(let i=0;i<DAY_DEFS.length;i++)
+    if(isoLocal(dayDate(n,i))===iso) return {n, dk:DAY_DEFS[i].dk};
+  return null;
+}
+function sendBlockToDay(n, dk, b, targetISO, dayTasksHere, agHere){
+  const tgt=isoToPlanDay(targetISO); if(!tgt) return;
+  const srcDay='w'+n+'-'+dk, tgtDay='w'+tgt.n+'-'+tgt.dk;
+  if(srcDay===tgtDay) return;
+  // it lands on the target day as one of your own blocks, same hours
+  const nb={k:'own-'+Date.now().toString(36), s:b.s, e:b.e, n:b.n, d:b.d||''};
+  blocksOwn[tgtDay]=[...(blocksOwn[tgtDay]||[]), nb];
+  if(blockMods[tgtDay]) blockMods[tgtDay]=[...blockMods[tgtDay],{k:nb.k,s:nb.s,e:nb.e}].sort((x,y)=>x.s-y.s);
+  // ...and leaves this one
+  if(b.own){
+    blocksOwn[srcDay]=(blocksOwn[srcDay]||[]).filter(x=>x.k!==b.k);
+    if(blocksOwn[srcDay] && !blocksOwn[srcDay].length) delete blocksOwn[srcDay];
+  } else {
+    blockOff[srcDay]=[...(blockOff[srcDay]||[]), b.k];
+  }
+  if(blockMods[srcDay]) blockMods[srcDay]=blockMods[srcDay].filter(m=>m.k!==b.k);
+  // everything parked inside rides along
+  (dayTasksHere||[]).forEach(t=>{ if(!taskSlots(t).includes(b.k)) return;
+    const home=(TASK_HOME[t.id]||{}).iso;
+    if(targetISO===home) delete tmoved[t.id]; else tmoved[t.id]=targetISO;
+    slotted[t.id]=nb.k; });
+  (agHere||[]).forEach(it=>{ if(!(it.slots||[]).includes(b.k)) return;
+    const info=AGENDA_INDEX[it.id]||{};
+    if(MOVABLE(info.kind) && info.date!==targetISO) moved[it.id]=Object.assign({}, moved[it.id], {d:targetISO});
+    slotted[it.id]=nb.k; });
+  saveBlocksOwn(); saveBlockMods(); saveBlockOff(); saveTmoved(); saveSlotted(); saveMoved();
+  rebuildWeeks(); if(view==='plan') renderPlan(); render();
+}
 /* ---- 🧱 A BLOCK OF YOUR OWN ----
    The plan doesn't know about the 12:20am kitchen-and-chores hour, or the bath,
    or the hour the cats decided was theirs. Make the block yourself: name it, give
@@ -3483,7 +3547,8 @@ function checklist(items,cntEl,ctx){
       const cur=taskSlots(it);
       lbl('do it during (tap two blocks and it sits in both):');
       chip('📌 no set time','leave it loose at the bottom of the day',!cur.length,()=>gpSlot(it.id,null));
-      ctx.blocks.forEach(b=>chip(b.n, b.t+' · '+b.d, cur.includes(b.k), ()=>gpSlotToggle(it,b.k)));
+      // 😴 hosts no work, ever: Sleep is not offered as a home for the plan's tasks
+      ctx.blocks.filter(b=>b.k!=='sleep').forEach(b=>chip(b.n, b.t+' · '+b.d, cur.includes(b.k), ()=>gpSlotToggle(it,b.k)));
       lbl('or another day:');
       ctx.days.forEach(dy=>chip(dy.name.slice(0,3), dy.name+' '+dy.label, dy.iso===ctx.dayISO,
         ()=>gpMove(it.id, dy.iso)));
@@ -3864,6 +3929,34 @@ const taskSlots = t => { const v=slotted[t.id];
   if(v==null) return [t.slot||'focus'];
   return Array.isArray(v)?v:[v]; };
 const taskSlot = t => taskSlots(t)[0]||null;
+/* 😴 work never sleeps (house rule): the plan's tasks never sit under the Sleep
+   block. And a task whose block isn't on this day's clock at all (pushed onto a
+   weekend card, or its block was taken off the day) used to pile up unlabeled
+   below the LAST block of the day, which is Sleep on most days, so it looked
+   like a to-do list inside Sleep. Both kinds now flow into the closest real
+   work block the day actually has; a day with none gets a labeled 📌 strip. */
+const GP_REST=new Set(['sleep','wake','wind','off','rest','lunch','dinner','break','cats','therapy']);
+const gpWorkKey=k=>!GP_REST.has(k)&&!String(k).startsWith('own-')&&!String(k).startsWith('solo:');
+const SLOT_KIN={fast:['deep','focus','satfilm','ugly','flex'],deep:['fast','focus','satfilm','ugly','flex'],
+  focus:['deep','fast','satfilm','ugly','flex'],content:['satfilm','ugly','flex','focus'],
+  msgs:['setup','checkin','flex','focus'],setup:['msgs','checkin','satfilm','focus'],
+  flex:['focus','content','satfilm','ugly'],satfilm:['content','ugly','focus','flex'],
+  ugly:['content','satfilm','focus','flex'],checkin:['setup','msgs','focus'],
+  dinner:['lunch','break'],lunch:['dinner','break'],break:['lunch','dinner']};
+function gpFlow(k, ck, blockKeys){
+  for(const kk of (SLOT_KIN[k]||[])) if(blockKeys.has(kk)&&kk!=='sleep') return kk;
+  const w=ck.find(b=>blockKeys.has(b.k)&&gpWorkKey(b.k));   // first work block on the clock
+  return w?w.k:null;
+}
+// the block(s) a plan task actually lands in on THIS day's clock
+function gpDaySlots(t, ck, blockKeys){
+  const out=[];
+  taskSlots(t).forEach(k=>{
+    const kk=(k!=='sleep'&&blockKeys.has(k)) ? k : gpFlow(k, ck, blockKeys);
+    if(kk&&!out.includes(kk)) out.push(kk);
+  });
+  return out;
+}
 /* the ⇅ chips toggle now: tap a block to put the task in it, tap it again to
    take it out, and two lit chips means it lives in both. Dragging still means
    "move": a drop replaces every parking spot with where it landed. */
@@ -3900,6 +3993,7 @@ function gpSlot(id, k){
    blockKey 'keep' = it landed on a day header, so whatever block it was in is
    the block it stays in. */
 function gpPlace(id, dayISO, blockKey){
+  if(blockKey==='sleep') blockKey=null;   // 😴 hosts no work: a drop on Sleep lands loose instead
   const home=(TASK_HOME[id]||{}).iso;
   if(!dayISO || dayISO===home) delete tmoved[id]; else tmoved[id]=dayISO;
   if(blockKey!=='keep'){ if(blockKey) slotted[id]=blockKey; else slotted[id]='none'; saveSlotted(); }
@@ -4025,17 +4119,22 @@ function buildWeeks(){
         // it shows up. Plan blocks keep their own per-day checkbox id.
         const bid=b.solo ? b.id : ('gpb-w'+n+'-'+dd.dk+'-'+b.k);
         if(!b.solo) dayIds.push(bid);
-        const hr=hourRow(b,bid,{n:n, dk:dd.dk});
+        const hr=hourRow(b,bid,{n:n, dk:dd.dk, iso:dISO, tasks:tasks, ag:ag});
         dropZone(hr, id=>placeItem(id, dISO, b.k));   // drop on ANY block, 🧱 ones included: that's when you're doing it
         dBody.appendChild(hr);
-        const sub=[...tasks.filter(t=>taskSlots(t).includes(b.k)), ...agIn(b.k)];
+        const sub=[...tasks.filter(t=>gpDaySlots(t,ck,blockKeys).includes(b.k)), ...agIn(b.k)];
         if(sub.length){ const st=document.createElement('div'); st.className='blk-tasks';
           st.appendChild(checklist(sub,null,ctx));
           dropZone(st, id=>placeItem(id, dISO, b.k));
           dBody.appendChild(st); }
       });
-      const rest=tasks.filter(t=>!taskSlots(t).some(k=>blockKeys.has(k)));
-      if(rest.length){ const st=document.createElement('div'); st.className='blk-tasks'; st.appendChild(checklist(rest,null,ctx)); dBody.appendChild(st); }
+      const rest=tasks.filter(t=>!gpDaySlots(t,ck,blockKeys).length);
+      if(rest.length){ const strip=document.createElement('div'); strip.className='ag-strip';
+        const hd=document.createElement('div'); hd.className='ag-head';
+        hd.textContent='📌 No time block yet (floating, NOT part of sleep)';
+        strip.appendChild(hd); strip.appendChild(checklist(rest,null,ctx));
+        dropZone(strip, id=>placeItem(id, dISO, null));
+        dBody.appendChild(strip); }
       dBody.appendChild(myAddRow(dd, dISO, ck));   // ＋ add your own, always last
       dBody.appendChild(blockAddRow(dd, n));       // 🧱 ...and a block of your own
       const dUpd=()=>{ dCnt.textContent=dayIds.filter(id=>done[id]).length+' / '+dayIds.length; };
@@ -4088,6 +4187,35 @@ function hourRow(b,bid,mv){
   (gpReg[bid]=gpReg[bid]||[]).push(sync);
   cb.onchange=()=>gpSet(bid,cb.checked);   // ONLY the square checks it off, same as task rows
   row.appendChild(cb); row.appendChild(t);
+  /* 📅 the whole block can hop to another day (everything parked inside rides
+     along). Not for 🧱 promoted to-dos (their ⇅ already moves them) or Sleep. */
+  const dayHop=tbs=>{
+    if(!mv || !mv.iso || b.solo || b.k==='sleep') return;
+    const btn=document.createElement('button'); btn.className='tb'; btn.textContent='📅';
+    btn.title='Send this whole block to another day. Its tasks ride along; on this day the ↺ chip brings the plan\'s version back.';
+    const drw=document.createElement('div'); drw.className='ag-move'; drw.style.display='none'; drw.style.flexBasis='100%';
+    drw.onclick=e=>e.stopPropagation();
+    const lbl=document.createElement('span'); lbl.className='rs-lbl'; lbl.textContent='move this block (and what\'s in it) to:'; drw.appendChild(lbl);
+    const go=iso=>sendBlockToDay(mv.n, mv.dk, b, iso, mv.tasks, mv.ag);
+    DAY_DEFS.forEach((x,i)=>{ const iso=isoLocal(dayDate(mv.n,i));
+      const c=document.createElement('button'); c.textContent=x.name.slice(0,3);
+      c.title=x.name; if(iso===mv.iso) c.classList.add('on');
+      c.onclick=e=>{ e.stopPropagation(); if(iso!==mv.iso) go(iso); }; drw.appendChild(c); });
+    const tm=document.createElement('button'); tm.textContent='tomorrow';
+    tm.title='push it to tomorrow';
+    tm.onclick=e=>{ e.stopPropagation(); go(fromToday(1)); }; drw.appendChild(tm);
+    const dp=document.createElement('input'); dp.type='date'; dp.className='ag-date';
+    dp.title='or pick any day in the sprint';
+    dp.min=PLAN_START; dp.max=PLAN_END; dp.value=mv.iso;
+    dp.onclick=e=>e.stopPropagation();
+    dp.onchange=e=>{ e.stopPropagation(); if(dp.value) go(dp.value); };
+    drw.appendChild(dp);
+    btn.onclick=e=>{ e.stopPropagation();
+      if(!drw.parentNode){ row.style.flexWrap='wrap'; row.appendChild(drw); }  // last child, so it wraps below the row
+      const open=drw.style.display==='none';
+      drw.style.display=open?'flex':'none'; btn.classList.toggle('on',open); };
+    tbs.appendChild(btn);
+  };
   // 🧱 one of your own: ↩ takes it back off the clock, into the day's to-do list,
   // and 🗑 deletes the block AND the to-do behind it (delete means delete)
   if(b.solo){
@@ -4107,6 +4235,7 @@ function hourRow(b,bid,mv){
   // 🧱 a block you made: 🗑 deletes it for real (it was never the plan's to keep)
   else if(b.own && mv){
     const tbs=document.createElement('div'); tbs.className='tbs';
+    dayHop(tbs);
     const del=document.createElement('button'); del.className='tb'; del.textContent='🗑';
     del.title='Delete this block (it is yours, so it goes for good)';
     del.onclick=e=>{ e.stopPropagation();
@@ -4119,6 +4248,7 @@ function hourRow(b,bid,mv){
   // tasks just go back to having no set time, and ↺ brings the block back.
   else if(mv){
     const tbs=document.createElement('div'); tbs.className='tbs';
+    dayHop(tbs);
     const del=document.createElement('button'); del.className='tb'; del.textContent='🗑';
     del.title='Take this block off this day only (↺ puts it back)';
     del.onclick=e=>{ e.stopPropagation();
@@ -5496,9 +5626,62 @@ function addNote(){
   inp.value=''; sel.value='auto';
   saveNotes(); renderNotes();
 }
+/* ---- 🪄 project templates ----
+   Pick a shape when starting a project and it arrives already knowing what it
+   needs: its own steps in week buckets, spaced out to land on the target date
+   (or a sensible default span), and a family (`group`) so all the YouTube
+   videos fold into one dropdown together. Everything it makes is hers to
+   reword, reorder (⇅ on the plan? here: 🗑/double-click), or delete. */
+const PJ_TEMPLATES={
+  yt:{group:'🎥 YouTube videos', weeks:3, goal:'Take "{title}" from idea to published',
+    steps:[
+      ['🧠 Outline the beats + the hook (bullet points, ugly is fine)',
+       '📝 Script pass 1: just talk it onto the page'],
+      ['📝 Script pass 2 + read it aloud once',
+       '🎬 Record VO / film A-roll',
+       '📸 Gather b-roll + assets (make the list first)'],
+      ['✂️ Rough cut','✂️ Fine cut + sound pass',
+       '🖼 Thumbnail (2 options) + title + description',
+       '🚀 PUBLISH + share a clip to IG/TikTok'],
+    ]},
+  comm:{group:'🖼 Commissions', weeks:2, goal:'Deliver "{title}" happy, on time, and paid',
+    steps:[
+      ['💬 Confirm brief, price, and deadline in writing',
+       '✏️ Sketch + send for approval'],
+      ['🎨 Final render','👀 Client pass (one round of tweaks)',
+       '📦 Deliver files + 💸 invoice',
+       '📣 Post it (with permission) as portfolio content'],
+    ]},
+  anim:{group:'🎬 Animation shorts', weeks:4, goal:'Get "{title}" moving and out the door',
+    steps:[
+      ['🧠 Concept + gather references','📋 Boards / animatic'],
+      ['🎨 Style frames + build the assets'],
+      ['🕺 Animation pass 1','🕺 Animation pass 2 + polish'],
+      ['🔊 Sound + music','🚀 Export + post it everywhere'],
+    ]},
+};
 function addProject(){
   const inp=document.getElementById('projName'); const v=(inp.value||'').trim(); if(!v){ inp.focus(); return; }
-  const p={id:nid('pj'), name:v}; proj.list.push(p); pjOpen.add(p.id); inp.value='';
+  const kindSel=document.getElementById('projKind'), dueInp=document.getElementById('projDue');
+  const p={id:nid('pj'), name:v};
+  const t=PJ_TEMPLATES[(kindSel&&kindSel.value)||''];
+  if(t){
+    p.group=t.group; p.goal=t.goal.replace('{title}', v);
+    const start=parse(iso(today));
+    let end=(dueInp&&dueInp.value)?parse(dueInp.value):null;
+    if(!end||end<=start){ end=new Date(start); end.setDate(end.getDate()+t.weeks*7); }
+    p.due=iso(end);
+    // each week-bucket's steps aim at an evenly spaced slice of the runway
+    const span=Math.max(1, Math.round((end-start)/86400000));
+    const items=[];
+    t.steps.forEach((bucket,i)=>{
+      const d=new Date(start.getTime()); d.setDate(d.getDate()+Math.round(span*(i+1)/t.steps.length));
+      bucket.forEach(txt=>items.push({id:nid('pt'), k:'todo', txt:txt, due:iso(d), at:iso(new Date())}));
+    });
+    proj.items[p.id]=items;
+  }
+  proj.list.push(p); pjOpen.add(p.id);
+  inp.value=''; if(kindSel) kindSel.value=''; if(dueInp) dueInp.value='';
   saveProj(); renderProjects();
 }
 /* ---- one card list, two homes ----
@@ -5510,19 +5693,17 @@ const PJ_CTX={ store:()=>proj, save:saveProj, tombs:projTombs, redraw:()=>render
   open:pjOpen, openKey:LS_PJOPEN,
   empty:'No projects yet. Name one below and give it a home. 🌱',
   archTitle:'archive this project (it moves to 📦 below, nothing is lost)',
-  ideas:true, research:true,
-  top:(p,body)=>{ pjGoalLine(p,body); pjNextStep(p,body); },
-  mid:(p,body)=>{ pjTimeline(p,body); pjRhythm(p,body); } };
+  ideas:true, research:true, grouped:true,
+  top:(p,body)=>{ pjGoalLine(p,body); if(guideFor(p.name)) pjNextStep(p,body); else pjOwnNext(p,body); },
+  mid:(p,body)=>{ if(guideFor(p.name)){ pjTimeline(p,body); pjRhythm(p,body); } else pjOwnTimeline(p,body); } };
 const ME_CTX={ store:()=>me, save:saveMe, tombs:meTombs, redraw:()=>renderMe(),
   listId:'meList', archWrapId:'meArchWrap', archId:'meArch',
   open:meOpen, openKey:LS_MEOPEN,
   empty:'Nothing here yet. Add a section below: car, health, plants, paperwork... 🌱',
   archTitle:'archive this section (it moves to 📦 below, nothing is lost)',
-  urg:true, sub:true, rep:true, research:true, log:true,
-  tdHead:'📋 to-dos & fix-its · the dot is urgency, 📎 is its research pocket',
+  urg:true, sub:true, rep:true, research:true, log:true, moveable:true,
   tdPh:'add a to-do (the dropdown makes it repeat)...',
-  top:(p,body)=>meRepeats(p,body),
-  mid:(p,body)=>{ meWatch(p,body); meOdo(p,body); meWty(p,body); meLog(p,body); } };
+  body:(p,body)=>meBody(p,body) };
 function pjItems(ctx,pid){ const st=ctx.store(); return st.items[pid]=st.items[pid]||[]; }
 function pjRowEl(ctx,p,it){
   const row=document.createElement('div'); row.className='pl-item'+(it.done?' done':'');
@@ -5550,6 +5731,15 @@ function pjRowEl(ctx,p,it){
   // a finished step keeps the day you finished it ("✓ 7/15")
   if(it.done&&it.doneAt){ const w=document.createElement('span'); w.className='pj-when';
     w.textContent='✓ '+it.doneAt.slice(5).replace('-','/'); row.appendChild(w); }
+  // 📅 a step aiming at a date wears it ("by Jul 24"), pink once it's slipped
+  if(it.k==='todo'&&it.due&&!it.every&&!it.done){
+    const w=document.createElement('span'); w.className='pj-when'+(it.due<iso(today)?' late':'');
+    w.textContent='by '+fmtMD(parse(it.due)); w.title='its target date · tap to change';
+    w.style.cursor='pointer';
+    w.onclick=()=>inlineEdit(w, fmtMD(parse(it.due)), v=>{ const pw=parseWhen(v||'')||{};
+      if(pw.date) it.due=pw.date; ctx.save(); ctx.redraw(); });
+    row.appendChild(w);
+  }
   // 🔎✨ a note can go straight to research: the web, or Claude with a ready prompt
   if(ctx.research&&it.k==='note'){
     const q=(it.txt||'').replace(/https?:\/\/\S+/g,'').trim();
@@ -5567,15 +5757,49 @@ function pjRowEl(ctx,p,it){
     cl.onclick=()=>{ if(subOpen.has(k)) subOpen.delete(k); else subOpen.add(k); ctx.redraw(); };
     row.appendChild(cl);
   }
+  // ⇅ move it: nudge it up or down the list, or send it to another card entirely
+  if(ctx.moveable&&it.k==='todo'&&!it.done){
+    const k='mv:'+it.id;
+    const mv=document.createElement('button'); mv.className='tb rs'+(moveOpen.has(k)?' on':''); mv.textContent='⇅';
+    mv.title='move it: up, down, or onto another card';
+    mv.onclick=()=>{ if(moveOpen.has(k)) moveOpen.delete(k); else moveOpen.add(k); ctx.redraw(); };
+    row.appendChild(mv);
+  }
   const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove (Ctrl+Z brings it back)';
   del.onclick=()=>{ ctx.tombs.add(it.id); ctx.store().items[p.id]=pjItems(ctx,p.id).filter(x=>x!==it); ctx.save(); ctx.redraw(); };
   row.appendChild(del);
   return row;
 }
-// a row plus, when its 📎 pocket is open, the pocket right under it
+// a row plus, when its 📎 pocket or ⇅ mover is open, that drawer right under it
 function pjAppendRow(ctx,p,it,body){
   body.appendChild(pjRowEl(ctx,p,it));
   if(ctx.sub&&it.k==='todo'&&subOpen.has('sub:'+it.id)) body.appendChild(pjSubDrawer(ctx,p,it));
+  if(ctx.moveable&&it.k==='todo'&&moveOpen.has('mv:'+it.id)) body.appendChild(pjMoveDrawer(ctx,p,it));
+}
+/* ⇅ the mover: ▲▼ nudge it past its neighbors (within the same urgency tier,
+   since 🔴 always floats above 🟡), or send the whole to-do to another card. */
+const moveOpen=new Set();
+function pjMoveDrawer(ctx,p,it){
+  const d=document.createElement('div'); d.className='ag-move';
+  const chip=(label,title,fn)=>{ const b=document.createElement('button');
+    b.textContent=label; b.title=title; b.onclick=e=>{ e.stopPropagation(); fn(); }; d.appendChild(b); return b; };
+  const lbl=x=>{ const s=document.createElement('span'); s.className='rs-lbl'; s.textContent=x; d.appendChild(s); };
+  const nudge=dir=>{ const a=pjItems(ctx,p.id); const i=a.indexOf(it); if(i<0) return;
+    let j=i+dir;   // hop over logs/notes/repeats living in the same array: land on the next to-do
+    while(j>=0&&j<a.length&&!(a[j].k==='todo'&&!a[j].every&&!a[j].done)) j+=dir;
+    if(j<0||j>=a.length) return;
+    a.splice(i,1); a.splice(j,0,it); ctx.save(); ctx.redraw(); };
+  chip('▲ up','nudge it one spot up',()=>nudge(-1));
+  chip('▼ down','nudge it one spot down',()=>nudge(1));
+  const others=ctx.store().list.filter(q=>!q.arch&&q.id!==p.id);
+  if(others.length){
+    lbl('or send it to:');
+    others.forEach(q=>chip(q.name,'move this to-do onto "'+q.name+'" (its 📎 pocket rides along)',()=>{
+      ctx.store().items[p.id]=pjItems(ctx,p.id).filter(x=>x!==it);
+      pjItems(ctx,q.id).push(it);
+      moveOpen.delete('mv:'+it.id); ctx.save(); ctx.redraw(); }));
+  }
+  return d;
 }
 function webSearch(q){ window.open('https://www.google.com/search?q='+encodeURIComponent(q), '_blank', 'noopener'); }
 // ✨ a ready research prompt: what is it, where to buy it, who can fix it, fair price
@@ -6167,6 +6391,69 @@ function pjTimeline(p, body){
     body.appendChild(det);
   });
 }
+/* 👉 the same spotlight for a project SHE made (usually born from a 🪄 template):
+   the first unchecked of its own steps, plus the little progress bar */
+function pjOwnNext(p, body){
+  const tds=pjItems(PJ_CTX,p.id).filter(i=>i.k==='todo');
+  if(!tds.length) return;
+  const nxt=tds.find(t=>!t.done);
+  if(nxt){
+    const sec=document.createElement('div'); sec.className='pj-next';
+    const l=document.createElement('div'); l.className='pj-next-l'; l.textContent='👉 your next tiny step'; sec.appendChild(l);
+    sec.appendChild(pjRowEl(PJ_CTX,p,nxt));
+    body.appendChild(sec);
+  } else {
+    const d=document.createElement('div'); d.className='pj-next alldone';
+    d.textContent='🏁 every step of this one is DONE 🎉'; body.appendChild(d);
+  }
+  const fin=tds.filter(t=>t.done).length;
+  const pr=document.createElement('div'); pr.className='pj-prog';
+  const i=document.createElement('i'); i.style.width=Math.round(fin/tds.length*100)+'%'; pr.appendChild(i);
+  body.appendChild(pr);
+  const pt=document.createElement('div'); pt.className='pj-prog-t';
+  pt.textContent=fin+' of '+tds.length+' steps done'+(fin===tds.length&&fin?' 🎉':'');
+  body.appendChild(pt);
+}
+/* 🗺️ week-by-week for a project SHE made: its dated steps bucket into weeks,
+   the 🏁 target date counts down on top, and this week greets you open */
+function pjOwnTimeline(p, body){
+  const tds=pjItems(PJ_CTX,p.id).filter(i=>i.k==='todo'&&i.due);
+  if(!tds.length&&!p.due) return;
+  if(p.due){
+    const days=Math.round((parse(p.due)-parse(iso(today)))/86400000);
+    const row=document.createElement('div'); row.className='pj-big';
+    const w=document.createElement('span'); w.className='wk'; w.textContent='🏁 target '+fmtMD(parse(p.due)); row.appendChild(w);
+    const t2=document.createElement('span'); t2.className='bt';
+    t2.textContent=days>1?(days+' days to go'):(days===1?'tomorrow!':(days===0?'today!':'that date slipped by · still yours to land, no guilt'));
+    t2.title='double-click to pick a new target date';
+    t2.ondblclick=()=>inlineEdit(t2, p.due, v=>{ const pw=parseWhen(v||'')||{}; if(pw.date) p.due=pw.date; saveProj(); renderProjects(); });
+    row.appendChild(t2); body.appendChild(row);
+  }
+  if(!tds.length) return;
+  const sec=document.createElement('div'); sec.className='pj-sec'; sec.textContent='🗺️ week by week · its own little plan'; body.appendChild(sec);
+  const wkKey=s=>{ const d=parse(s); d.setDate(d.getDate()-((d.getDay()+6)%7)); return iso(d); };  // that week's Monday
+  const buckets={};
+  tds.forEach(t=>{ const k=wkKey(t.due); (buckets[k]=buckets[k]||[]).push(t); });
+  const nowK=wkKey(iso(today));
+  Object.keys(buckets).sort().forEach((k,i)=>{
+    const det=document.createElement('details'); det.className='pj-week'+(k===nowK?' now':(k<nowK?' past':''));
+    det.open=(k===nowK);
+    const sum=document.createElement('summary');
+    const car=document.createElement('span'); car.className='caret'; car.textContent='▶'; sum.appendChild(car);
+    const ttl=document.createElement('span'); ttl.textContent='Week '+(i+1); sum.appendChild(ttl);
+    const a=parse(k), b=new Date(a); b.setDate(b.getDate()+6);
+    const wh=document.createElement('span'); wh.className='wk-when';
+    wh.textContent=fmtMD(a)+' - '+(a.getMonth()===b.getMonth()?b.getDate():fmtMD(b)); sum.appendChild(wh);
+    if(k===nowK){ const h=document.createElement('span'); h.className='wk-here'; h.textContent='you are here'; sum.appendChild(h); }
+    const done2=buckets[k].filter(t=>t.done).length;
+    const cnt=document.createElement('span'); cnt.className='pj-count'; cnt.textContent=done2+' / '+buckets[k].length; sum.appendChild(cnt);
+    det.appendChild(sum);
+    const bd=document.createElement('div'); bd.className='pd-body';
+    buckets[k].forEach(t=>bd.appendChild(pjRowEl(PJ_CTX,p,t)));
+    det.appendChild(bd);
+    body.appendChild(det);
+  });
+}
 /* 🔁 what this project asks for on repeat: the content engine has daily beats
    woven into the day cards; everything else has its one theme day a week */
 const CONTENT_REC=['trend','film','edit','eng','wip','post','batch'];
@@ -6188,7 +6475,7 @@ function renderCardList(ctx){
   const st=ctx.store();
   const live=st.list.filter(p=>!p.arch), dead=st.list.filter(p=>p.arch);
   if(!live.length){ const e=document.createElement('div'); e.className='empty'; e.textContent=ctx.empty; wrap.appendChild(e); }
-  live.forEach(p=>{
+  const buildCard=p=>{
     const d=document.createElement('details'); d.className='projcard'; d.open=ctx.open.has(p.id);
     d.addEventListener('toggle',()=>{ if(d.open) ctx.open.add(p.id); else ctx.open.delete(p.id);
       localStorage.setItem(ctx.openKey, JSON.stringify([...ctx.open])); });
@@ -6205,11 +6492,14 @@ function renderCardList(ctx){
     sum.appendChild(car); sum.appendChild(nm); sum.appendChild(ct); sum.appendChild(ab);
     d.appendChild(sum);
     const body=document.createElement('div'); body.className='pj-body';
+    if(ctx.body){ ctx.body(p, body); d.appendChild(body); return d; }
     if(ctx.top) ctx.top(p, body);
     const s1=document.createElement('div'); s1.className='pj-sec'; s1.textContent=ctx.tdHead||'📋 your own to-dos · checked ones sink and stay'; body.appendChild(s1);
-    const open=tds.filter(i=>!i.done);
+    // steps wearing a date live in the 🗺️ week-by-week below, not in this list too
+    const plain=tds.filter(i=>!i.due);
+    const open=plain.filter(i=>!i.done);
     if(ctx.urg) open.sort((a,b)=>(a.urg||9)-(b.urg||9));   // 🔴 floats to the top, untagged keep their order
-    open.concat(tds.filter(i=>i.done)).forEach(it=>pjAppendRow(ctx,p,it,body));
+    open.concat(plain.filter(i=>i.done)).forEach(it=>pjAppendRow(ctx,p,it,body));
     body.appendChild(pjAddRow(ctx,p,'todo',ctx.tdPh||'add a step of your own...'));
     if(ctx.mid) ctx.mid(p, body);
     if(ctx.ideas){
@@ -6221,8 +6511,25 @@ function renderCardList(ctx){
     items.filter(i=>i.k==='note').forEach(it=>body.appendChild(pjRowEl(ctx,p,it)));
     body.appendChild(pjAddRow(ctx,p,'note','park a link, a phone number, a thought...'));
     d.appendChild(body);
-    wrap.appendChild(d);
-  });
+    return d;
+  };
+  /* 🗂 cards that share a family (p.group, e.g. every 🎥 YouTube video) fold
+     into one dropdown together; everything else lists like it always did */
+  if(ctx.grouped){
+    const fams={}, loose=[];
+    live.forEach(p=>{ if(p.group) (fams[p.group]=fams[p.group]||[]).push(p); else loose.push(p); });
+    loose.forEach(p=>wrap.appendChild(buildCard(p)));
+    Object.keys(fams).forEach(g=>{
+      const det=document.createElement('details'); det.className='pj-group'; det.open=ctx.open.has('g:'+g);
+      det.addEventListener('toggle',()=>{ if(det.open) ctx.open.add('g:'+g); else ctx.open.delete('g:'+g);
+        localStorage.setItem(ctx.openKey, JSON.stringify([...ctx.open])); });
+      const sum=document.createElement('summary'); sum.className='pj-group-sum';
+      sum.innerHTML='<span class="caret">▶</span>'+g+' <span class="pj-count">'+fams[g].length+'</span>';
+      det.appendChild(sum);
+      fams[g].forEach(p=>det.appendChild(buildCard(p)));
+      wrap.appendChild(det);
+    });
+  } else live.forEach(p=>wrap.appendChild(buildCard(p)));
   const aw=document.getElementById(ctx.archWrapId), al=document.getElementById(ctx.archId);
   aw.style.display=dead.length?'':'none'; al.innerHTML='';
   dead.forEach(p=>{
@@ -6311,6 +6618,8 @@ const ME_SEED=[];
    markers ('i:<id>') in me.seeded keep a deleted one deleted, and the shell
    ships this list EMPTY (desktop seeds, the phone hears about it via sync). */
 const ME_SEED_REP=[];
+// the 🐾 crew, one 👀 thread each (desktop-only seed, stripped from the shell)
+const ME_SEED_CATS=[];
 // [card key, item index in ME_SEED] of the old reference notes those repeats
 // replace; matched against the seed wording, so a note she reworded stays hers
 const ME_SEED_DROP=[['car',1],['health',1],['admin',0]];
@@ -6345,6 +6654,82 @@ function meSeed(){
     const i=arr.findIndex(x=>x.id===iid&&(x.txt||'').slice(0,14)===want);
     if(i>=0){ meTombs.add(iid); arr.splice(i,1); }
   });
+  /* round 3: the cats stop being a line in the notes section ("😺 The crew: ...")
+     and become real 👀 threads, one per cat, so each one gets his own dated
+     history (vet visits, weird appetite days, hairball eras). The names live in
+     ME_SEED_CATS, which is desktop-only and stripped from the public shell just
+     like the rest of the seed; the phone hears about the cats via state sync. */
+  if(ME_SEED_CATS.length && !me.seeded.includes('i:me-pets-cats')){
+    const arr=me.items['me-pets'];
+    // only claim the marker where the card actually lives (the phone boots with
+    // an empty store; the desktop does the work and sync carries it over)
+    if(arr && me.list.some(pp=>pp.id==='me-pets'&&!pp.arch)){
+      me.seeded.push('i:me-pets-cats');
+      const i=arr.findIndex(x=>x.id==='me-pets-0'&&/The crew/.test(x.txt||''));
+      if(i>=0){ meTombs.add('me-pets-0'); arr.splice(i,1); }
+      ME_SEED_CATS.forEach(txt=>{
+        const plain=txt.slice(txt.indexOf(' ')+1);
+        if(!arr.some(x=>x.k==='watch'&&(x.txt||'').includes(plain)))
+          arr.push({id:'me-pets-'+plain.toLowerCase().replace(/\W+/g,''), k:'watch', txt:txt, at:iso(new Date())});
+      });
+    }
+  }
+}
+/* ---- 🌸 a personal card, tidied ----
+   Instead of every section stacked into one tall pile (repeats, to-dos, watch
+   threads, log, notes, all at once), each card gets a row of little pill tabs
+   with counts and shows ONE section at a time. A pill glows when something in
+   it is due. Which pill you were on is remembered per card, on this device. */
+let mePill={}; try{ mePill=JSON.parse(localStorage.getItem('lupita-dash-mepill-v1')||'{}'); }catch(_){ mePill={}; }
+function meBody(p, body){
+  const items=pjItems(ME_CTX,p.id);
+  const tds=items.filter(i=>i.k==='todo'&&!i.every);
+  const reps=items.filter(i=>i.every);
+  const watch=items.filter(i=>i.k==='watch');
+  const logs=items.filter(i=>i.k==='log');
+  const nts=items.filter(i=>i.k==='note');
+  const wty=items.filter(i=>i.k==='wty');
+  const isCar=!!p.odo||/car|🚗/i.test(p.name);
+  const isStuff=wty.length>0||/receipt|warrant|🧾/i.test(p.name);
+  const dueNow=reps.filter(it=>repAwake(it, iso(today))).length;
+  const tabs=[
+    {k:'todo', lbl:'📋 to-dos', n:tds.filter(t=>!t.done).length, draw:bd=>{
+      const hint=document.createElement('div'); hint.className='pj-sec';
+      hint.textContent='📋 to-dos & fix-its · the dot is urgency, 📎 its research pocket, ⇅ moves it';
+      bd.appendChild(hint);
+      const open=tds.filter(i=>!i.done).sort((a,b)=>(a.urg||9)-(b.urg||9));
+      open.concat(tds.filter(i=>i.done)).forEach(it=>pjAppendRow(ME_CTX,p,it,bd));
+      bd.appendChild(pjAddRow(ME_CTX,p,'todo',ME_CTX.tdPh));
+    }},
+  ];
+  if(reps.length) tabs.push({k:'rep', lbl:'🔁 repeat', n:dueNow, hot:dueNow>0, draw:bd=>meRepeats(p,bd)});
+  tabs.push({k:'watch', lbl:'👀 watching', n:watch.length, draw:bd=>meWatch(p,bd)});
+  if(isCar) tabs.push({k:'odo', lbl:'🧮 miles', n:0, draw:bd=>meOdo(p,bd)});
+  if(isStuff) tabs.push({k:'wty', lbl:'🧾 receipts', n:wty.length, draw:bd=>meWty(p,bd)});
+  tabs.push({k:'log', lbl:'📒 log', n:logs.length, draw:bd=>meLog(p,bd)});
+  tabs.push({k:'note', lbl:'🔍 notes', n:nts.length, draw:bd=>{
+    const hint=document.createElement('div'); hint.className='pj-sec'; hint.textContent='🔍 notes · links · research';
+    bd.appendChild(hint);
+    nts.forEach(it=>bd.appendChild(pjRowEl(ME_CTX,p,it)));
+    bd.appendChild(pjAddRow(ME_CTX,p,'note','park a link, a phone number, a thought...'));
+  }});
+  const nav=document.createElement('div'); nav.className='me-pills';
+  const panel=document.createElement('div'); panel.className='me-panel';
+  const cur=()=>tabs.some(t=>t.k===mePill[p.id])?mePill[p.id]:'todo';
+  const draw=()=>{ panel.innerHTML='';
+    tabs.find(t=>t.k===cur()).draw(panel);
+    nav.querySelectorAll('.me-pill').forEach(b=>b.classList.toggle('on', b.dataset.k===cur()));
+  };
+  tabs.forEach(t=>{
+    const b=document.createElement('button'); b.className='me-pill'+(t.hot?' hot':''); b.dataset.k=t.k;
+    b.innerHTML=t.lbl+(t.n?' <i>'+t.n+'</i>':'');
+    if(t.hot) b.title=t.n+' due or close · worth a peek';
+    b.onclick=()=>{ mePill[p.id]=t.k;
+      try{ localStorage.setItem('lupita-dash-mepill-v1', JSON.stringify(mePill)); }catch(_){/* private mode is fine */}
+      draw(); };
+    nav.appendChild(b);
+  });
+  body.appendChild(nav); body.appendChild(panel); draw();
 }
 function renderMe(){
   if(!document.getElementById('meList')) return;
