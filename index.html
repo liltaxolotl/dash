@@ -531,6 +531,14 @@
   .pj-sub{margin:0 0 6px 26px; border-left:2px solid var(--line); padding:2px 0 4px 10px}
   .pj-sub .pl-item{padding:5px 4px; font-size:.82rem}
   .pj-rsrch{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
+  /* 🌸 personal hub extras: 📒 logs, 👀 watch threads, 🧮 odometer, 🧾 warranties */
+  .log-when{font-size:.68rem; font-weight:700; color:var(--soft); white-space:nowrap; cursor:text}
+  .pl-item.logrow{padding:4px 6px; font-size:.82rem}
+  .wt-date{font-size:.68rem; font-weight:700; color:var(--soft); white-space:nowrap}
+  .odo-now{font-size:.78rem; color:var(--soft); margin:2px 2px 4px}
+  .pj-add input.sm{flex:0 0 86px}
+  .me-prep{border:none; border-radius:99px; background:#f3ebff; color:var(--ink); font-family:inherit; font-size:.76rem; font-weight:700; padding:4px 12px; cursor:pointer; margin:4px 2px}
+  .me-prep:hover{background:#e9defc}
   /* ---------- 🎨 Projects tab: one hub per project ---------- */
   #projPanel{max-width:900px; margin:0 auto; flex-direction:column; gap:18px}
   /* 👉 the next tiny step: one obvious thing, big and friendly */
@@ -5510,17 +5518,20 @@ const ME_CTX={ store:()=>me, save:saveMe, tombs:meTombs, redraw:()=>renderMe(),
   open:meOpen, openKey:LS_MEOPEN,
   empty:'Nothing here yet. Add a section below: car, health, plants, paperwork... 🌱',
   archTitle:'archive this section (it moves to 📦 below, nothing is lost)',
-  urg:true, sub:true, rep:true, research:true,
+  urg:true, sub:true, rep:true, research:true, log:true,
   tdHead:'📋 to-dos & fix-its · the dot is urgency, 📎 is its research pocket',
   tdPh:'add a to-do (the dropdown makes it repeat)...',
-  top:(p,body)=>meRepeats(p,body) };
+  top:(p,body)=>meRepeats(p,body),
+  mid:(p,body)=>{ meWatch(p,body); meOdo(p,body); meWty(p,body); meLog(p,body); } };
 function pjItems(ctx,pid){ const st=ctx.store(); return st.items[pid]=st.items[pid]||[]; }
 function pjRowEl(ctx,p,it){
   const row=document.createElement('div'); row.className='pl-item'+(it.done?' done':'');
   if(it.k==='todo'){
     const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox'; cb.checked=!!it.done;
     cb.onchange=()=>{ if(cb.checked){ it.done=1; it.doneAt=iso(new Date()); confetti(12); }
-      else { delete it.done; delete it.doneAt; } ctx.save(); ctx.redraw(); };
+      else { delete it.done; delete it.doneAt; }
+      if(ctx.log) meAutoFile(p, it, cb.checked);   // 🌸 personal check-offs write the card's 📒 (and the budget)
+      ctx.save(); ctx.redraw(); };
     row.appendChild(cb);
     // 🔴🟠🟡 how much this one is breathing down your neck (tap to cycle)
     if(ctx.urg&&!it.done){
@@ -5706,7 +5717,13 @@ function repRowEl(ctx,p,it){
   const cb=document.createElement('input'); cb.type='checkbox'; cb.className='cbox'; cb.checked=!awake;
   cb.title=awake?'done for this round? it files today\'s date and comes back for the next one'
               :'resting until the next round · uncheck if that was a mistake';
-  cb.onchange=()=>{ repCheck(it, cb.checked); if(cb.checked) confetti(12); ctx.save(); ctx.redraw(); };
+  cb.onchange=()=>{
+    // each round also files into the card's 📒 log (src matches the money bid)
+    const covered=it.due||iso(new Date()), last=(it.hist||[])[(it.hist||[]).length-1];
+    repCheck(it, cb.checked);
+    if(ctx.log){ if(cb.checked) meLogAdd(p.id, it.txt, 'rep-'+it.id+'@'+covered);
+      else meLogPull(p.id, 'rep-'+it.id+'@'+(last?(last.due||''):'')); }
+    if(cb.checked) confetti(12); ctx.save(); ctx.redraw(); };
   row.appendChild(cb);
   const tx=document.createElement('div'); tx.className='txt2'; linkifyInto(tx, it.txt);
   tx.title='double-click to reword';
@@ -5760,6 +5777,289 @@ function meRepeats(p, body){
     body.appendChild(repRowEl(ME_CTX,p,it));
     if(subOpen.has('log:'+it.id)) body.appendChild(repLogEl(it));
   });
+}
+/* ---- 🌸 the personal HUB extras ----
+   Everything below rides inside the existing `me` store (new item kinds on a
+   card's items, plus a little `odo` bag on the Car card itself), so there are
+   ZERO new sync keys: state.json, undo, and the rescue path all carry these
+   for free, and a stale shell can't drop them.
+     k:'log'   = 📒 a dated record line ({txt, on, src?}); check-offs auto-file
+     k:'watch' = 👀 a keep-an-eye-on thread; its dated notes live in it.sub
+     k:'wty'   = 🧾 a receipt/warranty ({txt, end}); 🛡 counts down to `end` */
+function meItemsOf(pid){ return me.items[pid]=me.items[pid]||[]; }
+function meLogAdd(pid, txt, src){
+  const arr=meItemsOf(pid);
+  if(src&&arr.some(x=>x.k==='log'&&x.src===src)) return null;   // a re-check, or the other device beat us
+  const it={id:nid('ml'), k:'log', txt:txt, on:iso(new Date())}; if(src) it.src=src;
+  arr.push(it); return it;
+}
+function meLogPull(pid, src){
+  const arr=meItemsOf(pid), i=arr.findIndex(x=>x.k==='log'&&x.src===src);
+  if(i>=0){ meTombs.add(arr[i].id); arr.splice(i,1); return true; }
+  return false;
+}
+// ✅→📒 checking a personal to-do files the record AND the money (uncheck = both back out)
+function meAutoFile(p, it, on){
+  if(on){ meLogAdd(p.id, it.txt, it.id); moneyAutoLog({id:it.id, text:it.txt}, 'task', true); }
+  else { meLogPull(p.id, it.id); billAutoLog({id:it.id}, false); }
+}
+// 📒 the card's log: manual entries welcome; a $ in a typed entry hits the budget too
+function meLog(p, body){
+  const items=pjItems(ME_CTX,p.id).filter(i=>i.k==='log');
+  const sec=document.createElement('div'); sec.className='pj-sec';
+  sec.textContent='📒 log · the record of what happened, newest first'; body.appendChild(sec);
+  items.slice().sort((a,b)=>String(b.on||'').localeCompare(String(a.on||''))).forEach(it=>{
+    const row=document.createElement('div'); row.className='pl-item logrow';
+    const wh=document.createElement('span'); wh.className='log-when';
+    wh.textContent=(it.on||'').slice(5).replace('-','/');
+    wh.title='double-click to change the date';
+    wh.ondblclick=()=>inlineEdit(wh, (it.on||'').slice(5).replace('-','/'), v=>{
+      const pw=parseWhen(v||'')||{}; if(pw.date) it.on=pw.date; saveMe(); renderMe(); });
+    row.appendChild(wh);
+    const tx=document.createElement('div'); tx.className='txt2'; linkifyInto(tx, it.txt);
+    tx.title='double-click to reword';
+    tx.ondblclick=()=>inlineEdit(tx, it.txt, v=>{ if(v) it.txt=v; saveMe(); renderMe(); });
+    row.appendChild(tx);
+    const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove this record line (Ctrl+Z brings it back)';
+    del.onclick=()=>{ meTombs.add(it.id);
+      if(!it.src) billAutoLog({id:'log:'+it.id}, false);   // manual entries own their budget line; auto ones leave it to the check-off
+      me.items[p.id]=pjItems(ME_CTX,p.id).filter(x=>x!==it); saveMe(); renderMe(); };
+    row.appendChild(del);
+    body.appendChild(row);
+  });
+  const add=document.createElement('div'); add.className='pj-add';
+  const inp=document.createElement('input'); inp.type='text'; inp.maxLength=300;
+  inp.placeholder='what happened? ("replaced wipers $28" files today)...';
+  const go=document.createElement('button'); go.className='tb'; go.textContent='＋'; go.title='add it to the record';
+  const doAdd=()=>{ const v=inp.value.trim(); if(!v) return;
+    const it=meLogAdd(p.id, v, null);
+    if(it&&priceIn(v)!=null) billAutoLog({id:'log:'+it.id, text:v}, true);
+    saveMe(); renderMe(); };
+  go.onclick=doAdd;
+  inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); doAdd(); } };
+  add.appendChild(inp); add.appendChild(go); body.appendChild(add);
+}
+/* ---- 👀 keeping an eye on ----
+   Each watch item is a little thread: dated notes pile up under it, so "how is
+   the wrist / the noise / the leak trending" is one tap away (and readable to
+   a doctor or a mechanic word for word). */
+function meWatch(p, body){
+  const items=pjItems(ME_CTX,p.id).filter(i=>i.k==='watch');
+  const sec=document.createElement('div'); sec.className='pj-sec';
+  sec.textContent='👀 keeping an eye on · each one is a thread of dated notes'; body.appendChild(sec);
+  items.forEach(it=>{
+    const row=document.createElement('div'); row.className='pl-item';
+    const dot=document.createElement('span'); dot.textContent='👀'; dot.style.fontSize='.85rem'; row.appendChild(dot);
+    const tx=document.createElement('div'); tx.className='txt2'; linkifyInto(tx, it.txt);
+    tx.title='double-click to reword';
+    tx.ondblclick=()=>inlineEdit(tx, it.txt, v=>{ if(v) it.txt=v; saveMe(); renderMe(); });
+    row.appendChild(tx);
+    const k='w:'+it.id, n=(it.sub||[]).length;
+    const th=document.createElement('button'); th.className='tb rs'+(subOpen.has(k)?' on':''); th.textContent='🧵'+(n||'');
+    th.title='its thread: every dated note so far';
+    th.onclick=()=>{ if(subOpen.has(k)) subOpen.delete(k); else subOpen.add(k); renderMe(); };
+    row.appendChild(th);
+    const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='stop watching (Ctrl+Z brings it back)';
+    del.onclick=()=>{ meTombs.add(it.id); me.items[p.id]=pjItems(ME_CTX,p.id).filter(x=>x!==it); saveMe(); renderMe(); };
+    row.appendChild(del);
+    body.appendChild(row);
+    if(subOpen.has(k)) body.appendChild(meWatchThread(p,it));
+  });
+  const add=pjAddRow(ME_CTX,p,'watch','start watching something (a tooth, a car noise, a leak)...');
+  body.appendChild(add);
+  // 📋 one tap = a cheat sheet of this card's threads + to-dos + recent record
+  if(/health|💗|🩺|doctor|dentist|\bdr\b/i.test(p.name)||items.length){ // leakcheck-allow: generic section-name words
+    const prep=document.createElement('button'); prep.className='me-prep'; prep.textContent='📋 visit prep · copy the cheat sheet';
+    prep.title='copies everything worth mentioning (threads, open to-dos, recent record) so you never blank in the room';
+    prep.onclick=()=>{ copyText(meVisitText(p, iso(new Date()))).then(()=>{
+      const t0=prep.textContent; prep.textContent='✓ copied! paste it anywhere';
+      setTimeout(()=>{ prep.textContent=t0; }, 2000); }); };
+    body.appendChild(prep);
+  }
+}
+function meWatchThread(p, it){
+  const d=document.createElement('div'); d.className='pj-sub';
+  (it.sub||[]).slice().reverse().forEach(s=>{
+    const r=document.createElement('div'); r.className='pl-item';
+    const wh=document.createElement('span'); wh.className='wt-date'; wh.textContent=(s.at||'').slice(5).replace('-','/'); r.appendChild(wh);
+    const tx=document.createElement('div'); tx.className='txt2'; linkifyInto(tx, s.txt);
+    tx.title='double-click to reword';
+    tx.ondblclick=()=>inlineEdit(tx, s.txt, v=>{ if(v) s.txt=v; saveMe(); renderMe(); });
+    r.appendChild(tx);
+    const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove this note (Ctrl+Z brings it back)';
+    del.onclick=()=>{ it.sub=(it.sub||[]).filter(x=>x!==s); saveMe(); renderMe(); };
+    r.appendChild(del);
+    d.appendChild(r);
+  });
+  const add=document.createElement('div'); add.className='pj-add';
+  const inp=document.createElement('input'); inp.type='text'; inp.maxLength=300; inp.placeholder='how is it today? (files with the date)...';
+  const go=document.createElement('button'); go.className='tb'; go.textContent='＋'; go.title='add a dated note';
+  const doAdd=()=>{ const v=inp.value.trim(); if(!v) return;
+    it.sub=it.sub||[]; it.sub.push({id:nid('wn'), txt:v, at:iso(new Date())}); saveMe(); renderMe(); };
+  go.onclick=doAdd;
+  inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); doAdd(); } };
+  add.appendChild(inp); add.appendChild(go); d.appendChild(add);
+  return d;
+}
+// 📋 the cheat sheet itself (plain text: paste into Notes, a message, anywhere)
+function meVisitText(p, todayISO){
+  const items=pjItems(ME_CTX,p.id), L=['📋 Visit prep · '+todayISO.slice(5).replace('-','/')];
+  const watch=items.filter(i=>i.k==='watch');
+  if(watch.length){ L.push('','👀 Watching:');
+    watch.forEach(w=>{ L.push('• '+w.txt);
+      (w.sub||[]).slice(-5).reverse().forEach(s=>L.push('    '+(s.at||'').slice(5).replace('-','/')+': '+s.txt)); }); }
+  const open=items.filter(i=>i.k==='todo'&&!i.done&&!i.every);
+  if(open.length){ L.push('','📋 Still open:'); open.forEach(t=>L.push('• '+t.txt)); }
+  const logs=items.filter(i=>i.k==='log').sort((a,b)=>String(b.on||'').localeCompare(String(a.on||''))).slice(0,8);
+  if(logs.length){ L.push('','📒 Recently:'); logs.forEach(g=>L.push('• '+(g.on||'').slice(5).replace('-','/')+' '+g.txt)); }
+  L.push('','❓ Questions to ask:','• ');
+  return L.join('\n');
+}
+/* ---- 🧮 mileage & service ----
+   Log the odometer once in a while; each service remembers when it last
+   happened (miles + date) and nags by miles OR months, whichever lands first. */
+function fmtMi(n){ return (+n).toLocaleString('en-US'); }
+function odoLatest(p){ const r=((p.odo||{}).reads)||[]; return r.length?r[r.length-1]:null; }
+function odoDueOn(lastOnISO, mo){ const d=parse(lastOnISO); return iso(repClamp(d.getFullYear(), d.getMonth()+mo, d.getDate())); }
+function odoChip(svc, latestMi, todayISO){
+  if(svc.lastMi==null&&!svc.lastOn) return {cls:'', label:'no record yet · ✓ when you do it'};
+  const dueMi=(svc.lastMi!=null&&svc.mi)?svc.lastMi+svc.mi:null;
+  const dueOn=(svc.lastOn&&svc.mo)?odoDueOn(svc.lastOn, svc.mo):null;
+  if((dueMi!=null&&latestMi!=null&&latestMi>=dueMi)||(dueOn&&todayISO>=dueOn))
+    return {cls:'over', label:'due now'};
+  const soonMi=dueMi!=null&&latestMi!=null&&(dueMi-latestMi)<=500;
+  let soonOn=false;
+  if(dueOn){ const w=parse(dueOn); w.setDate(w.getDate()-21); soonOn=parse(todayISO)>=w; }
+  const bits=[]; if(dueMi!=null) bits.push('~'+fmtMi(dueMi)+' mi'); if(dueOn) bits.push('by '+fmtMD(parse(dueOn)));
+  return {cls:(soonMi||soonOn)?'soon':'', label:(soonMi||soonOn?'soon · ':'next ')+bits.join(' or ')};
+}
+function ensureOdo(p){
+  return p.odo=p.odo||{reads:[], svc:[
+    {id:'oil', n:'🛢 Oil change', mi:5000, mo:6},
+    {id:'rot', n:'🔄 Tire rotation', mi:7500, mo:6},
+  ]};
+}
+function meOdo(p, body){
+  if(!p.odo && !/car|🚗/i.test(p.name)) return;
+  const o=p.odo||{reads:[],svc:[]};
+  const sec=document.createElement('div'); sec.className='pj-sec';
+  sec.textContent='🧮 mileage & service · nags by miles or months, whichever lands first'; body.appendChild(sec);
+  const latest=odoLatest(p);
+  const now=document.createElement('div'); now.className='odo-now';
+  now.textContent=latest?('odometer: '+fmtMi(latest.mi)+' mi · logged '+(latest.on||'').slice(5).replace('-','/'))
+                        :'log your mileage once in a while; the reminders do the math';
+  body.appendChild(now);
+  (o.svc||[]).forEach(svc=>{
+    const row=document.createElement('div'); row.className='pl-item';
+    const tx=document.createElement('div'); tx.className='txt2'; tx.textContent=svc.n;
+    tx.title='double-click to reword';
+    tx.ondblclick=()=>inlineEdit(tx, svc.n, v=>{ if(v) svc.n=v; saveMe(); renderMe(); });
+    row.appendChild(tx);
+    const st=odoChip(svc, latest?latest.mi:null, iso(new Date()));
+    const chip=document.createElement('span'); chip.className='rep-chip'+(st.cls?' '+st.cls:'');
+    chip.textContent=st.label;
+    chip.title='every '+(svc.mi?fmtMi(svc.mi)+' mi':'')+(svc.mi&&svc.mo?' / ':'')+(svc.mo?svc.mo+' months':'')
+      +(svc.lastOn?(' · last: '+(svc.lastOn||'').slice(5).replace('-','/')+(svc.lastMi!=null?(' @ '+fmtMi(svc.lastMi)+' mi'):'')):'');
+    row.appendChild(chip);
+    const did=document.createElement('button'); did.className='tb rs'; did.textContent='✓';
+    did.title='did it today: stamps the date + current miles, files the 📒, asks what it cost';
+    did.onclick=()=>{ const lm=odoLatest(p);
+      svc.lastOn=iso(new Date()); svc.lastMi=lm?lm.mi:null;
+      meLogAdd(p.id, svc.n+(lm?(' @ '+fmtMi(lm.mi)+' mi'):''), null);
+      moneyAutoLog({id:'svc:'+svc.id+'@'+svc.lastOn, text:svc.n}, 'task', true);
+      saveMe(); renderMe(); };
+    row.appendChild(did);
+    const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove this service (Ctrl+Z brings it back)';
+    del.onclick=()=>{ o.svc=o.svc.filter(x=>x!==svc); saveMe(); renderMe(); };
+    row.appendChild(del);
+    body.appendChild(row);
+  });
+  // log a reading + add a service of your own
+  const add=document.createElement('div'); add.className='pj-add';
+  const inp=document.createElement('input'); inp.type='text'; inp.inputMode='numeric'; inp.placeholder='current odometer ("87450")...';
+  const go=document.createElement('button'); go.className='tb'; go.textContent='＋'; go.title='log the reading';
+  const doAdd=()=>{ const mi=parseInt((inp.value||'').replace(/[^\d]/g,''),10); if(!(mi>0)){ inp.focus(); return; }
+    const oo=ensureOdo(p); oo.reads.push({mi, on:iso(new Date())});
+    if(oo.reads.length>24) oo.reads=oo.reads.slice(-24);   // plenty of history, no bloat
+    saveMe(); renderMe(); };
+  go.onclick=doAdd;
+  inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); doAdd(); } };
+  add.appendChild(inp); add.appendChild(go); body.appendChild(add);
+  const add2=document.createElement('div'); add2.className='pj-add';
+  const nm=document.createElement('input'); nm.type='text'; nm.maxLength=80; nm.placeholder='add a service ("brake fluid")...';
+  const mi2=document.createElement('input'); mi2.type='text'; mi2.className='sm'; mi2.inputMode='numeric'; mi2.placeholder='miles';
+  const mo2=document.createElement('input'); mo2.type='text'; mo2.className='sm'; mo2.inputMode='numeric'; mo2.placeholder='months';
+  const go2=document.createElement('button'); go2.className='tb'; go2.textContent='＋'; go2.title='add it (either interval can stay blank)';
+  const doAdd2=()=>{ const v=nm.value.trim(); if(!v){ nm.focus(); return; }
+    const mi=parseInt(mi2.value,10)||0, mo=parseInt(mo2.value,10)||0;
+    if(!mi&&!mo){ mi2.focus(); return; }
+    const oo=ensureOdo(p); const svc={id:nid('sv'), n:v}; if(mi) svc.mi=mi; if(mo) svc.mo=mo;
+    oo.svc.push(svc); nm.value=''; mi2.value=''; mo2.value='';
+    saveMe(); renderMe(); };
+  go2.onclick=doAdd2;
+  [nm,mi2,mo2].forEach(x=>x.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); doAdd2(); } });
+  add2.appendChild(nm); add2.appendChild(mi2); add2.appendChild(mo2); add2.appendChild(go2);
+  body.appendChild(add2);
+}
+/* ---- 🧾 receipts & warranties ----
+   A big purchase gets one line: what it is (+ where the receipt lives), and
+   when the warranty ends. 🛡 counts down and turns loud near the end. */
+function parseWtyEnd(v){
+  v=(v||'').trim(); if(!v) return null;
+  let m=/^(\d{1,2})\s*\/\s*(\d{4})$/.exec(v);
+  if(m) return iso(new Date(+m[2], +m[1], 0));   // "8/2027" = good through that whole month
+  m=/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(v);
+  if(m){ let y=+m[3]; if(y<100) y+=2000; return iso(new Date(y, +m[1]-1, +m[2])); }
+  return (parseWhen(v)||{}).date||null;
+}
+function wtyChip(endISO, todayISO){
+  if(!endISO) return {cls:'', label:'🛡 no end date'};
+  const days=Math.round((parse(endISO)-parse(todayISO))/86400000);
+  if(days<0) return {cls:'over', label:'expired '+fmtMD(parse(endISO))};
+  if(days<=60) return {cls:'soon', label:'🛡 '+days+' day'+(days===1?'':'s')+' left'};
+  const d=parse(endISO); return {cls:'', label:'🛡 until '+(d.getMonth()+1)+'/'+d.getFullYear()};
+}
+function meWty(p, body){
+  const items=pjItems(ME_CTX,p.id).filter(i=>i.k==='wty');
+  if(!items.length && !/receipt|warrant|🧾/i.test(p.name)) return;
+  const sec=document.createElement('div'); sec.className='pj-sec';
+  sec.textContent='🧾 receipts & warranties · 🛡 counts down to the end date'; body.appendChild(sec);
+  items.slice().sort((a,b)=>String(a.end||'9').localeCompare(String(b.end||'9'))).forEach(it=>{
+    const row=document.createElement('div'); row.className='pl-item';
+    const st=wtyChip(it.end, iso(new Date()));
+    const chip=document.createElement('button'); chip.className='rep-chip'+(st.cls?' '+st.cls:'');
+    chip.textContent=st.label; chip.title='warranty ends '+(it.end||'?')+' · tap to change ("8/2027")';
+    chip.onclick=()=>{
+      const inp=document.createElement('input'); inp.type='text'; inp.className='rep-edit'; inp.placeholder='8/2027';
+      row.replaceChild(inp, chip); inp.focus();
+      const fin=()=>{ const d=parseWtyEnd(inp.value); if(d) it.end=d; saveMe(); renderMe(); };
+      inp.onblur=fin;
+      inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } if(e.key==='Escape'){ inp.value=''; inp.blur(); } };
+    };
+    row.appendChild(chip);
+    const tx=document.createElement('div'); tx.className='txt2'; linkifyInto(tx, it.txt);
+    tx.title='double-click to reword (a good line: what it is + where the receipt lives)';
+    tx.ondblclick=()=>inlineEdit(tx, it.txt, v=>{ if(v) it.txt=v; saveMe(); renderMe(); });
+    row.appendChild(tx);
+    const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='remove (Ctrl+Z brings it back)';
+    del.onclick=()=>{ meTombs.add(it.id); me.items[p.id]=pjItems(ME_CTX,p.id).filter(x=>x!==it); saveMe(); renderMe(); };
+    row.appendChild(del);
+    body.appendChild(row);
+  });
+  const add=document.createElement('div'); add.className='pj-add';
+  const inp=document.createElement('input'); inp.type='text'; inp.maxLength=200; inp.placeholder='the thing + where the receipt lives ("drawing tablet, Gmail receipt")...';
+  const en=document.createElement('input'); en.type='text'; en.className='sm'; en.placeholder='ends 8/2027';
+  const go=document.createElement('button'); go.className='tb'; go.textContent='＋'; go.title='add it';
+  const doAdd=()=>{ const v=inp.value.trim(); if(!v){ inp.focus(); return; }
+    const d=parseWtyEnd(en.value);
+    if(en.value.trim()&&!d){ en.focus(); en.style.borderColor='var(--urgent)'; return; }
+    const it={id:nid('wy'), k:'wty', txt:v, at:iso(new Date())}; if(d) it.end=d;
+    pjItems(ME_CTX,p.id).push(it); inp.value=''; en.value=''; en.style.borderColor='';
+    saveMe(); renderMe(); };
+  go.onclick=doAdd;
+  [inp,en].forEach(x=>x.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); doAdd(); } });
+  add.appendChild(inp); add.appendChild(en); add.appendChild(go);
+  body.appendChild(add);
 }
 // 🎯 the one-line goal at the top of a project card
 function pjGoalLine(p, body){
