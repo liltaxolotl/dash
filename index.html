@@ -509,6 +509,14 @@
   .me-pill.hot:not(.on){border-color:var(--pink-deep); color:var(--pink-deep)}
   .me-pill.hot:not(.on) i{background:var(--pink-deep); color:#fff}
   .me-panel{min-height:40px}
+  /* 🟦 the personal page sits in a grid of squares (like the jobs cards), not a
+     stack of full-width dropdown bars: every card open, side by side */
+  #meList{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; align-items:start; margin-top:12px}
+  @media(max-width:720px){#meList{grid-template-columns:1fr}}
+  .me-tile{border:1px solid var(--line); border-radius:14px; background:#fdfafe; overflow:hidden}
+  .me-tile-h{display:flex; align-items:center; gap:9px; padding:11px 13px 7px; font-weight:800; font-size:.92rem; flex-wrap:wrap}
+  .me-tile-h .pj-count{margin-left:auto; font-size:.7rem; font-weight:700; color:var(--soft); background:var(--line); padding:2px 9px; border-radius:99px; white-space:nowrap}
+  .me-tile .pj-body{padding-top:0}
   /* 🗂 a family of projects (all the YouTube videos) folded into one dropdown */
   .pj-group{border:1px solid var(--line); border-radius:14px; margin:10px 0; background:#fffafd}
   .pj-group>summary{cursor:pointer; list-style:none; padding:10px 14px; font-weight:800; display:flex; align-items:center; gap:8px}
@@ -5701,7 +5709,7 @@ const ME_CTX={ store:()=>me, save:saveMe, tombs:meTombs, redraw:()=>renderMe(),
   open:meOpen, openKey:LS_MEOPEN,
   empty:'Nothing here yet. Add a section below: car, health, plants, paperwork... 🌱',
   archTitle:'archive this section (it moves to 📦 below, nothing is lost)',
-  urg:true, sub:true, rep:true, research:true, log:true, moveable:true,
+  urg:true, sub:true, rep:true, research:true, log:true, moveable:true, tiles:true,
   tdPh:'add a to-do (the dropdown makes it repeat)...',
   body:(p,body)=>meBody(p,body) };
 function pjItems(ctx,pid){ const st=ctx.store(); return st.items[pid]=st.items[pid]||[]; }
@@ -6083,9 +6091,12 @@ function meWatch(p, body){
     th.title='its thread: every dated note so far';
     th.onclick=()=>{ if(subOpen.has(k)) subOpen.delete(k); else subOpen.add(k); renderMe(); };
     row.appendChild(th);
-    const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='stop watching (Ctrl+Z brings it back)';
-    del.onclick=()=>{ meTombs.add(it.id); me.items[p.id]=pjItems(ME_CTX,p.id).filter(x=>x!==it); saveMe(); renderMe(); };
-    row.appendChild(del);
+    // family members (the cats) are permanent residents: no ✕ on them, ever
+    if(!it.keep){
+      const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='stop watching (Ctrl+Z brings it back)';
+      del.onclick=()=>{ meTombs.add(it.id); me.items[p.id]=pjItems(ME_CTX,p.id).filter(x=>x!==it); saveMe(); renderMe(); };
+      row.appendChild(del);
+    }
     body.appendChild(row);
     if(subOpen.has(k)) body.appendChild(meWatchThread(p,it));
   });
@@ -6476,11 +6487,19 @@ function renderCardList(ctx){
   const live=st.list.filter(p=>!p.arch), dead=st.list.filter(p=>p.arch);
   if(!live.length){ const e=document.createElement('div'); e.className='empty'; e.textContent=ctx.empty; wrap.appendChild(e); }
   const buildCard=p=>{
-    const d=document.createElement('details'); d.className='projcard'; d.open=ctx.open.has(p.id);
-    d.addEventListener('toggle',()=>{ if(d.open) ctx.open.add(p.id); else ctx.open.delete(p.id);
-      localStorage.setItem(ctx.openKey, JSON.stringify([...ctx.open])); });
-    const sum=document.createElement('summary');
-    const car=document.createElement('span'); car.className='caret'; car.textContent='▶';
+    /* 🟦 tiles (the Personal page): always-open squares sitting in a grid, like
+       the Jobs page cards, instead of a stack of full-width dropdown bars */
+    const tile=!!ctx.tiles;
+    const d=document.createElement(tile?'div':'details'); d.className='projcard'+(tile?' me-tile':'');
+    let sum;
+    if(tile){ sum=document.createElement('div'); sum.className='me-tile-h'; }
+    else {
+      d.open=ctx.open.has(p.id);
+      d.addEventListener('toggle',()=>{ if(d.open) ctx.open.add(p.id); else ctx.open.delete(p.id);
+        localStorage.setItem(ctx.openKey, JSON.stringify([...ctx.open])); });
+      sum=document.createElement('summary');
+      const car=document.createElement('span'); car.className='caret'; car.textContent='▶'; sum.appendChild(car);
+    }
     const nm=document.createElement('span'); nm.textContent=p.name; nm.title='double-click to rename';
     nm.ondblclick=e=>{ e.preventDefault(); inlineEdit(nm, p.name, v=>{ if(v) p.name=v; ctx.save(); ctx.redraw(); }); };
     const items=pjItems(ctx,p.id), tds=items.filter(i=>i.k==='todo'&&!i.every);
@@ -6489,7 +6508,7 @@ function renderCardList(ctx){
     const ab=document.createElement('button'); ab.className='tb'; ab.textContent='📦';
     ab.title=ctx.archTitle;
     ab.onclick=e=>{ e.preventDefault(); e.stopPropagation(); p.arch=1; ctx.save(); ctx.redraw(); };
-    sum.appendChild(car); sum.appendChild(nm); sum.appendChild(ct); sum.appendChild(ab);
+    sum.appendChild(nm); sum.appendChild(ct); sum.appendChild(ab);
     d.appendChild(sum);
     const body=document.createElement('div'); body.className='pj-body';
     if(ctx.body){ ctx.body(p, body); d.appendChild(body); return d; }
@@ -6670,10 +6689,15 @@ function meSeed(){
       ME_SEED_CATS.forEach(txt=>{
         const plain=txt.slice(txt.indexOf(' ')+1);
         if(!arr.some(x=>x.k==='watch'&&(x.txt||'').includes(plain)))
-          arr.push({id:'me-pets-'+plain.toLowerCase().replace(/\W+/g,''), k:'watch', txt:txt, at:iso(new Date())});
+          arr.push({id:'me-pets-'+plain.toLowerCase().replace(/\W+/g,''), k:'watch', txt:txt, at:iso(new Date()), keep:1});
       });
     }
   }
+  // the cats are family, not list items: their threads never grow a ✕ (repairs
+  // threads made before `keep` existed; the generic watch seed stays deletable)
+  (me.items['me-pets']||[]).forEach(x=>{
+    if(x.k==='watch'&&/^me-pets-/.test(x.id||'')&&x.id!=='me-pets-1') x.keep=1;
+  });
 }
 /* ---- 🌸 a personal card, tidied ----
    Instead of every section stacked into one tall pile (repeats, to-dos, watch
