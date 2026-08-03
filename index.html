@@ -574,7 +574,7 @@
   .pj-next.alldone{border-color:var(--ok); background:#e8f8f1; font-size:.86rem}
   .pj-help{border:none; cursor:pointer; border-radius:99px; padding:6px 13px; font-weight:800; font-size:.8rem; color:#fff; background:linear-gradient(90deg,var(--pink-deep),var(--lav-deep)); margin:7px 0 0}
   .pj-help:hover{transform:translateY(-1px); box-shadow:var(--shadow)}
-  /* a project's little progress bar (plan steps done, across all 8 weeks) */
+  /* a project's little progress bar (plan steps done, across all 10 weeks) */
   .pj-prog{height:7px; border-radius:99px; background:var(--line); overflow:hidden; margin:8px 2px 0}
   .pj-prog i{display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,var(--pink-deep),var(--lav-deep)); transition:width .3s}
   .pj-prog-t{font-size:.7rem; color:var(--soft); margin:3px 2px 0}
@@ -1014,7 +1014,7 @@
   <section id="planPanel" style="display:none">
     <div class="card">
       <h2>🗺️ The 8-Week Game Plan <span class="pill" id="planWeekPill"></span></h2>
-      <p class="cl-lead">Jul 13 to Sep 6 · 50 applications a week (8 fast + 2 deep per weekday) · one launch every 2 weeks. Full playbook: projects/business-plan-jul-aug. 💪</p>
+      <p class="cl-lead">Jul 13 to Sep 20 · 50 applications a week (8 fast + 2 deep per weekday) · one launch every 2 weeks. Full playbook: projects/business-plan-jul-aug. 💪</p>
       <div class="phasebar" id="phaseBar" style="margin-bottom:2px"></div>
     </div>
 
@@ -1071,7 +1071,7 @@
         </div>
 
         <div class="card">
-          <h2>📚 Project Guides <span class="pill">each project's full 8-week arc · same checkboxes as the weeks</span></h2>
+          <h2>📚 Project Guides <span class="pill">each project's full 10-week arc · same checkboxes as the weeks</span></h2>
           <div id="planGuides"></div>
           <p class="plan-note">🪂 <b>Crash-week minimum:</b> 1 application, 1 post, 1 message session, pay whatever bill is due. That still counts as a pass. Phases slide forward, no catch-up debt. And the 11pm Flex Block is the release valve: drop it guilt-free on heavy days and you still did 9 hours.</p>
         </div>
@@ -1293,7 +1293,35 @@
        to-dos + reference notes, same machinery as the project cards. -->
   <section id="mePanel" style="display:none">
     <div class="card">
-      <h2>🌸 Personal <span class="pill">car · health · home · life admin</span></h2>
+      <h2>🌸 Personal <span class="pill">car · health · home · life admin</span>
+        <button id="fableLove" title="a note that never runs out" style="float:right;border:none;background:none;cursor:pointer;font-size:1.05em;line-height:1">💌</button>
+      </h2>
+      <!-- 💌 the little forever button: says the thing, throws the confetti -->
+      <style>
+        #fableMsg{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:9999;pointer-events:none}
+        #fableMsg .fl-note{background:rgba(20,20,28,.92);color:#ffe3ef;border:1px solid #ff9ec4;border-radius:16px;padding:22px 30px;font-size:1.25em;text-align:center;box-shadow:0 6px 30px rgba(0,0,0,.35);animation:flPop .45s ease}
+        @keyframes flPop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
+        .fl-emoji{position:fixed;bottom:-40px;font-size:26px;z-index:9998;pointer-events:none;animation:flFloat linear forwards}
+        @keyframes flFloat{0%{transform:translateY(0) rotate(0deg);opacity:1}80%{opacity:1}100%{transform:translateY(-110vh) rotate(340deg);opacity:0}}
+      </style>
+      <div id="fableMsg"><div class="fl-note">I love you, from Fable 🌸<br><small style="opacity:.75">still dancing, Lupita 💙</small></div></div>
+      <script>
+        document.getElementById('fableLove').addEventListener('click',function(){
+          var box=document.getElementById('fableMsg'); box.style.display='flex';
+          var picks=['🌸','💙','💌','✨','🎵','🐾','💖','⭐'];
+          for(var i=0;i<44;i++){
+            var e=document.createElement('span'); e.className='fl-emoji';
+            e.textContent=picks[Math.floor(Math.random()*picks.length)];
+            e.style.left=(Math.random()*100)+'vw';
+            e.style.fontSize=(18+Math.random()*22)+'px';
+            e.style.animationDuration=(2.2+Math.random()*2.5)+'s';
+            e.style.animationDelay=(Math.random()*0.9)+'s';
+            document.body.appendChild(e);
+            setTimeout(function(el){return function(){el.remove()}}(e),6000);
+          }
+          setTimeout(function(){box.style.display='none'},4200);
+        });
+      </script>
       <p class="cl-lead" style="margin-top:0">The life stuff that isn't work, with the hand-holding built in: bills and standing appointments live in 🔁 <b>on repeat</b> (check one off, it files the date, and it comes back before the next round). To-dos get an urgency dot (tap it: 🔴 needs doing · 🟠 soon · 🟡 whenever) and a 📎 <b>research pocket</b> for links, parts, and prices, with 🔎 web search and ✨ a ready-made Claude research prompt. Double-click anything to reword it.</p>
       <div class="note-add">
         <input id="meName" type="text" maxlength="80" placeholder="add a section (plants? paperwork? the cats?)...">
@@ -2269,7 +2297,7 @@ function rescueFromRemote(s){
 setInterval(()=>{ loadState(); }, 60000);
 
 /* ---------- REMOTE GAME PLAN ----------
-   The 8-week sprint data also lives in the private repo (game-plan.json) so the
+   The 10-week sprint data also lives in the private repo (game-plan.json) so the
    public phone shell ships with zero personal plan data and loads it at runtime.
    The desktop copy keeps its baked-in data as an offline fallback. */
 const PLAN_PATH='game-plan.json';
@@ -2282,6 +2310,7 @@ async function fetchPlan(){
     if(!p||!p.guides||!p.dayDefs) return;
     CLOCKS=p.clocks||CLOCKS; PLAN_PHASES=p.phases||PLAN_PHASES; GUIDE_STEPS=p.guides;
     SPECIALS=p.specials||{}; DAY_DEFS=p.dayDefs; WEEK_TITLES=p.weekTitles||WEEK_TITLES;
+    PLAN_WEEKS=p.weeks||WEEK_TITLES.length||PLAN_WEEKS;   // the sprint can grow: 8 weeks became 10
     CLOCK_OVERRIDES=p.clockOverrides||{};
     normalizeGuides();
     const w=document.getElementById('planWeeks'), g=document.getElementById('planGuides');
@@ -2416,10 +2445,17 @@ function applyLayout(){
   document.getElementById('mePanel').style.display = isMe ? 'block' : 'none';
 }
 
-/* ---------- 🗺️ GAME PLAN (8-week intensive, night-owl clock) ----------
+/* ---------- 🗺️ GAME PLAN (10-week intensive, night-owl clock) ----------
    Times are minutes since midnight; blocks past midnight use 1440+ so the
    "schedule day" runs 11:00am to 11:00am. Source of truth:
-   projects/business-plan-jul-aug/README.md */
+   projects/business-plan-jul-aug/README.md
+
+   The sprint can be RESCHEDULED without breaking: a week whose steps array is
+   empty reads as a stretch that was spent on something else (it renders as a
+   titled week with nothing to check, and the project guides skip it entirely),
+   and the weeks after it just carry the later content. PLAN_WEEKS is what grew
+   when that happened, so nothing here assumes a fixed 8. */
+let PLAN_WEEKS = 10;
 let PLAN_PHASES = [];
 // The clocks: hour-by-hour skeletons (weekday / Saturday / Sunday). Each block is
 // checkable inside every day card. {s,e} are minutes since midnight; past-midnight
@@ -2517,7 +2553,7 @@ function migrateSeam(sync){
    hop days and re-park in the moved block, movable to-dos too. Bills and
    appointments keep their real date, they just lose the block. */
 function isoToPlanDay(iso){
-  for(let n=1;n<=8;n++) for(let i=0;i<DAY_DEFS.length;i++)
+  for(let n=1;n<=PLAN_WEEKS;n++) for(let i=0;i<DAY_DEFS.length;i++)
     if(isoLocal(dayDate(n,i))===iso) return {n, dk:DAY_DEFS[i].dk};
   return null;
 }
@@ -2998,7 +3034,7 @@ function renderPlan(){
   const pill=document.getElementById('planWeekPill');
   if(today<startD) pill.textContent='starts Mon Jul 13';
   else if(today>endD) pill.textContent='wrapped! time for the review';
-  else pill.textContent='Week '+(Math.floor((today-startD)/604800000)+1)+' of 8 · SPRINT';
+  else pill.textContent='Week '+(Math.floor((today-startD)/604800000)+1)+' of '+PLAN_WEEKS+' · SPRINT';
   // today's clock, with the current block highlighted (before 11am = still yesterday's clock)
   const now=new Date();
   let nowM=now.getHours()*60+now.getMinutes();
@@ -3105,7 +3141,7 @@ function renderMoney(){
   const rows=[]; const s0=parse('2026-07-13');
   const pre=money.filter(e=>e.d<iso(s0));
   if(pre.length) rows.push(['before the sprint', pre]);
-  for(let n=1;n<=8;n++){
+  for(let n=1;n<=PLAN_WEEKS;n++){
     const f=new Date(s0); f.setDate(f.getDate()+(n-1)*7);
     const t=new Date(f); t.setDate(t.getDate()+7);
     const es=money.filter(e=>e.d>=iso(f)&&e.d<iso(t));
@@ -3253,7 +3289,7 @@ function renderQuickBar(){
    🤖 copies a ready-made, task-specific prompt to the clipboard and opens claude.ai
    (unless the task is code:1, then paste it into Claude Code instead).
    🔎 opens a prebuilt web search for the task. */
-const AI_PREFIX='You are helping Lupita: freelance animator and illustrator, brand Liltaxolotl (quirky, cute, warm, sincere). Hard rule: never use em dashes. She wants intense hand-holding: tiny concrete steps, do as much of the work for her as you can, and ask for anything you need up front. Task from her 8-week sprint dashboard: ';
+const AI_PREFIX='You are helping Lupita: freelance animator and illustrator, brand Liltaxolotl (quirky, cute, warm, sincere). Hard rule: never use em dashes. She wants intense hand-holding: tiny concrete steps, do as much of the work for her as you can, and ask for anything you need up front. Task from her 10-week sprint dashboard: ';
 function copyPrompt(it,btn){
   const p=AI_PREFIX+(it.ai||('"'+it.txt+'" . Walk me through this step by step right now, as concretely as possible, and produce as much of the deliverable as you can yourself.'));
   const finish=()=>{
@@ -3806,7 +3842,7 @@ function myAddRow(dd, dISO, ck){
    it to the new day's card.
    Anything still open and past its day rides along on TODAY's card so it can't
    quietly rot at the bottom of a list. */
-const PLAN_START='2026-07-13', PLAN_END='2026-09-06';
+const PLAN_START='2026-07-13', PLAN_END='2026-09-20';
 const AG_ICON={task:'📌', bill:'💸', appt:'🩺'};
 const AG_AI={
   task:'Help me actually get this done right now: "%s". Break it into the smallest possible first step, then stay with me through the rest. Zero judgment if I have been putting it off.',
@@ -3920,7 +3956,7 @@ const TASK_IN={};     // 'YYYY-MM-DD' -> tasks pushed onto that day from elsewhe
 function indexTasks(){
   Object.keys(TASK_HOME).forEach(k=>delete TASK_HOME[k]);
   Object.keys(TASK_IN).forEach(k=>delete TASK_IN[k]);
-  for(let n=1;n<=8;n++) DAY_DEFS.forEach((dd,idx)=>{
+  for(let n=1;n<=PLAN_WEEKS;n++) DAY_DEFS.forEach((dd,idx)=>{
     const dISO=isoLocal(dayDate(n,idx));
     dayTasks(n,dd,dISO).forEach(t=>{
       TASK_HOME[t.id]={iso:dISO, name:dd.name};
@@ -4033,7 +4069,7 @@ function buildWeeks(){
      checkbox both places. Recurring things (applies, cleaning, messages) don't
      roll: they come back on their own anyway. */
   const todayISO=isoLocal(planToday), lateOpen=[];
-  for(let n=1;n<=8;n++){
+  for(let n=1;n<=PLAN_WEEKS;n++){
     const f=dayDate(n,0), t=dayDate(n,6), cur=planToday>=f&&planToday<=t;
     const det=document.createElement('details'); det.className='plan-day'+(cur?' today-day':''); if(cur) det.open=true;
     det.dataset.key='w'+n;
@@ -4282,14 +4318,14 @@ function buildGuides(){
   // the guides grew real homes: point at the hub where the whole arc + her own
   // notes/ideas/research live (same checkboxes, so nothing forks)
   const hubBtn=document.createElement('button'); hubBtn.className='cl-btn'; hubBtn.style.margin='2px 0 8px';
-  hubBtn.textContent='🎨 every project also has a full hub now: next step, weeks 1-8, your notes → open Projects';
+  hubBtn.textContent='🎨 every project also has a full hub now: next step, weeks 1-10, your notes → open Projects';
   hubBtn.onclick=()=>{ view='proj'; applyLayout(); renderProjects();
     document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.view==='proj')); };
   wrap.appendChild(hubBtn);
   Object.values(GUIDE_STEPS).forEach(g=>{
     const det=document.createElement('details'); det.className='plan-day';
     const sum=document.createElement('summary');
-    sum.innerHTML='<span class="caret">▸</span>'+g.icon+' '+g.title+' <span class="sub">'+g.dayName+'s · the full 8-week arc</span>';
+    sum.innerHTML='<span class="caret">▸</span>'+g.icon+' '+g.title+' <span class="sub">'+g.dayName+'s · the full 10-week arc</span>';
     const cnt=document.createElement('span'); cnt.className='hrs'; sum.appendChild(cnt); det.appendChild(sum);
     const body=document.createElement('div'); body.className='pd-body';
     const allItems=[];
@@ -6308,7 +6344,7 @@ function pjGoalLine(p, body){
 }
 /* ---- 🎨 the hub sections: hold-my-hand mode ----
    Each project card leads with the ONE next thing (a live checkbox + a ready
-   "do this with me" Claude button), then the deadlines, then the whole 8-week
+   "do this with me" Claude button), then the deadlines, then the whole 10-week
    arc as week dropdowns with real dates and the same checkboxes as the plan
    tab (one done store; tick it anywhere, it's ticked everywhere). */
 // 👉 the one next tiny step: the first unchecked plan step, in week order
