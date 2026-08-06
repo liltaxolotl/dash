@@ -160,6 +160,7 @@
   .status.active{background:#e8f8f1; color:var(--ok)}
   .status.hi{background:#ffe3ef; color:var(--pink-deep)}
   .status.todo{background:#fff2d9; color:#c79016}
+  .status.chill{background:#f0eef7; color:#8a83a6}
 
   .add-row{display:flex; gap:8px; margin-top:12px}
   .add-row input{flex:1; border:1px solid var(--line); border-radius:12px; padding:10px 12px; font-size:.9rem; font-family:inherit; color:var(--ink)}
@@ -5926,7 +5927,7 @@ function pjAddRow(ctx,p, kind, ph){
   let sel=null;
   if(kind==='todo'&&ctx.rep){
     sel=document.createElement('select'); sel.className='rep-sel'; sel.title='does this one come back?';
-    [['','once'],['month','every month'],['week','every week'],['year','every year']].forEach(o=>{
+    [['','once'],['month','every month'],['week','every week'],['2week','every 2 weeks'],['year','every year']].forEach(o=>{
       const op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; sel.appendChild(op); });
   }
   const go=document.createElement('button'); go.className='tb'; go.textContent='＋'; go.title='add it';
@@ -5943,7 +5944,7 @@ function pjAddRow(ctx,p, kind, ph){
   return w;
 }
 /* ---- 🔁 repeating to-dos: the little date engine ----
-   A repeat carries every ('month'|'week'|'year'), due (next date, ISO), dom (day
+   A repeat carries every ('month'|'week'|'2week'|'year'), due (next date, ISO), dom (day
    of month it aims for, so Jan 31 -> Feb 28 -> Mar 31 never drifts), and hist
    (every past check-off: [{on, due}], the record that "archives" each round).
    Checking one files today's date into hist and rolls due forward; the row then
@@ -5953,11 +5954,16 @@ function repClamp(y,m,day){ const last=new Date(y,m+1,0).getDate(); const d=new 
 function advanceDue(dueISO, every, dom){
   const d=parse(dueISO);
   if(every==='week'){ d.setDate(d.getDate()+7); return iso(d); }
+  if(every==='2week'){ d.setDate(d.getDate()+14); return iso(d); }
   if(every==='year') return iso(repClamp(d.getFullYear()+1, d.getMonth(), dom||d.getDate()));
   return iso(repClamp(d.getFullYear(), d.getMonth()+1, dom||d.getDate()));
 }
-// how many days before its date a resting repeat wakes back up
-function repLead(every){ return every==='week'?4:(every==='year'?21:7); }
+// how it reads on the little chip's tooltip ('2week' would say "every 2week")
+const REP_LBL={week:'week', '2week':'2 weeks', month:'month', year:'year'};
+/* how many days before its date a resting repeat wakes back up. A fortnightly
+   one gets a 1-day lead on purpose: it should surface the DAY BEFORE (the Sunday
+   before its Monday), not sit awake half the cycle. */
+function repLead(every){ return every==='2week'?1:(every==='week'?4:(every==='year'?21:7)); }
 function repAwake(it, todayISO){
   if(!it.due) return true;
   const w=parse(it.due); w.setDate(w.getDate()-repLead(it.every));
@@ -5967,7 +5973,7 @@ function repAwake(it, todayISO){
 // wording when there is one, else starts from today's date
 function firstDue(every, txt, fromISO, dom){
   const from=parse(fromISO);
-  if(every==='week'){
+  if(every==='week'||every==='2week'){
     const m=/\b(sun|mon|tue|wed|thu|fri|sat)/i.exec(txt||'');
     const want=m?WD_IDX[m[1].toLowerCase()]:from.getDay();
     let off=(want-from.getDay()+7)%7; if(!off&&!m) off=7;
@@ -6005,7 +6011,7 @@ function ord(n){ return n+(n%10===1&&n%100!==11?'st':n%10===2&&n%100!==12?'nd':n
 function repChipText(it, awake){
   if(!it.due) return '↻';
   const d=parse(it.due);
-  const md=(it.every==='week'?(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]+' '):'')+fmtMD(d);
+  const md=(it.every==='week'||it.every==='2week'?(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]+' '):'')+fmtMD(d);
   if(awake) return (it.due<iso(today)?'was due ':'due ')+md;
   const h=(it.hist||[])[(it.hist||[]).length-1];
   const w=new Date(d); w.setDate(w.getDate()-repLead(it.every));
@@ -6033,7 +6039,7 @@ function repRowEl(ctx,p,it){
   const chip=document.createElement('button');
   chip.className='rep-chip'+(awake?(it.due&&it.due<iso(today)?' over':' soon'):'');
   chip.textContent=repChipText(it, awake);
-  chip.title='every '+(it.every||'month')+(it.dom?(' on the '+ord(it.dom)):'')+' · tap to change the date';
+  chip.title='every '+(REP_LBL[it.every]||'month')+(it.dom?(' on the '+ord(it.dom)):'')+' · tap to change the date';
   chip.onclick=()=>{
     const inp=document.createElement('input'); inp.type='text'; inp.className='rep-edit'; inp.placeholder='8/1';
     row.replaceChild(inp, chip); inp.focus();
@@ -6729,9 +6735,13 @@ function meSeed(){
     if(!me.list.some(p=>p.id===pid&&!p.arch)) return;   // card gone or shelved: her call wins
     const arr=me.items[pid]=me.items[pid]||[];
     if(arr.some(x=>x.id===sd.id)) return;
-    const fd=firstDue(sd.every, sd.txt, iso(today), sd.dom);
+    /* a seed may pin its own anchor date, because a fortnightly cycle is not
+       guessable from today (this Monday or next one?), and may carry the rounds
+       already filed, so its 📜 record starts out true instead of blank. */
+    const fd=sd.due?{due:sd.due, dom:sd.dom||null}:firstDue(sd.every, sd.txt, iso(today), sd.dom);
     const it={id:sd.id, txt:sd.txt, k:'todo', every:sd.every, due:fd.due, at:iso(new Date())};
     if(fd.dom) it.dom=fd.dom;
+    if(sd.hist) it.hist=sd.hist.map(h=>Object.assign({},h));
     arr.push(it);
   });
   ME_SEED_DROP.forEach(cd=>{
