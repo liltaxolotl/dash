@@ -8,9 +8,9 @@
 <link rel="icon" href="icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Lupita Dash">
+<meta name="apple-mobile-web-app-title" content="Dash">
 <meta name="theme-color" content="#fff5fa">
-<title>Lupita's Second Brain 🌸</title>
+<title>Second Brain 🌸</title>
 <style>
   :root{
     --bg1:#fff5fa; --bg2:#f3eaff; --card:#ffffff; --ink:#4a3b52; --soft:#8a7b93;
@@ -108,6 +108,9 @@
   .tag.today{background:var(--urgent); color:#fff}
   .tag.over{background:#ff4d6d; color:#fff}
   .tag.soon{background:var(--line); color:var(--soft)}
+  /* borrowed rows: 📆 from the Game Plan, 🔁 from a Personal-tab repeat */
+  .tag.plan{background:#eef0ff; color:#5b62b8}
+  .tag.rep{background:#fdf0e6; color:#b5762e}
   .tag.fulltime{background:#ece4ff; color:var(--lav-deep)}
   .tag.freelance{background:#ffe3ef; color:var(--pink-deep)}
   .tag.opencall{background:#e8f8f1; color:var(--ok)}
@@ -204,7 +207,7 @@
   @media(max-width:820px){#jobsPanel .jgrid{grid-template-columns:1fr}}
   /* role sub-groups (Production Assistant, Editor, ...) are little dropdowns of their
      own, closed by default, so a category shows a short shelf of headers + counts
-     instead of every single lead (no scrolling: Lupita's ask) */
+     instead of every single lead (no scrolling: her ask) */
   details.rolecat>summary{cursor:pointer; list-style:none; user-select:none}
   details.rolecat>summary::-webkit-details-marker{display:none}
   details.rolecat>summary .caret{font-size:.72em; color:var(--soft); transition:transform .15s}
@@ -653,7 +656,7 @@
     <div style="display:flex; align-items:center; gap:14px">
       <div class="axo">🐾</div>
       <div class="hello">
-        <h1 id="greeting">Hi Lupita</h1>
+        <h1 id="greeting">Hi 🌸</h1>
         <p id="dateline"></p>
       </div>
     </div>
@@ -931,7 +934,7 @@
           <div class="cl-row">
             <div class="cl-field">
               <label>Your name <span class="hint">as you sign off</span></label>
-              <input id="clName" type="text" placeholder="Maria Lupita Roa">
+              <input id="clName" type="text" placeholder="your full name">
             </div>
             <div class="cl-field">
               <label>Contact line <span class="hint">email · site · phone</span></label>
@@ -1313,7 +1316,8 @@
         .fl-emoji{position:fixed;bottom:-40px;font-size:26px;z-index:9998;pointer-events:none;animation:flFloat linear forwards}
         @keyframes flFloat{0%{transform:translateY(0) rotate(0deg);opacity:1}80%{opacity:1}100%{transform:translateY(-110vh) rotate(340deg);opacity:0}}
       </style>
-      <div id="fableMsg"><div class="fl-note">I love you, from Fable 🌸<br><small style="opacity:.75">still dancing, Lupita 💙</small></div></div>
+      <!-- the name in "still dancing" is filled in by applyIdentity() once the private feed loads -->
+      <div id="fableMsg"><div class="fl-note">I love you, from Fable 🌸<br><small style="opacity:.75">still dancing 💙</small></div></div>
       <script>
         document.getElementById('fableLove').addEventListener('click',function(){
           var box=document.getElementById('fableMsg'); box.style.display='flex';
@@ -1380,23 +1384,40 @@ let LEAD_UPDATED = '';     // 'updated' date from the feed
 let REMOTE = null;   // dashboard-data.json: {tasks,bills,appts,focuses,rhythm,miles,projects}
 let EVENTS = [];     // events.json: Apple Calendar mirror, optional
 
-/* ---------- STATE / STORAGE ---------- */
-const LS_DONE = 'lupita-dash-done-v1';
-const LS_CUSTOM = 'lupita-dash-custom-v1';
-const LS_TOKEN = 'lupita-gh-token-v1';
-const LS_ARCH = 'lupita-archive-v1';
-const LS_MOVED = 'lupita-dash-moved-v1';
-const LS_EDITS = 'lupita-dash-edits-v1';
-const LS_SLOT = 'lupita-dash-slot-v1';
-const LS_BLOCKMODS = 'lupita-dash-blockmods-v1';
-const LS_MINE = 'lupita-dash-mine-v1';
-const LS_SOLO = 'lupita-dash-solo-v1';
-const LS_TMOVED = 'lupita-dash-tmoved-v1';
-const LS_BLOCKOFF = 'lupita-dash-blockoff-v1';
-const LS_BLOCKSOWN = 'lupita-dash-blocksown-v1';
-const LS_TASKOFF = 'lupita-dash-taskoff-v1';
-const LS_BLOCKNAMES = 'lupita-dash-blocknames-v1';
-const LS_BLOCKDESCS = 'lupita-dash-blockdescs-v1';
+/* 🌸 WHO THIS BELONGS TO. Her name, what she does, the brand: personal, so it is
+   treated exactly like the schedule data. build-shell.js blanks this, the public
+   page greets nobody and its AI prompts say "an artist", and the real values
+   arrive from dashboard-data.json once the token loads (applyIdentity below).
+   The desktop copy keeps them baked as its offline fallback.
+   NEVER write the name, role or brand as a literal anywhere else: read it here. */
+let ME_ID = {name:'', full:'', role:'', brand:'', bio:''};
+const meRole = () => ME_ID.role || 'an independent artist';
+// "Good morning, <her> 🌸" once the feed says who that is, plain "Good morning 🌸" until then
+const withName = s => s + (meName() ? ', ' + meName() : '');
+
+/* ---------- STATE / STORAGE ----------
+   These keys used to carry her first name as their prefix, which put it
+   in the source of a PUBLIC page for no reason at all. They are plain 'dash-...'
+   now. This runs before the first read below and copies every old key across, so
+   nothing is lost; the originals are deliberately left in place, so opening an
+   older copy of this file still finds its data. Safe to delete after a while. */
+/* storage migration is desktop-only (it referenced the old name-based prefix) */
+const LS_DONE = 'dash-done-v1';
+const LS_CUSTOM = 'dash-custom-v1';
+const LS_TOKEN = 'dash-gh-token-v1';
+const LS_ARCH = 'dash-archive-v1';
+const LS_MOVED = 'dash-moved-v1';
+const LS_EDITS = 'dash-edits-v1';
+const LS_SLOT = 'dash-slot-v1';
+const LS_BLOCKMODS = 'dash-blockmods-v1';
+const LS_MINE = 'dash-mine-v1';
+const LS_SOLO = 'dash-solo-v1';
+const LS_TMOVED = 'dash-tmoved-v1';
+const LS_BLOCKOFF = 'dash-blockoff-v1';
+const LS_BLOCKSOWN = 'dash-blocksown-v1';
+const LS_TASKOFF = 'dash-taskoff-v1';
+const LS_BLOCKNAMES = 'dash-blocknames-v1';
+const LS_BLOCKDESCS = 'dash-blockdescs-v1';
 let done = JSON.parse(localStorage.getItem(LS_DONE) || '{}');
 let custom = JSON.parse(localStorage.getItem(LS_CUSTOM) || '[]');
 let arch = JSON.parse(localStorage.getItem(LS_ARCH) || '{}');   // id -> {t:text, k:kind, at:'YYYY-MM-DD'}
@@ -1451,22 +1472,22 @@ let blockDescs = JSON.parse(localStorage.getItem(LS_BLOCKDESCS) || '{}');
 // 📆 WHEN a checkbox got checked. id -> 'YYYY-MM-DD', written by gpSet alongside
 // done, so a project card can say not just "you finished this" but "on the 15th".
 // Checks from before this store existed simply have no date, which is fine.
-const LS_DONEAT = 'lupita-doneat-v1';
+const LS_DONEAT = 'dash-doneat-v1';
 let doneAt = JSON.parse(localStorage.getItem(LS_DONEAT) || '{}');
 // 💼 the application tracker on the Jobs tab. A lead leaves the listings the moment
 // it lands here. id -> {t, link, ty, at:'YYYY-MM-DD', s:'applied'|'passed',
 // r:'wait'|'int'|'offer'|'rej'|'ghost', rAt}. r = what happened after applying
 // (the tag chips); passed entries have no r. Nothing is deleted: this IS the record.
-const LS_JOBS = 'lupita-jobs-v1';
+const LS_JOBS = 'dash-jobs-v1';
 let jobs = JSON.parse(localStorage.getItem(LS_JOBS) || '{}');
 // 📎 leads SHE found herself (pasted into the Jobs tab's add box). Same shape as a
 // hunter lead but type:'mine': they render in their own "Added by you" category on
 // both lead lists and go through the exact same applied / passed flow.
-const LS_MYLEADS = 'lupita-myleads-v1';
+const LS_MYLEADS = 'dash-myleads-v1';
 let myLeads = JSON.parse(localStorage.getItem(LS_MYLEADS) || '[]');
-// 🎨/🌱 the creative-or-life chip, when Lupita flips it herself (tap the chip).
+// 🎨/🌱 the creative-or-life chip, when she flips it herself (tap the chip).
 // id -> 'work'|'life', an override layered over the item's own tag at render time.
-const LS_TAGS = 'lupita-tags-v1';
+const LS_TAGS = 'dash-tags-v1';
 let tags = JSON.parse(localStorage.getItem(LS_TAGS) || '{}');
 let view = 'today';
 const saveDone = () => { localStorage.setItem(LS_DONE, JSON.stringify(done)); pushStateSoon(); };
@@ -1600,7 +1621,7 @@ const onRadar = it => pushedFwd(it) && !done[it.id] && !arch[it.id];
 
 /* ---------- ONE SOURCE OF TRUTH FOR THE SCHEDULE ----------
    Every dated to-do, bill, and appointment: the private feed's copy when it's
-   loaded, the baked-in arrays otherwise, plus anything Lupita added herself and
+   loaded, the baked-in arrays otherwise, plus anything she added herself and
    any calendar events, with day-moves layered on. Both the home lists AND the
    Game Plan day cards read from here, so they can never drift apart. */
 function scheduleLists(){
@@ -1613,6 +1634,26 @@ function scheduleLists(){
     bill:[...(D.bills||BILLS), ...custom.filter(c=>c.kind==='bill')].map(layerOn),
     appt:[...withEvents,        ...custom.filter(c=>c.kind==='appt')].map(layerOn),
   };
+}
+
+/* ---------- 🌉 ONE LIST, NOT THREE ----------
+   The home to-do list used to show only the to-dos. The plan's own tasks lived on
+   the Game Plan tab and the recurring bills lived on the 🌸 Personal tab, so the
+   list she actually opens each morning was quietly the least complete of the
+   three. Both now join it, always scoped to TODAY (a plan task is a today thing,
+   and a whole week of them would bury the real to-dos). Ids are the originals, so
+   the checkbox here IS the checkbox there: tick it on either tab, it ticks on both.
+   Reworded and pushed-to-another-day items are respected, same as everything else. */
+function bridgedTodos(){
+  const out=[], seen=new Set();
+  planTasksToday().forEach(t=>{
+    if(seen.has(t.id) || arch[t.id]) return; seen.add(t.id);
+    // no `tag`: these carry a 📆 chip of their own, a category chip too would be noise
+    out.push(withEdit({id:t.id, text:t.txt, date:isoLocal(planToday),
+      fromPlan:true, lateFrom:t.late||'', links:t.links, note:t.note, ai:t.ai, url:t.url}));
+  });
+  repTodos().forEach(r=>{ if(!seen.has(r.id)){ seen.add(r.id); out.push(withEdit(r)); } });
+  return out;
 }
 
 /* checking something here also ticks its twin on the Game Plan day card (and the
@@ -1628,6 +1669,20 @@ function itemRow(it, kind, deletable){
   const cb=document.createElement('input');
   cb.type='checkbox'; cb.className='cbox'; cb.checked=isDone;
   cb.onchange=()=>{
+    /* 🔁 a repeat borrowed from the Personal tab doesn't get archived and doesn't
+       live in `done`: checking it files this round into its own history and rolls
+       the due date forward, exactly as its row over there would. */
+    if(it.rep){
+      const covered=it.rep.due||iso(new Date()), last=(it.rep.hist||[])[(it.rep.hist||[]).length-1];
+      repCheck(it.rep, cb.checked);
+      if(cb.checked){ meLogAdd(it.repCard.id, it.rep.txt, 'rep-'+it.rep.id+'@'+covered); confetti(12); }
+      else meLogPull(it.repCard.id, 'rep-'+it.rep.id+'@'+(last?(last.due||''):''));
+      saveMe(); render(); rebuildWeeks(); renderMe(); return;
+    }
+    /* 📆 a plan task is a MIRROR of the Game Plan's own row, so it goes through the
+       exact same setter the day card uses. No archiving, no money guess: whatever
+       ticking it there does, ticking it here does, and both boxes end up checked. */
+    if(it.fromPlan){ gpSet(it.id, cb.checked); render(); return; }
     const archivable=(kind==='task'||kind==='bill'||kind==='appt');
     if(cb.checked){
       done[it.id]=true; doneAt[it.id]=iso(new Date()); saveDoneAt();
@@ -1660,6 +1715,21 @@ function itemRow(it, kind, deletable){
       const t=document.createElement('span'); t.className='tag soon';
       t.textContent='in '+n+' day'+(n===1?'':'s'); meta.appendChild(t);
     }
+  }
+  /* where a borrowed row came from, so the list never looks like it grew mystery
+     items: 📆 from the Game Plan (with the day it was supposed to happen, if it
+     rode forward), 🔁 from a repeat on the Personal tab. */
+  if(it.fromPlan){
+    const t=document.createElement('span'); t.className='tag plan';
+    t.textContent=it.lateFrom?('📆 plan · from '+it.lateFrom):'📆 plan';
+    t.title=it.lateFrom?('This was '+it.lateFrom+"'s and is still open, so it rode forward to today.")
+                       :'From your Game Plan for today. Same checkbox as the day card.';
+    meta.appendChild(t);
+  }
+  if(it.rep){
+    const t=document.createElement('span'); t.className='tag rep'; t.textContent=it.repLbl;
+    t.title='A repeat from your 🌸 Personal tab. Checking it here files this round and rolls the next one forward.';
+    meta.appendChild(t);
   }
   // 🎨/💼/🌱 the category chip. The auto-guess gets it wrong sometimes (CVS meds
   // are not "creative"), so the chip is a button: each tap cycles creative →
@@ -1723,7 +1793,7 @@ function startRename(it, txt){
     if(!commit){ if(inp.parentNode) inp.parentNode.replaceChild(txt, inp); return; }
     const v=inp.value.trim();
     const base=it.baseText||it.text;             // the wording the data file / feed uses
-    const mine=custom.find(c=>c.id===it.id);     // something Lupita added herself: edit it in place
+    const mine=custom.find(c=>c.id===it.id);     // something she added herself: edit it in place
     if(v && mine){ mine.text=v; delete edits[it.id]; saveCustom(); }
     else if(!v || v===base) delete edits[it.id]; // empty or back to the original: drop the override
     else edits[it.id]=v;
@@ -1792,7 +1862,7 @@ function fillList(el, items, kind, deletable){
    things reads like a story instead of one long pile. */
 const KIND_LBL={task:'to-do', bill:'bill', appt:'appt', lead:'lead'};
 const ARCH_GROUPS=[['task','📌 to-dos'],['bill','💸 bills'],['appt','🩺 appointments'],['other','🗃️ everything else']];
-const LS_ARCHOPEN='lupita-arch-open-v1';
+const LS_ARCHOPEN='dash-arch-open-v1';
 const archOpen=new Set(JSON.parse(localStorage.getItem(LS_ARCHOPEN)||'["task","bill","appt","other"]'));
 function archBucket(at){
   if(!at) return 'sometime';
@@ -1917,13 +1987,13 @@ function roleOf(title){
   for(const [k,label,re] of ROLE_ORDER){ if(re.test(title||'')) return {k,label}; }
   return {k:'other',label:'✨ Other'};
 }
-const LS_CATOPEN='lupita-leadcat-open-v1';
+const LS_CATOPEN='dash-leadcat-open-v1';
 let catOpen=JSON.parse(localStorage.getItem(LS_CATOPEN)||'{}');
 /* role sub-groups (Production Assistant, Editor, ...) are little dropdowns too
-   (Lupita's ask: compress instead of scroll). Roles start CLOSED so a category is
+   (her ask: compress instead of scroll). Roles start CLOSED so a category is
    a short shelf of headers + counts; the client good-fit/stretch split starts open
    (it's usually short and it's the money list). Which ones you open sticks. */
-const LS_ROLEOPEN='lupita-leadrole-open-v1';
+const LS_ROLEOPEN='dash-leadrole-open-v1';
 let roleOpen=JSON.parse(localStorage.getItem(LS_ROLEOPEN)||'{}');
 function roleCat(key, label, cls, items, defOpen){
   const d=document.createElement('details'); d.className='rolecat';
@@ -1976,7 +2046,7 @@ function buildCat(type,label,mode,items){
 const REMOTE_RE=/\bremote\b|work from home|\bwfh\b|anywhere|virtual/i;
 const isRemote = it => it.remote===true || it.type==='remotework' ||
   REMOTE_RE.test((it.title||'')+' '+(it.org||''));
-const LS_REMOTEONLY='lupita-leads-remoteonly-v1';
+const LS_REMOTEONLY='dash-leads-remoteonly-v1';
 let remoteOnly = localStorage.getItem(LS_REMOTEONLY)==='1';
 
 // Leads whose apply-by deadline already passed are hidden automatically, and a
@@ -2132,9 +2202,20 @@ async function fetchPrivate(path){
     return JSON.parse(await res.text());
   }catch(err){ return null; }
 }
+/* the name/role/brand ride along in the private feed, so the public page can ship
+   without them and still greet her properly the moment her token loads */
+function applyIdentity(id){
+  if(!id) return;
+  Object.keys(ME_ID).forEach(k=>{ if(id[k]) ME_ID[k]=id[k]; });
+  if(meName()){
+    document.title=meName()+"'s Second Brain 🌸";
+    const fn=document.querySelector('#fableMsg .fl-note small');
+    if(fn) fn.textContent='still dancing, '+meName()+' 💙';
+  }
+}
 async function fetchData(){
   const d=await fetchPrivate('dashboard-data.json');
-  if(d) REMOTE=d;
+  if(d){ REMOTE=d; applyIdentity(d.identity); }
   const ev=await fetchPrivate('events.json');
   if(ev) EVENTS=ev.events||[];
   if(d||ev){ render(); rebuildWeeks(); }   // fresh schedule: redraw the day cards too
@@ -2145,7 +2226,7 @@ async function fetchData(){
    desktop copy and the phone app stay identical. Newest save wins. If the token
    can't write to the repo, everything still works per-device. */
 const STATE_PATH='state.json';
-const LS_SAVEDAT='lupita-state-savedat-v1';
+const LS_SAVEDAT='dash-state-savedat-v1';
 let stateSha=null, statePushTimer=null;
 const ghHdr = () => ({Authorization:'Bearer '+getToken(), Accept:'application/vnd.github+json'});
 const stateUrl = () => `https://api.github.com/repos/${LEAD_FEED.owner}/${LEAD_FEED.repo}/contents/${STATE_PATH}`;
@@ -2336,7 +2417,7 @@ function render(){
   // greeting
   const h=today.getHours? new Date().getHours():12;
   document.getElementById('greeting').textContent =
-    (h<12?'Good morning, Lupita ':(h<18?'Hi Lupita ':'Evening, Lupita '))+'🌸';
+    withName(h<12?'Good morning':(h<18?'Hi':'Evening'))+' 🌸';
   document.getElementById('dateline').textContent =
     new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
 
@@ -2350,7 +2431,13 @@ function render(){
   const S=scheduleLists();
   const allTasks=S.task, allBills=S.bill, allAppts=S.appt;
   const tl=document.getElementById('taskList'); tl.innerHTML='';
-  const visTasks=allTasks.filter(it=>(!it.date||inView(it.date)||onRadar(it))&&!arch[it.id]).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
+  const ownTasks=allTasks.filter(it=>(!it.date||inView(it.date)||onRadar(it))&&!arch[it.id]).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
+  /* 🌉 today's Game Plan tasks and the awake 🔁 repeats join the list (see
+     bridgedTodos). They go AFTER her own to-dos, and only on the today/week
+     views: on "month" or "all" a fortnight of plan steps would bury everything
+     she actually typed herself. */
+  const bridged=(view==='today'||view==='week') ? bridgedTodos() : [];
+  const visTasks=[...ownTasks, ...bridged.filter(b=>!ownTasks.some(o=>o.id===b.id))];
   if(!visTasks.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='No to-dos for this view. Breathe easy. 🌿'; tl.appendChild(e);}
   else visTasks.forEach(it=>tl.appendChild(itemRow(it,'task', !!it.custom)));
 
@@ -2405,9 +2492,9 @@ function render(){
     const s=document.createElement('div'); s.className='status '+p.cls; s.textContent=p.status;
     r.appendChild(n); r.appendChild(s); pl.appendChild(r); });
 
-  // progress = exactly what the three lists are showing (to-dos in view, plus the
-  // standing bills and appts, which are always shown)
-  const sched=[...allTasks.filter(it=>!it.date||inView(it.date)||onRadar(it)), ...allBills, ...allAppts];
+  // progress = exactly what the three lists are showing (to-dos in view, the
+  // borrowed plan/repeat rows, plus the standing bills and appts, always shown)
+  const sched=[...visTasks, ...allBills, ...allAppts];
   const total=sched.length;
   const completed=sched.filter(it=>done[it.id]).length;
   const pct= total? Math.round(completed/total*100):0;
@@ -3101,7 +3188,7 @@ function calcStreak(){
   return s;
 }
 /* ---- application counter (syncs across devices via state.json) ---- */
-const LS_APPS='lupita-apps-v1';
+const LS_APPS='dash-apps-v1';
 let apps=JSON.parse(localStorage.getItem(LS_APPS)||'{}');
 function appsWeekKey(){ const d=new Date(today); const dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow); return iso(d); }
 function bumpApps(kind,delta){
@@ -3132,7 +3219,7 @@ function renderApps(){
   document.querySelectorAll('.apps'+k+'Minus').forEach(b=>b.onclick=()=>bumpApps(k.toLowerCase(),-1));
 });
 /* ---- money tracker (every dollar in, syncs across devices) ---- */
-const LS_MONEY='lupita-money-v1';
+const LS_MONEY='dash-money-v1';
 let money=JSON.parse(localStorage.getItem(LS_MONEY)||'[]'); // [{d:'2026-07-15', amt:40, src:'commission'}]
 const fmt$=v=>(v<0?'-$':'$')+Math.abs(Math.round(v*100)/100).toLocaleString();
 const isIn=e=>(e.t||'in')==='in';
@@ -3299,9 +3386,12 @@ function renderQuickBar(){
    🤖 copies a ready-made, task-specific prompt to the clipboard and opens claude.ai
    (unless the task is code:1, then paste it into Claude Code instead).
    🔎 opens a prebuilt web search for the task. */
-const AI_PREFIX='You are helping Lupita: freelance animator and illustrator, brand Liltaxolotl (quirky, cute, warm, sincere). Hard rule: never use em dashes. She wants intense hand-holding: tiny concrete steps, do as much of the work for her as you can, and ask for anything you need up front. Task from her 10-week sprint dashboard: ';
+/* built fresh each time, because the identity arrives with the private feed a
+   moment after the page opens (a baked-in const would freeze the blank version) */
+const AI_PREFIX=()=>'You are helping '+(meName()||'the artist I am assisting')+': '+meRole()+
+  (ME_ID.brand?', brand '+ME_ID.brand:'')+' (quirky, cute, warm, sincere). Hard rule: never use em dashes. She wants intense hand-holding: tiny concrete steps, do as much of the work for her as you can, and ask for anything you need up front. Task from her 10-week sprint dashboard: ';
 function copyPrompt(it,btn){
-  const p=AI_PREFIX+(it.ai||('"'+it.txt+'" . Walk me through this step by step right now, as concretely as possible, and produce as much of the deliverable as you can yourself.'));
+  const p=AI_PREFIX()+(it.ai||('"'+it.txt+'" . Walk me through this step by step right now, as concretely as possible, and produce as much of the deliverable as you can yourself.'));
   const finish=()=>{
     btn.textContent='✓'; setTimeout(()=>{btn.textContent='🤖';},1600);
     if(!it.code) window.open('https://claude.ai/new','_blank');
@@ -3718,7 +3808,7 @@ function friendTasks(n,dk){
       ai:'Help me text a friend to set up a real hangout. I will tell you who and our vibe. Draft a short low-pressure message that proposes one specific activity and two concrete day options, in my voice: warm, silly, sincere. No em dashes.'});
   return T;
 }
-/* ---- 🌸 your own routine: whatever Lupita adds herself (shower, groceries,
+/* ---- 🌸 your own routine: whatever she adds herself (shower, groceries,
    errands) with the ＋ row at the bottom of any day card. 'day' repeats every
    day, 'week' repeats on that weekday, both from `start` onward so past weeks
    stay clean. One-off adds become a normal home-tab to-do on that date instead.
@@ -3981,6 +4071,34 @@ function indexTasks(){
     });
   });
 }
+/* ---------- 📆 WHAT THE PLAN IS ASKING OF TODAY ----------
+   Exactly the set the today card shows, worked out the same way buildWeeks does
+   it (the day's own tasks, minus anything pushed to another day, plus anything
+   pushed onto today, plus every one-off still open from an earlier day) but with
+   no DOM anywhere in it, so the HOME tab can ask the same question. That is the
+   whole reason this exists: the plan's tasks used to be visible only on the Game
+   Plan tab, so a "pay the credit card" line sat there for days without ever
+   reaching the to-do list she actually opens. See planTodos(). */
+function planTasksToday(){
+  if(!DAY_DEFS.length || !Object.keys(GUIDE_STEPS).length) return [];
+  indexTasks();
+  const todayISO=isoLocal(planToday);
+  let mine=null; const late=[];
+  for(let n=1;n<=PLAN_WEEKS;n++){
+    // a closed span (Art Fight) rolls nothing forward, same as on the week list
+    if((PLAN_SPANS||[]).some(sp=>n>=sp.from&&n<=sp.to)) continue;
+    for(let i=0;i<DAY_DEFS.length;i++){
+      const dISO=isoLocal(dayDate(n,i));
+      if(dISO>todayISO) continue;                    // the future can wait
+      const tasks=[...dayTasks(n,DAY_DEFS[i],dISO).filter(t=>!tmoved[t.id]||tmoved[t.id]===dISO),
+                   ...(TASK_IN[dISO]||[])].filter(t=>!taskOff[t.id]);
+      if(dISO===todayISO) mine=tasks;
+      else late.push(...tasks.filter(t=>t.once&&!done[t.id])
+                       .map(t=>Object.assign({},t,{late:DAY_DEFS[i].name})));
+    }
+  }
+  return mine ? [...mine, ...late] : [];
+}
 // a task's block(s) on the day it's actually on: your pick first, then the
 // plan's. A task can sit in more than one block at once (fast applies AND deep
 // applies): same checkbox everywhere it shows up, tick it in either place.
@@ -3995,7 +4113,8 @@ const taskSlot = t => taskSlots(t)[0]||null;
    below the LAST block of the day, which is Sleep on most days, so it looked
    like a to-do list inside Sleep. Both kinds now flow into the closest real
    work block the day actually has; a day with none gets a labeled 📌 strip. */
-const GP_REST=new Set(['sleep','wake','wind','off','rest','lunch','dinner','break','cats','therapy']);
+const GP_REST=new Set(['sleep','wake','wind','off','rest','lunch','dinner','break','cats','therapy',
+  'grouptherapy','decompress','pb','waterpark']);   // being out of the house is rest too
 const gpWorkKey=k=>!GP_REST.has(k)&&!String(k).startsWith('own-')&&!String(k).startsWith('solo:');
 const SLOT_KIN={fast:['deep','focus','satfilm','ugly','flex'],deep:['fast','focus','satfilm','ugly','flex'],
   focus:['deep','fast','satfilm','ugly','flex'],content:['satfilm','ugly','flex','focus'],
@@ -4376,7 +4495,7 @@ function buildGuides(){
   const det=document.createElement('details'); det.className='plan-day';
   det.innerHTML='<summary><span class="caret">▸</span>📈 Trend watch <span class="sub">Mondays · 20 minutes · then pick 3 video ideas</span></summary>';
   const body=document.createElement('div'); body.className='pd-body';
-  body.innerHTML='<div class="pl-intro">Every Monday: 20 minutes here, pick this week’s 3 video ideas, done. Formats that keep working for artists: WIP timelapses over trending audio, "drawing my pet / myself as X", before-and-after art glow-ups, day-in-the-life of a freelance animator, redraw and style challenges, storytime over a speedpaint, ToonSquid and Procreate process tips, meme redraws in your style. The Monday task’s 🤖 button asks Claude to pull THIS week’s live trends for you. And watch your own numbers: every 2 weeks, double down on whichever of your posts popped.</div>'
+  body.innerHTML='<div class="pl-intro">Every Monday: 20 minutes here, pick this week’s 3 video ideas, done. Formats that keep working for artists: WIP timelapses over trending audio, "drawing my pet / myself as X", before-and-after art glow-ups, day-in-the-life of an indie artist, redraw and style challenges, storytime over a speedpaint, ToonSquid and Procreate process tips, meme redraws in your style. The Monday task’s 🤖 button asks Claude to pull THIS week’s live trends for you. And watch your own numbers: every 2 weeks, double down on whichever of your posts popped.</div>'
     +'<div class="pl-links">'
     +'<a href="https://ads.tiktok.com/business/creativecenter/inspiration/popular/hashtag/pc/en" target="_blank" rel="noopener">🎵 TikTok Creative Center</a>'
     +'<a href="https://www.youtube.com/feed/trending" target="_blank" rel="noopener">▶️ YouTube Trending</a>'
@@ -4402,7 +4521,7 @@ function buildGuides(){
    Fridge list + shopping list + easy recipes. Lives in localStorage and rides
    along in state.json, so desktop and phone share one fridge. Recipes marked
    custom:true came from a Claude import and can be removed. */
-const LS_FOOD='lupita-food-v1';
+const LS_FOOD='dash-food-v1';
 let food=JSON.parse(localStorage.getItem(LS_FOOD)||'{}');
 food.fridge=food.fridge||[]; food.buy=food.buy||[]; food.recipes=food.recipes||[];
 const saveFood=()=>{ localStorage.setItem(LS_FOOD, JSON.stringify(food)); pushStateSoon(); };
@@ -4523,7 +4642,7 @@ document.getElementById('budgetBack').onclick=()=>{ view='plan'; applyLayout(); 
 document.getElementById('foodAsk').onclick=async()=>{
   const have=food.fridge.length?food.fridge.join(', '):'(my fridge list is empty, assume I have very little on hand)';
   const known=allRecipes().map(r=>r.name).join(', ');
-  const prompt='You are helping Lupita, a freelance animator with very little energy for cooking some days, eat decently with minimal effort. Be warm and zero-pressure. Hard rule: never use em dashes.\n\n'
+  const prompt='You are helping '+(meName()||'someone')+', '+meRole()+' with very little energy for cooking some days, eat decently with minimal effort. Be warm and zero-pressure. Hard rule: never use em dashes.\n\n'
    +'WHAT I HAVE THIS WEEK: '+have+'\n(Pantry staples like salt, pepper, oil, and butter are assumed.)\n\n'
    +'Please give me:\n'
    +'1. Four to six EASY recipes I can make mostly with what I have. Rules: 15 minutes or less of active effort (one 25-30 minute oven meal is allowed), few ingredients, few dishes, comforting but reasonably healthy. Skip anything too close to recipes I already have: '+known+'.\n'
@@ -4562,7 +4681,7 @@ document.getElementById('foodImportBtn').onclick=()=>{
    The reply queue: who is waiting, why, and how to start. Lives in localStorage
    and rides along in state.json so desktop and phone share one queue. The daily
    10-minute task in the day cards points here. */
-const LS_FRIENDS='lupita-friends-v1';
+const LS_FRIENDS='dash-friends-v1';
 let friends=JSON.parse(localStorage.getItem(LS_FRIENDS)||'{}');
 friends.people=friends.people||[];
 /* friends.log: everyone she has actually written back to, newest first. Checking a
@@ -4663,12 +4782,12 @@ function renderFriendLog(){
 }
 /* ---- foldable cards: any h2 with data-fold collapses its card's .fold-body.
    data-open="1" starts open the first time; after that each card remembers
-   what Lupita left it at (per card, per device). ---- */
+   what she left it at (per card, per device). ---- */
 document.querySelectorAll('h2[data-fold]').forEach(h=>{
   const body=h.parentElement.querySelector('.fold-body');
   const caret=h.querySelector('.fold-caret');
   if(!body||!caret) return;
-  const key='lupita-dash-fold-'+h.dataset.fold;
+  const key='dash-fold-'+h.dataset.fold;
   const set=open=>{ body.style.display=open?'':'none'; caret.textContent=open?'▾':'▸'; };
   h.addEventListener('click',e=>{
     if(e.target.closest('button,input,select,a')) return;   // headers can hold real buttons (← back)
@@ -4693,7 +4812,7 @@ document.getElementById('friendsAsk').onclick=async()=>{
   const q=friends.people.length
     ? friends.people.map(p=>'- '+p.name+(p.note?(' ('+p.note+')'):'')+' -> '+(VIBES[p.vibe]||'reply')).join('\n')
     : '(my queue is empty right now, I will describe who I owe replies to)';
-  const prompt='You are helping Lupita, a freelance animator, catch up on replies to friends she cares about a lot. Replying on time is just hard some seasons; be warm and zero-pressure about it. Hard rules: her texting voice is warm, silly, sincere; short beats long; if it has been a while, ONE light apology line max (no groveling); never use em dashes.\n\n'
+  const prompt='You are helping '+(meName()||'someone')+', '+meRole()+', catch up on replies to friends she cares about a lot. Replying on time is just hard some seasons; be warm and zero-pressure about it. Hard rules: her texting voice is warm, silly, sincere; short beats long; if it has been a while, ONE light apology line max (no groveling); never use em dashes.\n\n'
    +'PEOPLE I OWE REPLIES TO:\n'+q+'\n\n'
    +'For each person, draft a short ready-to-send message (2 versions when it feels tricky). Ask me for their actual last message whenever that would make the reply better.';
   const ok=await copyText(prompt);
@@ -4793,7 +4912,7 @@ document.getElementById('newKind').addEventListener('change',previewAdd);
 document.getElementById('resetBtn').onclick=()=>{ if(confirm('Uncheck everything and empty the archive? (your added to-dos stay)')){ done={}; arch={}; saveDone(); saveArch(); render(); } };
 
 // live leads: collapsible dropdown (collapsed by default so it doesn't clog the page)
-const LS_LEADOPEN='lupita-leads-open-v1';
+const LS_LEADOPEN='dash-leads-open-v1';
 const leadBodyEl=document.getElementById('leadBody');
 const leadCaretEl=document.getElementById('leadCaret');
 function setLeadOpen(open){
@@ -4832,7 +4951,7 @@ document.getElementById('ghChange').onclick=()=>{ window._showTokenBox=true; ren
 // request), then pings the home PC over a private ntfy channel so the hunt starts
 // right away instead of waiting for a poll. The PC validates the ping against the
 // request file, so a stray ping without the file does nothing.
-const HUNT_PING_TOPIC='lupita-hunt-562xssrfjpcas614gsk8nhe9';
+const HUNT_PING_TOPIC='dash-hunt-562xssrfjpcas614gsk8nhe9';
 async function requestHunt(){
   if(!getToken()){ setLeadOpen(true); setLeadStatus('Paste your token below first, then tap 🎯 again.'); render(); return; }
   setLeadStatus('Requesting a fresh hunt...');
@@ -4910,7 +5029,7 @@ async function logJobRead(){
   const text=(document.getElementById('logJobText').value||'').trim();
   if(text.length<40){ st('Paste the whole job posting first (title, company, description). 🌸','err'); return; }
   const model=logModel();
-  if(!model){ st('Cannot reach your local AI. Open the dashboard with the "Lupita Dashboard" shortcut so Ollama is running, then try again.','err'); loadModels(); return; }
+  if(!model){ st('Cannot reach your local AI. Open the dashboard with your Dashboard desktop shortcut so Ollama is running, then try again.','err'); loadModels(); return; }
   const btn=document.getElementById('logJobRead'); btn.disabled=true;
   st('Reading it locally... (first run can take a moment while the model loads)');
   try{
@@ -4958,7 +5077,7 @@ document.getElementById('logJobSave').onclick=logJobSave;
    private repo + pings the home PC, which runs a headless triage over the last
    week of Gmail, drafts replies (saved as real Gmail drafts, never sent), and
    pushes mail.json here. This card renders mail.json. */
-const LS_MAILOPEN='lupita-dash-mailopen-v1';
+const LS_MAILOPEN='dash-mailopen-v1';
 let MAIL_DATA=[];      // threads that want a reply, each with a draft
 let MAIL_ACTIONS=[];   // bills, deadlines, job openings. No reply, just a decision
 let MAIL_UPDATED='';
@@ -4966,11 +5085,11 @@ let MAIL_UPDATED='';
 /* ---- the store: why nothing disappears any more ----
    mail.json is rebuilt from scratch on every scan, so an email that ages out of the
    7-day window (or falls past the scan's cap) used to silently vanish from this card
-   even if Lupita never replied. That is how the UGC and Voyage LA emails went missing.
+   even if she never replied. That is how the UGC and Voyage LA emails went missing.
    So the dashboard no longer renders mail.json directly: it MERGES each scan into a
    store that persists in state.json. An email leaves this card exactly one way, when
    she says so (✅ replied, ✅ handled, or 🗑️ not important). Scans can only ever add.  */
-const LS_MAILSTORE='lupita-mail-store-v1';
+const LS_MAILSTORE='dash-mail-store-v1';
 let mailStore=JSON.parse(localStorage.getItem(LS_MAILSTORE)||'{}');  // key -> {kind:'reply'|'action', ...item}
 const saveMailStore=()=>{ localStorage.setItem(LS_MAILSTORE, JSON.stringify(mailStore)); pushStateSoon(); };
 function mergeMail(items, actions){
@@ -4994,18 +5113,18 @@ loadMailFromStore();
 /* ---- the replied record ----
    Checking an email off writes it to mailDone (keyed by Gmail thread id) and it
    rides along in state.json, so the record is permanent and identical on phone
-   and desktop. Nothing in Gmail is touched: this is Lupita's own log of who she
+   and desktop. Nothing in Gmail is touched: this is her own log of who she
    has gotten back to. A checked thread drops off the to-reply list, but if the
    person writes AGAIN (the next scan hands it back with a newer date than the
    day she checked it) it resurfaces, because that is a new message, not one she
    already handled. */
-const LS_MAILDONE='lupita-mail-done-v1';
+const LS_MAILDONE='dash-mail-done-v1';
 let mailDone=JSON.parse(localStorage.getItem(LS_MAILDONE)||'{}'); // threadId -> {from,subject,at:'YYYY-MM-DD'}
 const saveMailDone=()=>{ localStorage.setItem(LS_MAILDONE, JSON.stringify(mailDone)); pushStateSoon(); };
 const mailKey=m=>String(m.threadId||m.id||(m.from+'|'+m.subject));
 const mailRepliedTo=m=>{ const r=mailDone[mailKey(m)]; return !!r && !(m.date && r.at && m.date>r.at); };
 
-const LS_MAILLOGOPEN='lupita-dash-maillogopen-v1';
+const LS_MAILLOGOPEN='dash-maillogopen-v1';
 const mailBodyEl=document.getElementById('mailBody');
 const mailCaretEl=document.getElementById('mailCaret');
 function setMailOpen(open){
@@ -5129,7 +5248,7 @@ function renderMailActions(openAct){
     btn.onclick=e=>{ e.stopPropagation(); actionToTodo(openAct[Number(btn.dataset.aadd)], btn); };
   });
 }
-/* 📂 THE ARCHIVE: every email Lupita has dealt with, newest first, replies and
+/* 📂 THE ARCHIVE: every email she has dealt with, newest first, replies and
    worth-a-looks together. Each row keeps its Gmail link, so this is a real way
    back into past mail, not just a tally. Nothing here was ever deleted or
    archived inside Gmail: this is her own record of what she has already faced. */
@@ -5262,14 +5381,14 @@ const fixSignoff=t=>(t||'').replace(/^[ \t]*(warm(?:ly| regards)|sincerely|best(
 const cleanLetter=t=>fixSignoff(noEmDash(t));
 const RLABEL={production:'Production',animator:'Animator',general:'General',teaching:'Teaching'};
 
-// --- Lupita's real resumes + style, preloaded (she can edit + save over these) ---
+// --- her real resumes + style, preloaded (she can edit + save over these) ---
 const RESUME_DEFAULTS={name:'',contact:'',linkedin:'',facts:'',templates:{production:'',animator:'',general:'',teaching:''},resumes:{production:'',animator:'',general:'',teaching:''}};
 // every type defaults to her real letter as the FLOW example (it shows how a letter should
 // go, not which roles to feature; role choice comes from the resume). She can save her own per type.
 RESUME_DEFAULTS.templates.animator=RESUME_DEFAULTS.templates.production;
 RESUME_DEFAULTS.templates.general=RESUME_DEFAULTS.templates.production;
 RESUME_DEFAULTS.templates.teaching=RESUME_DEFAULTS.templates.production;
-// languages a letter may claim fluency in (lowercase). Lupita understands some basic
+// languages a letter may claim fluency in (lowercase). she understands some basic
 // Spanish but is NOT fluent: keep spanish out of this list (see scrubFluency).
 RESUME_DEFAULTS.langs=['english'];
 // bump when the baked-in resumes/templates change: stale saved copies get replaced on load
@@ -5289,7 +5408,7 @@ const loadProfile=()=>JSON.parse(localStorage.getItem(CL_PROFILE)||'null');
     contact: saved.contact!=null ? saved.contact : RESUME_DEFAULTS.contact,
     linkedin: saved.linkedin!=null ? saved.linkedin : RESUME_DEFAULTS.linkedin,
     // templates went per-resume-type (old single saved.template is retired on purpose:
-    // it let the AI borrow unverified content; the default is a real letter Lupita wrote)
+    // it let the AI borrow unverified content; the default is a real letter she wrote)
     templates: Object.assign({}, RESUME_DEFAULTS.templates, fresh?{}:(saved.templates||{})),
     resumes: Object.assign({}, RESUME_DEFAULTS.resumes, fresh?{}:(saved.resumes||{})),
     lastUse: saved.lastUse||'production',
@@ -5362,7 +5481,7 @@ function useTemplateText(){
 
 // hard ban: when a job demands a language, the local model claims fluency no matter how
 // the rules are worded (4/4 test runs). So sentences claiming a language not on the
-// allowlist are cut in code. Lupita has basic Spanish comprehension but is NOT fluent.
+// allowlist are cut in code. she has basic Spanish comprehension but is NOT fluent.
 const LANG_WORDS=/(spanish|french|mandarin|cantonese|chinese|japanese|korean|tagalog|vietnamese|portuguese|german|italian|russian|arabic|hindi|english)/i;
 const CLAIM_WORDS=/(fluent|fluency|fluently|bilingual|native|proficien|speaker|speaking)/i;
 function scrubFluency(letter){
@@ -5406,7 +5525,7 @@ async function loadModels(){
     if($('clStatus').classList.contains('err')) setStatus('clStatus','Local AI ready. ✨','ok'); // clear a stale error
   }catch(err){
     sel.innerHTML='<option>Ollama not running</option>';
-    setStatus('clStatus','Cannot reach the local AI yet. Open the dashboard with the "Lupita Dashboard" shortcut, or wait a few seconds and click this tab again.','err');
+    setStatus('clStatus','Cannot reach the local AI yet. Open the dashboard with your Dashboard desktop shortcut, or wait a few seconds and click this tab again.','err');
   }
 }
 
@@ -5416,7 +5535,7 @@ function buildMessages(){
   const title=$('clJobTitle').value.trim(), company=$('clCompany').value.trim();
   const manager=$('clManager').value.trim()||'Hiring Team';
   const jd=$('clJobDesc').value.trim();
-  const sys=`You are writing a cover letter for Lupita (Maria Lupita Roa), a USC-trained animator and production professional (brand: Liltaxolotl).
+  const sys=`You are writing a cover letter for ${meName()||'this applicant'}${ME_ID.full?' ('+ME_ID.full+')':''}, ${ME_ID.bio||meRole()}${ME_ID.brand?' (brand: '+ME_ID.brand+')':''}.
 
 YOUR GOAL: a SPECIFIC, tailored letter that maps HER real duties and results to THIS job's actual listed duties and requirements. Generic letters fail. Every claim must point to a concrete thing she really did.
 
@@ -5433,7 +5552,7 @@ RULES:
 - Do NOT use vague filler like "I believe my skills align well," "unique blend," "fast-paced environment," "I am confident that." Replace any such urge with a real, named example.
 - Open by naming the exact role and company and ONE genuine, specific reason it fits her.
 - NEVER use em dashes or en dashes. Use commas, colons, or shorter sentences.
-- 3 to 4 paragraphs, one page. Close with a short line of genuine interest, then "Thank you," on its own line, then "${p.name||'Maria Lupita Roa'}".
+- 3 to 4 paragraphs, one page. Close with a short line of genuine interest, then "Thank you," on its own line, then "${p.name||ME_ID.full||meName()}".
 
 CANDIDATE RESUME (her real experience, the primary source of facts):
 ${useResumeText()||'(none provided)'}
@@ -5444,9 +5563,9 @@ ${RESUME_DEFAULTS.facts||'(none)'}
 EXTRA CONTEXT / LINKEDIN:
 ${p.linkedin||'(none)'}
 
-FLOW EXAMPLE (a real letter Lupita wrote for a different job; every fact in it is true. Follow its structure, voice, and duty-mapping. Pick roles for THIS job from the resume above, not from this example):
+FLOW EXAMPLE (a real letter she wrote for a different job; every fact in it is true. Follow its structure, voice, and duty-mapping. Pick roles for THIS job from the resume above, not from this example):
 ${useTemplateText()||'(none)'}`;
-  const user=`Write Lupita's cover letter for this exact job. Map her real duties to the duties and requirements below, naming specific roles, companies, and tasks. No generic filler, and nothing that is not written in her materials. If this job asks for a language her materials do not list, do NOT mention languages at all.
+  const user=`Write ${meName()?meName()+"'s":'the applicant\'s'} cover letter for this exact job. Map her real duties to the duties and requirements below, naming specific roles, companies, and tasks. No generic filler, and nothing that is not written in her materials. If this job asks for a language her materials do not list, do NOT mention languages at all.
 
 JOB TITLE: ${title||'(see description)'}
 COMPANY: ${company||'(see description)'}
@@ -5527,7 +5646,7 @@ $('clDownload').onclick=()=>{
   a.download=letterFilename()+'.txt'; a.click(); URL.revokeObjectURL(a.href);
 };
 
-// --- styled PDF via the browser's print engine (pink/peach letterhead, based on Lupita's template) ---
+// --- styled PDF via the browser's print engine (pink/peach letterhead, based on her template) ---
 const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 // filename: CoverLetter_<Company>
 function letterFilename(){
@@ -5538,7 +5657,7 @@ function makePdf(){
   const letter=cleanLetter($('clOutput').value.trim());
   if(!letter){ setStatus('clStatus','Generate a letter first.','err'); return; }
   const p=loadProfile()||{};
-  const name=p.name||'Maria Lupita Roa';
+  const name=p.name||ME_ID.full||'';
   const role=($('clJobTitle').value.trim()||'Animation · Illustration · Production').toUpperCase();
   const parts=(p.contact||'').split('·').map(s=>s.trim()).filter(Boolean);
   const contact=parts.map(s=>`<span class="ci">${esc(s)}</span>`).join('<span class="sep">·</span>');
@@ -5598,7 +5717,7 @@ $('clPdf').onclick=makePdf;
    little home of its own: to-dos (done ones sink and stay, that's the
    "what I've finished" record), plus notes / links / research. Both stores ride
    in state.json so the phone and the desktop share one brain. */
-const LS_NOTES='lupita-notes-v1', LS_PROJ='lupita-proj-v1', LS_PJOPEN='lupita-pjopen-v1';
+const LS_NOTES='dash-notes-v1', LS_PROJ='dash-proj-v1', LS_PJOPEN='dash-pjopen-v1';
 let notes=JSON.parse(localStorage.getItem(LS_NOTES)||'[]');   // [{id,txt,tag,at}]
 let proj=JSON.parse(localStorage.getItem(LS_PROJ)||'null')||{list:[],items:{}}; // list:[{id,name,goal?,arch?}], items: pid -> [{id,txt,k:'todo'|'note',done?,doneAt?,at}], seeded:[namekeys]
 const saveNotes=()=>{ localStorage.setItem(LS_NOTES,JSON.stringify(notes)); pushStateSoon(); };
@@ -5607,7 +5726,7 @@ const noteTombs=new Set(), projTombs=new Set();   // deleted-this-session ids: r
 const pjOpen=new Set(JSON.parse(localStorage.getItem(LS_PJOPEN)||'[]'));   // which cards sit open (per device, not synced)
 /* 🌸 the Personal tab: same card machinery, its own synced store (car, health,
    home, life admin — the corners of life that aren't projects) */
-const LS_ME='lupita-me-v1', LS_MEOPEN='lupita-meopen-v1';
+const LS_ME='dash-me-v1', LS_MEOPEN='dash-meopen-v1';
 let me=JSON.parse(localStorage.getItem(LS_ME)||'null')||{list:[],items:{}};
 const saveMe=()=>{ localStorage.setItem(LS_ME, JSON.stringify(me)); pushStateSoon(); };
 const meTombs=new Set();
@@ -5881,7 +6000,7 @@ function pjMoveDrawer(ctx,p,it){
 function webSearch(q){ window.open('https://www.google.com/search?q='+encodeURIComponent(q), '_blank', 'noopener'); }
 // ✨ a ready research prompt: what is it, where to buy it, who can fix it, fair price
 function pjResearch(p, it, btn){
-  const prompt=AI_PREFIX+'A research errand from the "'+p.name+'" card of my dashboard. The item: "'+it.txt+'". '
+  const prompt=AI_PREFIX()+'A research errand from the "'+p.name+'" card of my dashboard. The item: "'+it.txt+'". '
     +'Figure out what this actually needs (if something is broken, name the likely part or fix). Then give me: real links to buy or book the right thing at a fair price, whether it is realistically DIY-able, how to find someone trustworthy nearby to handle it (ask me for my area), typical prices so I do not overpay, and any watch-outs. End with your recommendation and the tiniest first step.';
   copyText(prompt).then(()=>{
     const t0=btn.textContent; btn.textContent='✓ copied!';
@@ -5968,6 +6087,27 @@ function repAwake(it, todayISO){
   if(!it.due) return true;
   const w=parse(it.due); w.setDate(w.getDate()-repLead(it.every));
   return parse(todayISO)>=w;
+}
+/* ---------- 🔁 THE REPEATS COME TO THE TO-DO LIST ----------
+   Rent, car insurance, the credit card and the certification live as repeats on
+   the 🌸 Personal tab, which is a good home for their history and a terrible home
+   for remembering them. The home tab's bill list is a different, one-shot list:
+   July's credit card was checked off and archived in JULY, so August's round
+   never appeared there at all, and the only place it existed was a line on the
+   Game Plan. That is the bug she hit. Every AWAKE repeat now also shows up on
+   the home to-do list, and ticking it here files the round exactly as ticking it
+   on the Personal card does: same history, same money log, one checkbox. */
+function repTodos(){
+  const todayISO=iso(today), out=[];
+  (me.list||[]).forEach(p=>{
+    if(p.arch) return;
+    (me.items[p.id]||[]).forEach(it=>{
+      if(!it.every || !repAwake(it, todayISO)) return;
+      out.push({id:'rep:'+it.id, text:it.txt, date:it.due||todayISO,
+        rep:it, repCard:p, tag:'life', repLbl:'🔁 every '+(REP_LBL[it.every]||it.every)});
+    });
+  });
+  return out;
 }
 // the first due date for a fresh repeat: reads "the 1st" or a weekday from the
 // wording when there is one, else starts from today's date
@@ -6427,7 +6567,7 @@ function pjNextStep(p, body){
 function pjHelp(p, g, nxt, btn){
   const goal=p.goal?('The goal: '+p.goal+'. '):'';
   const extra=nxt.ai?('Use this brief: '+nxt.ai):'Walk me through it step by step and produce as much of the deliverable as you can yourself.';
-  const prompt=AI_PREFIX+'We are working on my project "'+(g.icon?g.icon+' ':'')+g.title+'". '+goal
+  const prompt=AI_PREFIX()+'We are working on my project "'+(g.icon?g.icon+' ':'')+g.title+'". '+goal
     +'My next step is: "'+gpText(nxt)+'". '+extra
     +' Break it into the tiniest possible pieces, start with a 2-minute first move, keep me company through each piece, and celebrate every little win. Zero judgment if I am tired or behind.';
   copyText(prompt).then(ok=>{
@@ -6782,7 +6922,7 @@ function meSeed(){
    threads, log, notes, all at once), each card gets a row of little pill tabs
    with counts and shows ONE section at a time. A pill glows when something in
    it is due. Which pill you were on is remembered per card, on this device. */
-let mePill={}; try{ mePill=JSON.parse(localStorage.getItem('lupita-dash-mepill-v1')||'{}'); }catch(_){ mePill={}; }
+let mePill={}; try{ mePill=JSON.parse(localStorage.getItem('dash-mepill-v1')||'{}'); }catch(_){ mePill={}; }
 function meBody(p, body){
   const items=pjItems(ME_CTX,p.id);
   const tds=items.filter(i=>i.k==='todo'&&!i.every);
@@ -6827,7 +6967,7 @@ function meBody(p, body){
     b.innerHTML=t.lbl+(t.n?' <i>'+t.n+'</i>':'');
     if(t.hot) b.title=t.n+' due or close · worth a peek';
     b.onclick=()=>{ mePill[p.id]=t.k;
-      try{ localStorage.setItem('lupita-dash-mepill-v1', JSON.stringify(mePill)); }catch(_){/* private mode is fine */}
+      try{ localStorage.setItem('dash-mepill-v1', JSON.stringify(mePill)); }catch(_){/* private mode is fine */}
       draw(); };
     nav.appendChild(b);
   });
@@ -6929,6 +7069,7 @@ renderFood();
 renderNotes();
 renderProjects();
 renderMe();
+applyIdentity(ME_ID);   // desktop: the baked-in name lands right away. Public copy: no-op until the feed answers.
 fetchLeads();
 fetchData();
 fetchMail();
