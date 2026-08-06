@@ -657,6 +657,7 @@
       <div class="hello">
         <h1 id="greeting">Hi 🌸</h1>
         <p id="dateline"></p>
+        <p id="feedStatus" style="display:none; margin:.4rem 0 0; padding:.5rem .6rem; border-radius:8px; background:#fff3f7; border:1px solid var(--lav-deep); color:var(--lav-deep); font-size:.85rem; line-height:1.35"></p>
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:14px">
@@ -2218,14 +2219,41 @@ async function fetchLeads(){
   }catch(err){ setLeadStatus('Could not load leads right now. Showing the last list.'); }
 }
 
+/* 🔌 CONNECTION STATE. Every page on this dashboard is drawn from the private feed,
+   so one failed fetch empties the WHOLE thing, and for a long time it did that in
+   total silence: a blank page that looked identical whether the token was missing,
+   expired, or the network was down. FEED_STATUS records which, and the header says
+   so out loud. Never swallow a feed failure again. */
+let FEED_STATUS={state:'idle', detail:''};
+function setFeedStatus(state, detail){
+  FEED_STATUS={state, detail:detail||''};
+  const el=document.getElementById('feedStatus');
+  if(!el) return;
+  const msg={
+    idle:  '',
+    ok:    '',
+    notoken:'🔌 Not connected yet. Paste your GitHub token on the Leads card to load your data.',
+    auth:  '🔑 GitHub rejected the saved token, so nothing could load. It has most likely expired: make a new one and paste it on the Leads card.',
+    missing:'📭 Connected, but the data feed is missing a file. Nothing was lost locally.',
+    net:   '📡 Could not reach GitHub, so this is the last data saved on this device.'
+  }[state] || '';
+  el.textContent=msg;
+  el.style.display=msg?'block':'none';
+}
 async function fetchPrivate(path){
-  const token=getToken(); if(!token) return null;
+  const token=getToken();
+  if(!token){ setFeedStatus('notoken'); return null; }
   try{
     const url=`https://api.github.com/repos/${LEAD_FEED.owner}/${LEAD_FEED.repo}/contents/${path}?ref=${LEAD_FEED.branch}&t=${Date.now()}`;
     const res=await fetch(url,{headers:{Authorization:'Bearer '+token, Accept:'application/vnd.github.raw+json'}, cache:'no-store'});
-    if(!res.ok) return null;
+    if(!res.ok){
+      // 401 = bad/expired token, 403 = token lacks access to the repo. Both mean "re-issue it".
+      setFeedStatus((res.status===401||res.status===403) ? 'auth' : 'missing', String(res.status));
+      return null;
+    }
+    setFeedStatus('ok');
     return JSON.parse(await res.text());
-  }catch(err){ return null; }
+  }catch(err){ setFeedStatus('net'); return null; }
 }
 /* the name/role/brand ride along in the private feed, so the public page can ship
    without them and still greet her properly the moment her token loads */
