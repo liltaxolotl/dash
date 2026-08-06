@@ -178,6 +178,8 @@
   .snz:hover{filter:none; opacity:1}
   .snz.on{filter:none; opacity:1}
   .snz ~ .del{margin-left:0}
+  /* a row with two ✕-style buttons (📦 then ↩) keeps them side by side, not split apart */
+  .del ~ .del{margin-left:0}
   .resched{margin-top:8px; padding:8px; border:1px dashed var(--lav); border-radius:10px; background:#faf6ff;
     display:flex; flex-wrap:wrap; gap:6px; align-items:center}
   .resched button{border:1px solid var(--line); background:#fff; border-radius:99px; padding:4px 10px;
@@ -908,8 +910,14 @@
 
         <div class="card">
           <h2>📋 Application Tracker <span class="pill" id="jobsAppliedCount"></span></h2>
-          <div class="note" style="margin:0 0 8px">Every job you check off as applied lands here. Tag what happened with the little chips (⏳🗣️🎉❌👻) so the analytics stay honest. ↩ puts one back on the leads list. (The ⚡/🎯 +1 counters live on the Game Plan like always; these two count different things, so use both.)</div>
+          <div class="note" style="margin:0 0 8px">Every job you check off as applied lands here. Tag what happened with the little chips (⏳🗣️🎉❌👻) so the analytics stay honest. Tag one ❌ or 👻 and a 📦 shows up: that files it under Closed below, out of the live list but still in the numbers. ↩ puts one back on the leads list. (The ⚡/🎯 +1 counters live on the Game Plan like always; these two count different things, so use both.)</div>
           <ul class="list" id="jobsAppliedList"></ul>
+          <button class="cl-btn ghost" id="jobsCloseAll" style="display:none; margin-top:9px"></button>
+          <details id="jobsClosedWrap" style="margin-top:10px">
+            <summary style="cursor:pointer; font-size:.82rem; font-weight:700; color:var(--soft)">📦 Closed <span class="pill" id="jobsClosedCount"></span></summary>
+            <div class="note" style="margin:6px 0 4px">The ❌ and 👻 ones, filed away so the live list stays short. They still count in the numbers above: this is your history, not a delete. 📤 puts one back on the active list.</div>
+            <ul class="list" id="jobsClosedList"></ul>
+          </details>
           <details id="jobsPassedWrap" style="margin-top:10px">
             <summary style="cursor:pointer; font-size:.82rem; font-weight:700; color:var(--soft)">🙅 Passed on <span class="pill" id="jobsPassedCount"></span></summary>
             <div class="note" style="margin:6px 0 4px">Jobs you decided against, kept for the record. ↩ puts one back on the leads list.</div>
@@ -2056,7 +2064,12 @@ function renderLeads(){
    Checking a lead off means "I applied": it moves from the listings into the
    jobs store (s:'applied') where the chips tag what happened next. ✕ on a lead
    means "not for me": same store, s:'passed'. Both lists keep the full history,
-   and ↩ hands a lead back to the listings if you change your mind. */
+   and ↩ hands a lead back to the listings if you change your mind.
+   A ❌/👻 one can also be filed away with 📦 (j.cl = the day she closed it): it
+   leaves the live list but STAYS in every stat, because a rejection she already
+   lived through should still count toward the total she sent. */
+const CLOSED_R=['rej','ghost'];   // the two "nothing more to do here" outcomes
+const isClosable = j => CLOSED_R.indexOf(j.r||'wait')>=0;
 const JOB_STATUSES=[
   ['wait','⏳ waiting','#d6dae2'],
   ['int','🗣️ interview','#cdbcff'],
@@ -2080,10 +2093,15 @@ function jobRow(id, j){
       const c=document.createElement('button');
       c.className='stchip'+(((j.r||'wait')===k)?(' on-'+k):'');
       c.textContent=lbl; c.title='tag what happened with this one';
-      c.onclick=()=>{ j.r=k; j.rAt=iso(new Date()); saveJobs(); render(); };
+      c.onclick=()=>{ j.r=k; j.rAt=iso(new Date());
+        if(j.cl && !isClosable(j)) delete j.cl;   // re-tagged as alive again: back on the live list
+        saveJobs(); render(); };
       chips.appendChild(c);
     });
     body.appendChild(chips);
+    if(j.cl){ const cw=document.createElement('div'); cw.className='meta';
+      const cs=document.createElement('span'); cs.className='when';
+      cs.textContent='closed '+fmtWhen(j.cl); cw.appendChild(cs); body.appendChild(cw); }
   }
   // 📄 the archived posting text (from ✨ Log a job): kept so a deleted listing still has a record
   if(j.desc){
@@ -2092,11 +2110,19 @@ function jobRow(id, j){
     const dc=document.createElement('div'); dc.className='jobdesc-body'; dc.textContent=j.desc;
     dd.appendChild(ds); dd.appendChild(dc); body.appendChild(dd);
   }
+  // 📦 file away / 📤 bring back: only for the ones that are actually finished
+  if(j.s!=='passed' && (isClosable(j)||j.cl)){
+    const cl=document.createElement('button'); cl.className='del';
+    cl.textContent=j.cl?'📤':'📦';
+    cl.title=j.cl?'put it back on the active list':'file this one under Closed (it still counts in your numbers)';
+    cl.onclick=()=>{ if(j.cl) delete j.cl; else j.cl=iso(new Date()); saveJobs(); render(); };
+    li.appendChild(body); li.appendChild(cl);
+  } else li.appendChild(body);
   const back=document.createElement('button'); back.className='del'; back.textContent='↩';
   back.title='put it back on the leads list';
   back.onclick=()=>{ delete jobs[id]; delete done[id]; delete arch[id];
     saveJobs(); saveDone(); saveArch(); render(); };
-  li.appendChild(body); li.appendChild(back);
+  li.appendChild(back);
   return li;
 }
 function renderJobTrack(){
@@ -2105,15 +2131,40 @@ function renderJobTrack(){
   const entries=Object.entries(jobs).sort((a,b)=>(b[1].at||'').localeCompare(a[1].at||''));
   const applied=entries.filter(([,j])=>j.s!=='passed');
   const passed=entries.filter(([,j])=>j.s==='passed');
+  const live=applied.filter(([,j])=>!j.cl);            // what's still on the live list
+  const closed=applied.filter(([,j])=>j.cl)
+    .sort((a,b)=>(b[1].cl||'').localeCompare(a[1].cl||''));   // most recently closed first
   ap.innerHTML='';
-  if(!applied.length){ const e=document.createElement('div'); e.className='empty';
-    e.textContent='Nothing yet. Check a lead off up there when you send an application and it lands here. 🌱'; ap.appendChild(e); }
-  else applied.forEach(([id,j])=>ap.appendChild(jobRow(id,j)));
+  if(!live.length){ const e=document.createElement('div'); e.className='empty';
+    e.textContent=closed.length
+      ? 'Nothing open right now: everything you sent is filed under Closed below. Fresh start. 🌱'
+      : 'Nothing yet. Check a lead off up there when you send an application and it lands here. 🌱';
+    ap.appendChild(e); }
+  else live.forEach(([id,j])=>ap.appendChild(jobRow(id,j)));
+
+  /* 📦 the Closed drawer + the one-tap "file all the finished ones" button */
+  const cl=document.getElementById('jobsClosedList'), clWrap=document.getElementById('jobsClosedWrap');
+  if(cl){
+    cl.innerHTML='';
+    closed.forEach(([id,j])=>cl.appendChild(jobRow(id,j)));
+    clWrap.style.display=closed.length?'':'none';
+    document.getElementById('jobsClosedCount').textContent=closed.length?String(closed.length):'';
+  }
+  const allBtn=document.getElementById('jobsCloseAll');
+  if(allBtn){
+    const ready=live.filter(([,j])=>isClosable(j));
+    allBtn.style.display=ready.length?'':'none';
+    allBtn.textContent='📦 File away the '+ready.length+' closed '+(ready.length===1?'one':'ones')+' (❌ / 👻)';
+    allBtn.onclick=()=>{ const now=iso(new Date());
+      ready.forEach(([,j])=>{ j.cl=now; }); saveJobs(); render(); };
+  }
   pa.innerHTML='';
   if(!passed.length){ const e=document.createElement('div'); e.className='empty';
     e.textContent='Nothing passed on yet.'; pa.appendChild(e); }
   else passed.forEach(([id,j])=>pa.appendChild(jobRow(id,j)));
-  document.getElementById('jobsAppliedCount').textContent=applied.length?(applied.length+' sent'):'';
+  // the pill counts everything she ever sent; the "open" half is what's still live
+  document.getElementById('jobsAppliedCount').textContent=applied.length
+    ? (applied.length+' sent'+(closed.length?(' · '+live.length+' open'):'')) : '';
   document.getElementById('jobsPassedCount').textContent=passed.length?String(passed.length):'';
 
   /* 📊 how it's going: counts up top, one proportion bar of what came back */
