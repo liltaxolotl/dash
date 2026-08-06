@@ -658,6 +658,7 @@
         <h1 id="greeting">Hi 🌸</h1>
         <p id="dateline"></p>
         <p id="feedStatus" style="display:none; margin:.4rem 0 0; padding:.5rem .6rem; border-radius:8px; background:#fff3f7; border:1px solid var(--lav-deep); color:var(--lav-deep); font-size:.85rem; line-height:1.35"></p>
+        <p id="buildStamp" style="margin:.15rem 0 0; font-size:.7rem; opacity:.5"></p>
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:14px">
@@ -2224,6 +2225,10 @@ async function fetchLeads(){
    total silence: a blank page that looked identical whether the token was missing,
    expired, or the network was down. FEED_STATUS records which, and the header says
    so out loud. Never swallow a feed failure again. */
+/* 🏷️ which copy of this page am I looking at? The phone cached a broken build for
+   hours and every "is it updated yet?" was pure guesswork, so the build stamps
+   itself and the header says it in small grey text. build-shell.js overwrites this. */
+const BUILD_ID='2026-08-06 19:19Z';
 let FEED_STATUS={state:'idle', detail:''};
 function setFeedStatus(state, detail){
   FEED_STATUS={state, detail:detail||''};
@@ -2473,6 +2478,7 @@ function render(){
     withName(h<12?'Good morning':(h<18?'Hi':'Evening'))+' 🌸';
   document.getElementById('dateline').textContent =
     new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  document.getElementById('buildStamp').textContent = 'build '+BUILD_ID;
 
   // remote data (private repo) wins over the baked-in fallback arrays
   const D=REMOTE||{};
