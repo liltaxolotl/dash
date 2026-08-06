@@ -311,6 +311,14 @@
   details.plan-day>summary .sub{font-weight:600; color:var(--soft); font-size:.78rem}
   details.plan-day>summary .hrs{margin-left:auto; font-size:.7rem; font-weight:700; color:var(--soft); background:var(--line); padding:2px 9px; border-radius:99px; white-space:nowrap}
   details.plan-day.today-day{border-color:var(--pink); box-shadow:var(--shadow)}
+  /* 🎨 a stretch of weeks that was one single thing: flat banner, no dropdown, no day cards */
+  .plan-span{display:flex; gap:12px; align-items:flex-start; margin:10px 0; padding:14px 16px;
+    border:1px dashed var(--lav); border-radius:16px; background:linear-gradient(135deg,#fdf6ff,#fff5fa)}
+  .plan-span .ps-icon{font-size:1.5rem; line-height:1.1}
+  .plan-span .ps-body{display:flex; flex-direction:column; gap:3px}
+  .plan-span b{font-size:.95rem; letter-spacing:.4px; color:var(--lav-deep)}
+  .plan-span .sub{font-weight:600; color:var(--soft); font-size:.78rem}
+  .plan-span .ps-sub{font-size:.8rem; color:var(--ink); opacity:.8; line-height:1.4}
   details.plan-day.today-day>summary{background:linear-gradient(90deg,#fff0f7,#f6f0ff)}
   details.plan-day.today-day>summary .hrs{background:var(--urgent); color:#fff}
   .pd-body{padding:2px 12px 12px}
@@ -2312,6 +2320,7 @@ async function fetchPlan(){
     SPECIALS=p.specials||{}; DAY_DEFS=p.dayDefs; WEEK_TITLES=p.weekTitles||WEEK_TITLES;
     PLAN_WEEKS=p.weeks||WEEK_TITLES.length||PLAN_WEEKS;   // the sprint can grow: 8 weeks became 10
     CLOCK_OVERRIDES=p.clockOverrides||{};
+    PLAN_SPANS=p.spans||[];   // 🎨 condensed week ranges (Art Fight); [] is a real answer
     normalizeGuides();
     const w=document.getElementById('planWeeks'), g=document.getElementById('planGuides');
     w.innerHTML=''; delete w.dataset.built;
@@ -3933,6 +3942,12 @@ function agendaFor(dateStr, isToday){
 /* ---- one-off real-life items pinned to specific days ---- */
 let SPECIALS={};
 let DAY_DEFS=[];
+/* 📦 SPANS: a stretch of weeks that was really ONE thing. Those weeks get no day
+   cards and no dropdown at all, just a single flat banner in the week list, because
+   scrolling past fourteen empty day cards to reach today is not a plan, it is a
+   guilt trip. Their WEEK_TITLES stay put (the projects tab still reads them) and
+   their guide steps stay empty. Lives in game-plan.json as `spans`. */
+let PLAN_SPANS=[];
 let WEEK_TITLES=[];
 function dayDate(n,idx){ const d=parse(PLAN_START); d.setDate(d.getDate()+(n-1)*7+idx); return d; }
 /* ---- 📆 A SPRINT TASK CAN CHANGE DAYS TOO ----
@@ -4070,6 +4085,23 @@ function buildWeeks(){
      roll: they come back on their own anyway. */
   const todayISO=isoLocal(planToday), lateOpen=[];
   for(let n=1;n<=PLAN_WEEKS;n++){
+    // 🎨 weeks inside a span collapse into one flat banner: drawn once, then skipped.
+    // Nothing rolls forward out of them either, which is the point: they are closed.
+    const span=(PLAN_SPANS||[]).find(sp=>n>=sp.from&&n<=sp.to);
+    if(span){
+      if(n===span.from){
+        const b=document.createElement('div'); b.className='plan-span';
+        const si=document.createElement('span'); si.className='ps-icon'; si.textContent=span.icon||'📦';
+        const sb=document.createElement('span'); sb.className='ps-body';
+        const nm=document.createElement('b'); nm.textContent=span.label||''; sb.appendChild(nm);
+        const wh=document.createElement('span'); wh.className='sub';
+        wh.textContent='Weeks '+span.from+'-'+span.to+' · '+fmt(dayDate(span.from,0))+' to '+fmt(dayDate(span.to,6));
+        sb.appendChild(wh);
+        if(span.sub){ const s2=document.createElement('span'); s2.className='ps-sub'; s2.textContent=span.sub; sb.appendChild(s2); }
+        b.appendChild(si); b.appendChild(sb); wrap.appendChild(b);
+      }
+      continue;
+    }
     const f=dayDate(n,0), t=dayDate(n,6), cur=planToday>=f&&planToday<=t;
     const det=document.createElement('details'); det.className='plan-day'+(cur?' today-day':''); if(cur) det.open=true;
     det.dataset.key='w'+n;
