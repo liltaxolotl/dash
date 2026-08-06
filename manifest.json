@@ -1,6 +1,6 @@
 {
-  "name": "Lupita's Second Brain",
-  "short_name": "Lupita Dash",
+  "name": "Second Brain",
+  "short_name": "Dash",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#fff5fa",
