@@ -1,7 +1,7 @@
 {
   "name": "Second Brain",
   "short_name": "Dash",
-  "start_url": "./",
+  "start_url": "./?v=3",
   "display": "standalone",
   "background_color": "#fff5fa",
   "theme_color": "#fff5fa",
