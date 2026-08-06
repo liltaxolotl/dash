@@ -2210,7 +2210,16 @@ async function fetchLeads(){
   try{
     const url=`https://api.github.com/repos/${LEAD_FEED.owner}/${LEAD_FEED.repo}/contents/${LEAD_FEED.path}?ref=${LEAD_FEED.branch}&t=${Date.now()}`;
     const res=await fetch(url,{headers:{Authorization:'Bearer '+token, Accept:'application/vnd.github.raw+json'}, cache:'no-store'});
-    if(res.status===401||res.status===403){ setLeadStatus('Token not working. Tap ↻ to retry or re-paste it below.'); localStorage.removeItem(LS_TOKEN); render(); return; }
+    /* 🔑 do NOT delete the token here. GitHub answers 403 for plain rate-limiting too,
+       so wiping it on any refusal meant a temporary hiccup destroyed the saved token
+       and demanded a fresh paste, with the old one gone past recovery (👁 can only
+       reveal a token that still exists). Keep it, say what happened, and open the
+       paste box so re-pasting is still one tap away if it really has expired. */
+    if(res.status===401||res.status===403){
+      setLeadStatus('Token not working ('+res.status+'). Tap ↻ to retry, or paste a new one below.');
+      setFeedStatus('auth', 'leads.json ('+res.status+')');
+      window._showTokenBox=true; render(); return;
+    }
     if(!res.ok){ setLeadStatus('Could not reach the feed (offline?). Showing the last list.'); return; }
     const data=JSON.parse(await res.text());
     LEAD_DATA = Array.isArray(data) ? data : (data.leads||[]);
@@ -2228,7 +2237,7 @@ async function fetchLeads(){
 /* 🏷️ which copy of this page am I looking at? The phone cached a broken build for
    hours and every "is it updated yet?" was pure guesswork, so the build stamps
    itself and the header says it in small grey text. build-shell.js overwrites this. */
-const BUILD_ID='2026-08-06 19:19Z';
+const BUILD_ID='2026-08-06 19:24Z';
 let FEED_STATUS={state:'idle', detail:''};
 function setFeedStatus(state, detail){
   FEED_STATUS={state, detail:detail||''};
@@ -2239,21 +2248,26 @@ function setFeedStatus(state, detail){
     ok:    '',
     notoken:'🔌 Not connected yet. Paste your GitHub token on the Leads card to load your data.',
     auth:  '🔑 GitHub rejected the saved token, so nothing could load. It has most likely expired: make a new one and paste it on the Leads card.',
-    missing:'📭 Connected, but the data feed is missing a file. Nothing was lost locally.',
+    missing:'📭 Connected, but the feed could not return '+(detail||'a file')+'. Nothing was lost on this device.',
     net:   '📡 Could not reach GitHub, so this is the last data saved on this device.'
   }[state] || '';
   el.textContent=msg;
   el.style.display=msg?'block':'none';
 }
-async function fetchPrivate(path){
+/* `optional:true` means "this file may legitimately not exist yet". events.json is
+   the case that matters: it was designed for Apple Calendar sync back in July and
+   never created, because the iCloud link never got shared. A 404 on it is the normal
+   state of the world, not a fault, and must not raise an alarm on a healthy feed. */
+async function fetchPrivate(path, optional){
   const token=getToken();
   if(!token){ setFeedStatus('notoken'); return null; }
   try{
     const url=`https://api.github.com/repos/${LEAD_FEED.owner}/${LEAD_FEED.repo}/contents/${path}?ref=${LEAD_FEED.branch}&t=${Date.now()}`;
     const res=await fetch(url,{headers:{Authorization:'Bearer '+token, Accept:'application/vnd.github.raw+json'}, cache:'no-store'});
     if(!res.ok){
+      if(res.status===404 && optional) return null;   // absent on purpose: say nothing
       // 401 = bad/expired token, 403 = token lacks access to the repo. Both mean "re-issue it".
-      setFeedStatus((res.status===401||res.status===403) ? 'auth' : 'missing', String(res.status));
+      setFeedStatus((res.status===401||res.status===403) ? 'auth' : 'missing', path+' ('+res.status+')');
       return null;
     }
     setFeedStatus('ok');
@@ -2274,7 +2288,7 @@ function applyIdentity(id){
 async function fetchData(){
   const d=await fetchPrivate('dashboard-data.json');
   if(d){ REMOTE=d; applyIdentity(d.identity); }
-  const ev=await fetchPrivate('events.json');
+  const ev=await fetchPrivate('events.json', true);   // calendar sync was never set up; absence is fine
   if(ev) EVENTS=ev.events||[];
   if(d||ev){ render(); rebuildWeeks(); }   // fresh schedule: redraw the day cards too
 }
