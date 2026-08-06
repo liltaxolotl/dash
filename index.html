@@ -108,9 +108,6 @@
   .tag.today{background:var(--urgent); color:#fff}
   .tag.over{background:#ff4d6d; color:#fff}
   .tag.soon{background:var(--line); color:var(--soft)}
-  /* borrowed rows: 📆 from the Game Plan, 🔁 from a Personal-tab repeat */
-  .tag.plan{background:#eef0ff; color:#5b62b8}
-  .tag.rep{background:#fdf0e6; color:#b5762e}
   .tag.fulltime{background:#ece4ff; color:var(--lav-deep)}
   .tag.freelance{background:#ffe3ef; color:var(--pink-deep)}
   .tag.opencall{background:#e8f8f1; color:var(--ok)}
@@ -1636,26 +1633,6 @@ function scheduleLists(){
   };
 }
 
-/* ---------- 🌉 ONE LIST, NOT THREE ----------
-   The home to-do list used to show only the to-dos. The plan's own tasks lived on
-   the Game Plan tab and the recurring bills lived on the 🌸 Personal tab, so the
-   list she actually opens each morning was quietly the least complete of the
-   three. Both now join it, always scoped to TODAY (a plan task is a today thing,
-   and a whole week of them would bury the real to-dos). Ids are the originals, so
-   the checkbox here IS the checkbox there: tick it on either tab, it ticks on both.
-   Reworded and pushed-to-another-day items are respected, same as everything else. */
-function bridgedTodos(){
-  const out=[], seen=new Set();
-  planTasksToday().forEach(t=>{
-    if(seen.has(t.id) || arch[t.id]) return; seen.add(t.id);
-    // no `tag`: these carry a 📆 chip of their own, a category chip too would be noise
-    out.push(withEdit({id:t.id, text:t.txt, date:isoLocal(planToday),
-      fromPlan:true, lateFrom:t.late||'', links:t.links, note:t.note, ai:t.ai, url:t.url}));
-  });
-  repTodos().forEach(r=>{ if(!seen.has(r.id)){ seen.add(r.id); out.push(withEdit(r)); } });
-  return out;
-}
-
 /* checking something here also ticks its twin on the Game Plan day card (and the
    other way round: see gpSet). One item, one checkmark, two places to tap it. */
 const syncGp = id => (gpReg[id]||[]).forEach(f=>f());
@@ -1669,20 +1646,6 @@ function itemRow(it, kind, deletable){
   const cb=document.createElement('input');
   cb.type='checkbox'; cb.className='cbox'; cb.checked=isDone;
   cb.onchange=()=>{
-    /* 🔁 a repeat borrowed from the Personal tab doesn't get archived and doesn't
-       live in `done`: checking it files this round into its own history and rolls
-       the due date forward, exactly as its row over there would. */
-    if(it.rep){
-      const covered=it.rep.due||iso(new Date()), last=(it.rep.hist||[])[(it.rep.hist||[]).length-1];
-      repCheck(it.rep, cb.checked);
-      if(cb.checked){ meLogAdd(it.repCard.id, it.rep.txt, 'rep-'+it.rep.id+'@'+covered); confetti(12); }
-      else meLogPull(it.repCard.id, 'rep-'+it.rep.id+'@'+(last?(last.due||''):''));
-      saveMe(); render(); rebuildWeeks(); renderMe(); return;
-    }
-    /* 📆 a plan task is a MIRROR of the Game Plan's own row, so it goes through the
-       exact same setter the day card uses. No archiving, no money guess: whatever
-       ticking it there does, ticking it here does, and both boxes end up checked. */
-    if(it.fromPlan){ gpSet(it.id, cb.checked); render(); return; }
     const archivable=(kind==='task'||kind==='bill'||kind==='appt');
     if(cb.checked){
       done[it.id]=true; doneAt[it.id]=iso(new Date()); saveDoneAt();
@@ -1715,21 +1678,6 @@ function itemRow(it, kind, deletable){
       const t=document.createElement('span'); t.className='tag soon';
       t.textContent='in '+n+' day'+(n===1?'':'s'); meta.appendChild(t);
     }
-  }
-  /* where a borrowed row came from, so the list never looks like it grew mystery
-     items: 📆 from the Game Plan (with the day it was supposed to happen, if it
-     rode forward), 🔁 from a repeat on the Personal tab. */
-  if(it.fromPlan){
-    const t=document.createElement('span'); t.className='tag plan';
-    t.textContent=it.lateFrom?('📆 plan · from '+it.lateFrom):'📆 plan';
-    t.title=it.lateFrom?('This was '+it.lateFrom+"'s and is still open, so it rode forward to today.")
-                       :'From your Game Plan for today. Same checkbox as the day card.';
-    meta.appendChild(t);
-  }
-  if(it.rep){
-    const t=document.createElement('span'); t.className='tag rep'; t.textContent=it.repLbl;
-    t.title='A repeat from your 🌸 Personal tab. Checking it here files this round and rolls the next one forward.';
-    meta.appendChild(t);
   }
   // 🎨/💼/🌱 the category chip. The auto-guess gets it wrong sometimes (CVS meds
   // are not "creative"), so the chip is a button: each tap cycles creative →
@@ -2431,13 +2379,7 @@ function render(){
   const S=scheduleLists();
   const allTasks=S.task, allBills=S.bill, allAppts=S.appt;
   const tl=document.getElementById('taskList'); tl.innerHTML='';
-  const ownTasks=allTasks.filter(it=>(!it.date||inView(it.date)||onRadar(it))&&!arch[it.id]).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
-  /* 🌉 today's Game Plan tasks and the awake 🔁 repeats join the list (see
-     bridgedTodos). They go AFTER her own to-dos, and only on the today/week
-     views: on "month" or "all" a fortnight of plan steps would bury everything
-     she actually typed herself. */
-  const bridged=(view==='today'||view==='week') ? bridgedTodos() : [];
-  const visTasks=[...ownTasks, ...bridged.filter(b=>!ownTasks.some(o=>o.id===b.id))];
+  const visTasks=allTasks.filter(it=>(!it.date||inView(it.date)||onRadar(it))&&!arch[it.id]).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
   if(!visTasks.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='No to-dos for this view. Breathe easy. 🌿'; tl.appendChild(e);}
   else visTasks.forEach(it=>tl.appendChild(itemRow(it,'task', !!it.custom)));
 
@@ -2492,9 +2434,9 @@ function render(){
     const s=document.createElement('div'); s.className='status '+p.cls; s.textContent=p.status;
     r.appendChild(n); r.appendChild(s); pl.appendChild(r); });
 
-  // progress = exactly what the three lists are showing (to-dos in view, the
-  // borrowed plan/repeat rows, plus the standing bills and appts, always shown)
-  const sched=[...visTasks, ...allBills, ...allAppts];
+  // progress = exactly what the three lists are showing (to-dos in view, plus the
+  // standing bills and appts, which are always shown)
+  const sched=[...allTasks.filter(it=>!it.date||inView(it.date)||onRadar(it)), ...allBills, ...allAppts];
   const total=sched.length;
   const completed=sched.filter(it=>done[it.id]).length;
   const pct= total? Math.round(completed/total*100):0;
@@ -4070,34 +4012,6 @@ function indexTasks(){
       if(to && to!==dISO) (TASK_IN[to]=TASK_IN[to]||[]).push(t);
     });
   });
-}
-/* ---------- 📆 WHAT THE PLAN IS ASKING OF TODAY ----------
-   Exactly the set the today card shows, worked out the same way buildWeeks does
-   it (the day's own tasks, minus anything pushed to another day, plus anything
-   pushed onto today, plus every one-off still open from an earlier day) but with
-   no DOM anywhere in it, so the HOME tab can ask the same question. That is the
-   whole reason this exists: the plan's tasks used to be visible only on the Game
-   Plan tab, so a "pay the credit card" line sat there for days without ever
-   reaching the to-do list she actually opens. See planTodos(). */
-function planTasksToday(){
-  if(!DAY_DEFS.length || !Object.keys(GUIDE_STEPS).length) return [];
-  indexTasks();
-  const todayISO=isoLocal(planToday);
-  let mine=null; const late=[];
-  for(let n=1;n<=PLAN_WEEKS;n++){
-    // a closed span (Art Fight) rolls nothing forward, same as on the week list
-    if((PLAN_SPANS||[]).some(sp=>n>=sp.from&&n<=sp.to)) continue;
-    for(let i=0;i<DAY_DEFS.length;i++){
-      const dISO=isoLocal(dayDate(n,i));
-      if(dISO>todayISO) continue;                    // the future can wait
-      const tasks=[...dayTasks(n,DAY_DEFS[i],dISO).filter(t=>!tmoved[t.id]||tmoved[t.id]===dISO),
-                   ...(TASK_IN[dISO]||[])].filter(t=>!taskOff[t.id]);
-      if(dISO===todayISO) mine=tasks;
-      else late.push(...tasks.filter(t=>t.once&&!done[t.id])
-                       .map(t=>Object.assign({},t,{late:DAY_DEFS[i].name})));
-    }
-  }
-  return mine ? [...mine, ...late] : [];
 }
 // a task's block(s) on the day it's actually on: your pick first, then the
 // plan's. A task can sit in more than one block at once (fast applies AND deep
@@ -6087,27 +6001,6 @@ function repAwake(it, todayISO){
   if(!it.due) return true;
   const w=parse(it.due); w.setDate(w.getDate()-repLead(it.every));
   return parse(todayISO)>=w;
-}
-/* ---------- 🔁 THE REPEATS COME TO THE TO-DO LIST ----------
-   Rent, car insurance, the credit card and the certification live as repeats on
-   the 🌸 Personal tab, which is a good home for their history and a terrible home
-   for remembering them. The home tab's bill list is a different, one-shot list:
-   July's credit card was checked off and archived in JULY, so August's round
-   never appeared there at all, and the only place it existed was a line on the
-   Game Plan. That is the bug she hit. Every AWAKE repeat now also shows up on
-   the home to-do list, and ticking it here files the round exactly as ticking it
-   on the Personal card does: same history, same money log, one checkbox. */
-function repTodos(){
-  const todayISO=iso(today), out=[];
-  (me.list||[]).forEach(p=>{
-    if(p.arch) return;
-    (me.items[p.id]||[]).forEach(it=>{
-      if(!it.every || !repAwake(it, todayISO)) return;
-      out.push({id:'rep:'+it.id, text:it.txt, date:it.due||todayISO,
-        rep:it, repCard:p, tag:'life', repLbl:'🔁 every '+(REP_LBL[it.every]||it.every)});
-    });
-  });
-  return out;
 }
 // the first due date for a fresh repeat: reads "the 1st" or a weekday from the
 // wording when there is one, else starts from today's date
