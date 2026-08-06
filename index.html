@@ -1396,6 +1396,7 @@ let EVENTS = [];     // events.json: Apple Calendar mirror, optional
    The desktop copy keeps them baked as its offline fallback.
    NEVER write the name, role or brand as a literal anywhere else: read it here. */
 let ME_ID = {name:'', full:'', role:'', brand:'', bio:''};
+const meName = () => ME_ID.name || '';
 const meRole = () => ME_ID.role || 'an independent artist';
 // "Good morning, <her> 🌸" once the feed says who that is, plain "Good morning 🌸" until then
 const withName = s => s + (meName() ? ', ' + meName() : '');
