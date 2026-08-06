@@ -740,6 +740,14 @@
             </div>
           </div>
           <button id="ghChange" style="display:none; border:none; background:none; cursor:pointer; color:var(--lav-deep); font-size:.75rem; padding:.2rem 0; text-decoration:underline">🔑 change token</button>
+          <button id="ghShow" style="display:none; border:none; background:none; cursor:pointer; color:var(--lav-deep); font-size:.75rem; padding:.2rem 0; text-decoration:underline">👁 show my saved token</button>
+          <div id="ghReveal" style="display:none; margin-top:.3rem">
+            <div class="note" style="margin:0 0 .3rem">For setting up another device. Treat it like a password: copy it over, then hide it again. 🌸</div>
+            <div class="add-row">
+              <input id="ghTokenOut" type="text" readonly autocomplete="off" spellcheck="false">
+              <button id="ghCopy">Copy</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1523,6 +1531,23 @@ function migrateJobs(){
   }
 }
 migrateJobs();
+/* 🔑 TOKEN RESCUE. The storage prefix changed, so a device that already had a token
+   saved would otherwise be asked to paste it again for no reason. This adopts a
+   token stored under ANY older key ending in the same suffix. It is written as a
+   pattern instead of naming the old prefix on purpose: the old prefix was her first
+   name, and this half has to ship in the PUBLIC copy, where the desktop-only
+   migrateKeyPrefix() does not exist. Runs once, only when there is nothing to lose. */
+(function rescueToken(){
+  try{
+    if(localStorage.getItem(LS_TOKEN)) return;
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k || k===LS_TOKEN || !/-gh-token-v1$/.test(k)) continue;
+      const v=localStorage.getItem(k);
+      if(v){ localStorage.setItem(LS_TOKEN, v); return; }
+    }
+  }catch(e){}
+})();
 const getToken = () => localStorage.getItem(LS_TOKEN) || '';
 
 /* ---------- DATE HELPERS ---------- */
@@ -2416,6 +2441,9 @@ function render(){
   const authOpen = !getToken() || window._showTokenBox;
   document.getElementById('leadAuth').style.display = authOpen ? 'block' : 'none';
   document.getElementById('ghChange').style.display = authOpen ? 'none' : 'block';
+  // 👁 only offer to reveal a token that actually exists, and never leave it on screen
+  document.getElementById('ghShow').style.display = getToken() ? 'block' : 'none';
+  if(!getToken()) hideTokenReveal();
 
   fillList(document.getElementById('rhythmList'), dRHYTHM, 'rhythm', false);
   fillList(document.getElementById('mileList'), dMILES, 'mile', false);
@@ -4860,6 +4888,31 @@ function saveToken(){
 document.getElementById('ghSave').onclick=saveToken;
 document.getElementById('ghToken').addEventListener('keydown',e=>{ if(e.key==='Enter') saveToken(); });
 document.getElementById('ghChange').onclick=()=>{ window._showTokenBox=true; render(); document.getElementById('ghToken').focus(); };
+/* 👁 hand the saved token back, so setting up a second device does not mean digging
+   through browser devtools. It is her own secret on her own screen; the point is
+   that it takes one tap and goes away again on the next tap. */
+function hideTokenReveal(){
+  const box=document.getElementById('ghReveal'); if(!box) return;
+  box.style.display='none';
+  document.getElementById('ghTokenOut').value='';   // never leave it sitting in the DOM
+  document.getElementById('ghShow').textContent='👁 show my saved token';
+}
+document.getElementById('ghShow').onclick=()=>{
+  const box=document.getElementById('ghReveal');
+  if(box.style.display==='block'){ hideTokenReveal(); return; }
+  const out=document.getElementById('ghTokenOut');
+  out.value=getToken();
+  box.style.display='block';
+  document.getElementById('ghShow').textContent='🙈 hide it again';
+  out.focus(); out.select();
+};
+document.getElementById('ghCopy').onclick=async()=>{
+  const out=document.getElementById('ghTokenOut'), b=document.getElementById('ghCopy');
+  out.select();
+  try{ await navigator.clipboard.writeText(out.value); }
+  catch(e){ try{ document.execCommand('copy'); }catch(e2){} }   // file:// often blocks the async clipboard
+  b.textContent='Copied ✓'; setTimeout(()=>{ b.textContent='Copy'; },1500);
+};
 
 // on-demand lead hunt: writes hunt-request.json (the authoritative, token-gated
 // request), then pings the home PC over a private ntfy channel so the hunt starts
