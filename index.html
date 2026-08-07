@@ -920,11 +920,7 @@
             <div class="note" style="margin:6px 0 4px">The ❌ and 👻 ones, filed away so the live list stays short. They still count in the numbers above: this is your history, not a delete. 📤 puts one back on the active list.</div>
             <ul class="list" id="jobsClosedList"></ul>
           </details>
-          <details id="jobsPassedWrap" style="margin-top:10px">
-            <summary style="cursor:pointer; font-size:.82rem; font-weight:700; color:var(--soft)">🙅 Passed on <span class="pill" id="jobsPassedCount"></span></summary>
-            <div class="note" style="margin:6px 0 4px">Jobs you decided against, kept for the record. ↩ puts one back on the leads list.</div>
-            <ul class="list" id="jobsPassedList"></ul>
-          </details>
+          <div class="note" style="margin:10px 0 0">🙅 Passed on a job? It lives in <b>📦 Passed on</b> at the bottom of the listings above, so it sits right where you dismissed it.</div>
         </div>
 
         <div class="card">
@@ -1942,8 +1938,12 @@ function leadRow(it){
   if(it.link){ const a=document.createElement('a'); a.className='viewpost'; a.href=it.link; a.target='_blank'; a.rel='noopener'; a.textContent='View post →'; meta.appendChild(a); }
   body.appendChild(txt); if(meta.childNodes.length) body.appendChild(meta);
   const pass=document.createElement('button'); pass.className='del'; pass.textContent='✕';
-  pass.title='not for you? files it under Passed on the 💼 Jobs tab (nothing is lost)';
-  pass.onclick=()=>{ jobs[it.id]=jobEntry('passed'); saveJobs(); render(); };
+  pass.title='not for you? files it in 📦 Passed on at the bottom of this list (nothing is lost)';
+  // pop the archive open on the way out, so the first ✕ teaches where things land
+  // instead of looking like a delete
+  pass.onclick=()=>{ jobs[it.id]=jobEntry('passed');
+    catOpen.__passed=true; localStorage.setItem(LS_CATOPEN, JSON.stringify(catOpen));
+    saveJobs(); render(); };
   li.appendChild(cb); li.appendChild(body); li.appendChild(pass);
   return li;
 }
@@ -2044,6 +2044,57 @@ const allLeads = () => [...myLeads, ...LEAD_DATA];
 const liveLeads = () => allLeads().filter(it=>(!it.deadline || parse(it.deadline)>=today) && !arch[it.id]
   && !jobs[it.id] && (!remoteOnly || isRemote(it)));
 // The same listings live in two places: the 💼 card on the home tab and the 💼 Jobs tab.
+/* 📦 THE PASSED-ON ARCHIVE, right under the listings.
+   ✕ on a lead never deletes it, but it used to vanish with no visible destination
+   (the record was two tabs away behind a collapsed drawer), so it read as a delete.
+   This drawer sits at the bottom of the leads list in BOTH places the listings
+   appear, so the thing you just dismissed is one tap from where you dismissed it.
+   Newest first. ↩ hands it straight back to the live listings. */
+function passedRow(id,j){
+  const li=document.createElement('li'); li.className='item';
+  const body=document.createElement('div'); body.className='body';
+  const txt=document.createElement('div'); txt.className='txt'; txt.textContent=j.t;
+  const meta=document.createElement('div'); meta.className='meta';
+  if(j.ty){ const t=document.createElement('span'); t.className='tag '+j.ty; t.textContent=LEAD_TYPE_LBL[j.ty]||j.ty; meta.appendChild(t); }
+  const w=document.createElement('span'); w.className='when';
+  w.textContent='passed '+(j.at?fmtWhen(j.at):''); meta.appendChild(w);
+  if(j.link){ const a=document.createElement('a'); a.className='viewpost'; a.href=j.link; a.target='_blank'; a.rel='noopener'; a.textContent='View post →'; meta.appendChild(a); }
+  body.appendChild(txt); body.appendChild(meta);
+  if(j.desc){
+    const dd=document.createElement('details'); dd.className='jobdesc';
+    const ds=document.createElement('summary'); ds.textContent='📄 saved posting';
+    const dc=document.createElement('div'); dc.className='jobdesc-body'; dc.textContent=j.desc;
+    dd.appendChild(ds); dd.appendChild(dc); body.appendChild(dd);
+  }
+  const back=document.createElement('button'); back.className='del'; back.textContent='↩';
+  back.title='changed your mind? puts it back on the leads list';
+  back.onclick=()=>{ delete jobs[id]; delete done[id]; delete arch[id];
+    saveJobs(); saveDone(); saveArch(); render(); };
+  li.appendChild(body); li.appendChild(back);
+  return li;
+}
+function buildPassedCat(){
+  const passed=Object.entries(jobs).filter(([,j])=>j.s==='passed')
+    .sort((a,b)=>(b[1].at||'').localeCompare(a[1].at||''));
+  if(!passed.length) return null;
+  const d=document.createElement('details'); d.className='leadcat';
+  d.open = catOpen.__passed===undefined ? false : !!catOpen.__passed;
+  const sum=document.createElement('summary');
+  const caret=document.createElement('span'); caret.className='caret'; caret.textContent='▸';
+  const name=document.createElement('span'); name.textContent='📦 Passed on (your archive)';
+  const cnt=document.createElement('span'); cnt.className='cnt'; cnt.textContent=passed.length+' saved';
+  sum.appendChild(caret); sum.appendChild(name); sum.appendChild(cnt);
+  d.appendChild(sum);
+  const body=document.createElement('div'); body.className='catbody';
+  const note=document.createElement('div'); note.className='note'; note.style.margin='2px 0 6px';
+  note.textContent='Every listing you ✕ lands here, never deleted. Keep it for reference, or tap ↩ to put one back on the list.';
+  body.appendChild(note);
+  const ul=document.createElement('ul'); ul.className='list';
+  passed.forEach(([id,j])=>ul.appendChild(passedRow(id,j)));
+  body.appendChild(ul); d.appendChild(body);
+  d.addEventListener('toggle',()=>{ catOpen.__passed=d.open; localStorage.setItem(LS_CATOPEN, JSON.stringify(catOpen)); });
+  return d;
+}
 function renderLeadsInto(ll){
   ll.innerHTML='';
   const data=liveLeads();
@@ -2051,16 +2102,21 @@ function renderLeadsInto(ll){
     e.textContent = remoteOnly
       ? 'No remote leads in the list yet. Tap 🏠 again to see everything, or 🎯 hunt for fresh ones.'
       : 'No leads yet. Your morning run will fill this in. 🌷';
-    ll.appendChild(e); return; }
-  const seen=new Set();
-  LEAD_CATS.forEach(([type,label,mode])=>{
-    const items=data.filter(it=>it.type===type);
-    if(!items.length) return;
-    items.forEach(it=>seen.add(it.id));
-    ll.appendChild(buildCat(type,label,mode,items));
-  });
-  const others=data.filter(it=>!seen.has(it.id));
-  if(others.length) ll.appendChild(buildCat('__other','✨ Other','flat',others));
+    ll.appendChild(e);
+  } else {
+    const seen=new Set();
+    LEAD_CATS.forEach(([type,label,mode])=>{
+      const items=data.filter(it=>it.type===type);
+      if(!items.length) return;
+      items.forEach(it=>seen.add(it.id));
+      ll.appendChild(buildCat(type,label,mode,items));
+    });
+    const others=data.filter(it=>!seen.has(it.id));
+    if(others.length) ll.appendChild(buildCat('__other','✨ Other','flat',others));
+  }
+  // the archive renders even when the live list is empty: that is exactly when
+  // she is most likely to want to look back at what she already ruled out
+  const pc=buildPassedCat(); if(pc) ll.appendChild(pc);
 }
 function renderLeads(){
   renderLeadsInto(document.getElementById('leadList'));
@@ -2133,11 +2189,10 @@ function jobRow(id, j){
   return li;
 }
 function renderJobTrack(){
-  const ap=document.getElementById('jobsAppliedList'), pa=document.getElementById('jobsPassedList');
-  if(!ap||!pa) return;
+  const ap=document.getElementById('jobsAppliedList');
+  if(!ap) return;
   const entries=Object.entries(jobs).sort((a,b)=>(b[1].at||'').localeCompare(a[1].at||''));
-  const applied=entries.filter(([,j])=>j.s!=='passed');
-  const passed=entries.filter(([,j])=>j.s==='passed');
+  const applied=entries.filter(([,j])=>j.s!=='passed');   // passed ones render in 📦 under the listings
   const live=applied.filter(([,j])=>!j.cl);            // what's still on the live list
   const closed=applied.filter(([,j])=>j.cl)
     .sort((a,b)=>(b[1].cl||'').localeCompare(a[1].cl||''));   // most recently closed first
@@ -2165,14 +2220,9 @@ function renderJobTrack(){
     allBtn.onclick=()=>{ const now=iso(new Date());
       ready.forEach(([,j])=>{ j.cl=now; }); saveJobs(); render(); };
   }
-  pa.innerHTML='';
-  if(!passed.length){ const e=document.createElement('div'); e.className='empty';
-    e.textContent='Nothing passed on yet.'; pa.appendChild(e); }
-  else passed.forEach(([id,j])=>pa.appendChild(jobRow(id,j)));
   // the pill counts everything she ever sent; the "open" half is what's still live
   document.getElementById('jobsAppliedCount').textContent=applied.length
     ? (applied.length+' sent'+(closed.length?(' · '+live.length+' open'):'')) : '';
-  document.getElementById('jobsPassedCount').textContent=passed.length?String(passed.length):'';
 
   /* 📊 how it's going: counts up top, one proportion bar of what came back */
   const counts={};
@@ -2242,7 +2292,7 @@ async function fetchLeads(){
 /* 🏷️ which copy of this page am I looking at? The phone cached a broken build for
    hours and every "is it updated yet?" was pure guesswork, so the build stamps
    itself and the header says it in small grey text. build-shell.js overwrites this. */
-const BUILD_ID='2026-08-07 07:54Z';
+const BUILD_ID='2026-08-07 08:06Z';
 console.log('dash build '+BUILD_ID);
 let FEED_STATUS={state:'idle', detail:''};
 function setFeedStatus(state, detail){
