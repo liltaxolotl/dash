@@ -112,6 +112,7 @@
   .tag.freelance{background:#ffe3ef; color:var(--pink-deep)}
   .tag.opencall{background:#e8f8f1; color:var(--ok)}
   .tag.client{background:#fff2d9; color:#c79016}
+  .tag.teaching{background:#ffe8d9; color:#b45309}
   .tag.src{background:var(--line); color:var(--soft)}
   .leadgroup{font-size:.74rem; font-weight:800; letter-spacing:.4px; text-transform:uppercase;
     color:var(--soft); margin:12px 2px 2px; padding-top:4px}
@@ -1377,7 +1378,10 @@ const MILES = [];
 // path = real project folder on this PC; the name becomes a clickable link that opens it.
 const PROJECTS = [];
 // Job & client leads. The lead-hunter agent prepends new finds here.
-// type: 'fulltime' | 'freelance' | 'opencall' | 'client' | 'remotework'.  link = direct post/application URL.
+// type: 'fulltime' | 'freelance' | 'opencall' | 'client' | 'remotework' | 'teaching'.
+// link = direct post/application URL. 'teaching' = LA art/animation teaching, school
+// substitute work, and city recreation/craft jobs. Mostly in-person around LA, so those
+// carry no remote flag and the 🏠 chip hides them on purpose.
 // date = posted date (YYYY-MM-DD), deadline optional (YYYY-MM-DD or '').
 // remote:true = work-from-home. The 🏠 Remote only chip filters to these (titles saying
 // "remote" count too). 'remotework' entries are evergreen platform signups, always remote.
@@ -1905,7 +1909,7 @@ document.getElementById('archToggle').addEventListener('click',()=>{
   archBodyEl.style.display=open?'block':'none'; archCaretEl.textContent=open?'▾':'▸';
 });
 
-const LEAD_TYPE_LBL={fulltime:'production / full-time', freelance:'freelance', opencall:'open call', client:'client', generic:'general role', remotework:'remote platform', mine:'added by you'};
+const LEAD_TYPE_LBL={fulltime:'production / full-time', freelance:'freelance', opencall:'open call', client:'client', generic:'general role', remotework:'remote platform', teaching:'teaching / rec', mine:'added by you'};
 function leadRow(it){
   const isDone=!!done[it.id];
   const li=document.createElement('li');
@@ -1949,6 +1953,7 @@ const LEAD_CATS = [
   ['mine','📎 Added by you','flat'],
   ['fulltime','🎬 Production & full-time','role'],
   ['freelance','✏️ Freelance / contract','role'],
+  ['teaching','🎨 Teaching & rec jobs (LA)','flat'],
   ['generic','🗂️ General creative roles','role'],
   ['opencall','🌟 Open calls & programs','flat'],
   ['client','🤝 Client gigs','fit'],
@@ -2236,7 +2241,7 @@ async function fetchLeads(){
 /* 🏷️ which copy of this page am I looking at? The phone cached a broken build for
    hours and every "is it updated yet?" was pure guesswork, so the build stamps
    itself and the header says it in small grey text. build-shell.js overwrites this. */
-const BUILD_ID='2026-08-06 19:37Z';
+const BUILD_ID='2026-08-07 07:39Z';
 console.log('dash build '+BUILD_ID);
 let FEED_STATUS={state:'idle', detail:''};
 function setFeedStatus(state, detail){
