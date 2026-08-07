@@ -1380,8 +1380,9 @@ const PROJECTS = [];
 // Job & client leads. The lead-hunter agent prepends new finds here.
 // type: 'fulltime' | 'freelance' | 'opencall' | 'client' | 'remotework' | 'teaching'.
 // link = direct post/application URL. 'teaching' = LA art/animation teaching, school
-// substitute work, and city recreation/craft jobs. Mostly in-person around LA, so those
-// carry no remote flag and the 🏠 chip hides them on purpose.
+// substitute work, and city recreation/craft jobs. Covers LA-adjacent cities too (Pasadena,
+// Burbank, Santa Monica, ...). In-person ones carry no remote flag on purpose; online
+// teaching (Outschool, iD Tech, online adjunct) does carry remote:true.
 // date = posted date (YYYY-MM-DD), deadline optional (YYYY-MM-DD or '').
 // remote:true = work-from-home. The 🏠 Remote only chip filters to these (titles saying
 // "remote" count too). 'remotework' entries are evergreen platform signups, always remote.
@@ -2241,7 +2242,7 @@ async function fetchLeads(){
 /* 🏷️ which copy of this page am I looking at? The phone cached a broken build for
    hours and every "is it updated yet?" was pure guesswork, so the build stamps
    itself and the header says it in small grey text. build-shell.js overwrites this. */
-const BUILD_ID='2026-08-07 07:39Z';
+const BUILD_ID='2026-08-07 07:54Z';
 console.log('dash build '+BUILD_ID);
 let FEED_STATUS={state:'idle', detail:''};
 function setFeedStatus(state, detail){
