@@ -920,7 +920,11 @@
             <div class="note" style="margin:6px 0 4px">The ❌ and 👻 ones, filed away so the live list stays short. They still count in the numbers above: this is your history, not a delete. 📤 puts one back on the active list.</div>
             <ul class="list" id="jobsClosedList"></ul>
           </details>
-          <div class="note" style="margin:10px 0 0">🙅 Passed on a job? It lives in <b>📦 Passed on</b> at the bottom of the listings above, so it sits right where you dismissed it.</div>
+          <details id="jobsPassedWrap" style="margin-top:10px">
+            <summary style="cursor:pointer; font-size:.82rem; font-weight:700; color:var(--soft)">🙅 Passed on <span class="pill" id="jobsPassedCount"></span></summary>
+            <div class="note" style="margin:6px 0 4px">Jobs you decided against, kept for the record. ↩ puts one back on the leads list. (The same list also sits under the listings on the home tab, as 📦 Passed on.)</div>
+            <ul class="list" id="jobsPassedList"></ul>
+          </details>
         </div>
 
         <div class="card">
@@ -2095,7 +2099,7 @@ function buildPassedCat(){
   d.addEventListener('toggle',()=>{ catOpen.__passed=d.open; localStorage.setItem(LS_CATOPEN, JSON.stringify(catOpen)); });
   return d;
 }
-function renderLeadsInto(ll){
+function renderLeadsInto(ll, withArchive){
   ll.innerHTML='';
   const data=liveLeads();
   if(!data.length){ const e=document.createElement('div'); e.className='empty';
@@ -2116,11 +2120,14 @@ function renderLeadsInto(ll){
   }
   // the archive renders even when the live list is empty: that is exactly when
   // she is most likely to want to look back at what she already ruled out
-  const pc=buildPassedCat(); if(pc) ll.appendChild(pc);
+  if(withArchive){ const pc=buildPassedCat(); if(pc) ll.appendChild(pc); }
 }
+// Home tab gets the 📦 drawer right under the listings. The Jobs tab does NOT:
+// its own 🙅 Passed on card is a few inches down the same page, and two copies of
+// one list on one screen is just confusing.
 function renderLeads(){
-  renderLeadsInto(document.getElementById('leadList'));
-  renderLeadsInto(document.getElementById('jobsLeadList'));
+  renderLeadsInto(document.getElementById('leadList'), true);
+  renderLeadsInto(document.getElementById('jobsLeadList'), false);
 }
 
 /* ---------- 💼 JOBS TAB: application tracker + analytics ----------
@@ -2189,10 +2196,11 @@ function jobRow(id, j){
   return li;
 }
 function renderJobTrack(){
-  const ap=document.getElementById('jobsAppliedList');
-  if(!ap) return;
+  const ap=document.getElementById('jobsAppliedList'), pa=document.getElementById('jobsPassedList');
+  if(!ap||!pa) return;
   const entries=Object.entries(jobs).sort((a,b)=>(b[1].at||'').localeCompare(a[1].at||''));
-  const applied=entries.filter(([,j])=>j.s!=='passed');   // passed ones render in 📦 under the listings
+  const applied=entries.filter(([,j])=>j.s!=='passed');
+  const passed=entries.filter(([,j])=>j.s==='passed');
   const live=applied.filter(([,j])=>!j.cl);            // what's still on the live list
   const closed=applied.filter(([,j])=>j.cl)
     .sort((a,b)=>(b[1].cl||'').localeCompare(a[1].cl||''));   // most recently closed first
@@ -2220,9 +2228,14 @@ function renderJobTrack(){
     allBtn.onclick=()=>{ const now=iso(new Date());
       ready.forEach(([,j])=>{ j.cl=now; }); saveJobs(); render(); };
   }
+  pa.innerHTML='';
+  if(!passed.length){ const e=document.createElement('div'); e.className='empty';
+    e.textContent='Nothing passed on yet.'; pa.appendChild(e); }
+  else passed.forEach(([id,j])=>pa.appendChild(jobRow(id,j)));
   // the pill counts everything she ever sent; the "open" half is what's still live
   document.getElementById('jobsAppliedCount').textContent=applied.length
     ? (applied.length+' sent'+(closed.length?(' · '+live.length+' open'):'')) : '';
+  document.getElementById('jobsPassedCount').textContent=passed.length?String(passed.length):'';
 
   /* 📊 how it's going: counts up top, one proportion bar of what came back */
   const counts={};
@@ -2292,7 +2305,7 @@ async function fetchLeads(){
 /* 🏷️ which copy of this page am I looking at? The phone cached a broken build for
    hours and every "is it updated yet?" was pure guesswork, so the build stamps
    itself and the header says it in small grey text. build-shell.js overwrites this. */
-const BUILD_ID='2026-08-07 08:06Z';
+const BUILD_ID='2026-08-07 08:07Z';
 console.log('dash build '+BUILD_ID);
 let FEED_STATUS={state:'idle', detail:''};
 function setFeedStatus(state, detail){
