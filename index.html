@@ -2305,7 +2305,7 @@ async function fetchLeads(){
 /* 🏷️ which copy of this page am I looking at? The phone cached a broken build for
    hours and every "is it updated yet?" was pure guesswork, so the build stamps
    itself and the header says it in small grey text. build-shell.js overwrites this. */
-const BUILD_ID='2026-08-07 08:07Z';
+const BUILD_ID='2026-08-10 18:03Z';
 console.log('dash build '+BUILD_ID);
 let FEED_STATUS={state:'idle', detail:''};
 function setFeedStatus(state, detail){
@@ -5816,7 +5816,7 @@ function makePdf(){
   html,body{ margin:0; padding:0; }
   body{ font-family:'Segoe UI',Helvetica,Arial,sans-serif; color:#2c2c2c;
     -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .page{ min-height:100vh; padding:40px 62px 60px;
+  .page{ width:8.5in; min-height:11in; padding:40px 62px 60px;
     background:
       radial-gradient(90% 55% at 100% 0%, #d9edff 0%, rgba(217,237,255,0) 55%),
       radial-gradient(85% 60% at 0% 100%, #ffdbe7 0%, rgba(255,219,231,0) 55%),
@@ -5831,13 +5831,44 @@ function makePdf(){
   .letter p{ font-size:15px; line-height:1.6; margin:0 0 15px; }
   .letter p.greet{ font-weight:700; }
   .letter strong{ font-weight:700; }
-</style></head><body><div class="page">
+</style></head><body><div class="page" id="page">
   <div class="hdr"><div class="nm">${esc(name)}</div><div class="role">${esc(role)}</div></div>
   <div class="contact">${contact}</div>
   <div class="date">${dateStr}</div>
-  <div class="letter">${body}</div>
+  <div class="letter" id="letter">${body}</div>
 </div>
-<script>window.onload=function(){ setTimeout(function(){ window.print(); }, 500); };<\/script>
+<script>
+/* One page, always. Steps the BODY text down from 15px until the whole letter
+   clears a single 11in page. The letterhead (name, role, contact, date) never
+   moves, so every letter looks like the same stationery no matter its length.
+
+   It measures .page's own height against 11in in CSS px (1in = 96px), not the
+   text block and not the popup window: .page carries min-height:11in, so it sits
+   at exactly 1056px while the letter fits and grows the moment it does not.
+   That is the same thing the printer is deciding, which measuring the text
+   block is not (margins and padding below the last paragraph pushed a letter
+   onto page 2 while the text itself still measured as fitting).
+
+   At f=15 the values below are exactly the stylesheet's, so a letter that
+   already fits is untouched. Line height and paragraph gaps tighten smoothly on
+   the way down instead of only the type shrinking. A letter too long even at
+   the 9px floor stops there and runs to a second page rather than clipping. */
+function fitOnePage(){
+  var page=document.getElementById('page'), letter=document.getElementById('letter');
+  if(!page||!letter) return 15;
+  var PAGE=11*96, ps=letter.querySelectorAll('p'), f;
+  for(f=15; f>=9; f-=0.1){
+    var lh=1.42+(f-9)*0.03, mb=f*(0.7+(f-9)*0.05);
+    for(var i=0;i<ps.length;i++){
+      ps[i].style.fontSize=f.toFixed(2)+'px';
+      ps[i].style.lineHeight=lh.toFixed(3);
+      ps[i].style.marginBottom=mb.toFixed(2)+'px';
+    }
+    if(page.getBoundingClientRect().height<=PAGE+0.5) break;
+  }
+  return f;
+}
+window.onload=function(){ fitOnePage(); setTimeout(function(){ window.print(); }, 500); };<\/script>
 </body></html>`;
   const w=window.open('','_blank');
   if(!w){ setStatus('clStatus','Allow pop-ups for this page, then hit Save as PDF again.','err'); return; }
