@@ -1378,7 +1378,10 @@ const MILES = [];
 // path = real project folder on this PC; the name becomes a clickable link that opens it.
 const PROJECTS = [];
 // Job & client leads. The lead-hunter agent prepends new finds here.
-// type: 'fulltime' | 'freelance' | 'opencall' | 'client' | 'remotework' | 'teaching'.
+// type: 'fulltime' | 'parttime' | 'freelance' | 'opencall' | 'client' | 'remotework' | 'teaching'.
+// 'parttime' cuts ACROSS every other type (production, teaching, remote, freelance):
+// it is the bucket for anything with part-time hours, kept separate so income stays
+// under the Medi-Cal limit. Put the hours and the pay rate in the title where known.
 // link = direct post/application URL. 'teaching' = LA art/animation teaching, school
 // substitute work, and city recreation/craft jobs. Covers LA-adjacent cities too (Pasadena,
 // Burbank, Santa Monica, ...). In-person ones carry no remote flag on purpose; online
@@ -1910,7 +1913,7 @@ document.getElementById('archToggle').addEventListener('click',()=>{
   archBodyEl.style.display=open?'block':'none'; archCaretEl.textContent=open?'▾':'▸';
 });
 
-const LEAD_TYPE_LBL={fulltime:'production / full-time', freelance:'freelance', opencall:'open call', client:'client', generic:'general role', remotework:'remote platform', teaching:'teaching / rec', mine:'added by you'};
+const LEAD_TYPE_LBL={fulltime:'production / full-time', parttime:'part time', freelance:'freelance', opencall:'open call', client:'client', generic:'general role', remotework:'remote platform', teaching:'teaching / rec', mine:'added by you'};
 function leadRow(it){
   const isDone=!!done[it.id];
   const li=document.createElement('li');
@@ -1958,6 +1961,7 @@ const LEAD_CATS = [
   ['mine','📎 Added by you','flat'],
   ['fulltime','🎬 Production & full-time','role'],
   ['freelance','✏️ Freelance / contract','role'],
+  ['parttime','🕐 Part-time (every type of work)','role'],
   ['teaching','🎨 Teaching & rec jobs (LA)','flat'],
   ['generic','🗂️ General creative roles','role'],
   ['opencall','🌟 Open calls & programs','flat'],
@@ -1966,6 +1970,7 @@ const LEAD_CATS = [
 ];
 // Role buckets, checked top to bottom (first match wins).
 const ROLE_ORDER = [
+  ['teach','🍎 Teaching / Instructor', /instructor|teacher|teaching|faculty|adjunct|\btutor\b|professor/i],
   ['pa','🎬 Production Assistant', /production assistant|\bp\.?a\.?\b/i],
   ['editor','✂️ Editor', /\beditor\b|editorial/i],
   ['art','🎨 Animation / Art', /animat|storyboard|illustrat|motion graphic|visual dev|\bartist\b|character/i],
@@ -2305,7 +2310,7 @@ async function fetchLeads(){
 /* 🏷️ which copy of this page am I looking at? The phone cached a broken build for
    hours and every "is it updated yet?" was pure guesswork, so the build stamps
    itself and the header says it in small grey text. build-shell.js overwrites this. */
-const BUILD_ID='2026-08-10 18:03Z';
+const BUILD_ID='2026-08-20 12:17Z';
 console.log('dash build '+BUILD_ID);
 let FEED_STATUS={state:'idle', detail:''};
 function setFeedStatus(state, detail){
