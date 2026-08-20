@@ -138,6 +138,7 @@
   .rolehdr .rc{font-weight:700; color:var(--soft); font-size:.92em}
   .rolehdr.fitgood{color:var(--ok)}
   .rolehdr.fitstretch{color:#c79016}
+  .rolehdr.fitno{color:var(--muted)}
   .tag.generic{background:#eef0f4; color:#6b7280}
   .tag.flag{background:#ffe1e6; color:#d23b5b}
   .tag.remotework{background:#e0f2fe; color:#0369a1}
@@ -2016,8 +2017,12 @@ function buildRoleGroups(body, items, type){
 function buildFitGroups(body, items, type){
   const good=items.filter(it=>(it.fit||'good')==='good');
   const stretch=items.filter(it=>it.fit==='stretch');
+  /* Nothing found gets thrown away: a gig that reads wrong for her still lands
+     here, just folded shut, so she can disagree with me and open it. */
+  const nomatch=items.filter(it=>it.fit==='nomatch');
   if(good.length) body.appendChild(roleCat(type+':good','✅ Good fit for you','fitgood', good, true));
   if(stretch.length) body.appendChild(roleCat(type+':stretch','🤔 Maybe / a stretch','fitstretch', stretch, true));
+  if(nomatch.length) body.appendChild(roleCat(type+':nomatch','🙃 Probably not your thing','fitno', nomatch, false));
 }
 function buildCat(type,label,mode,items){
   const d=document.createElement('details'); d.className='leadcat';
@@ -2310,7 +2315,7 @@ async function fetchLeads(){
 /* 🏷️ which copy of this page am I looking at? The phone cached a broken build for
    hours and every "is it updated yet?" was pure guesswork, so the build stamps
    itself and the header says it in small grey text. build-shell.js overwrites this. */
-const BUILD_ID='2026-08-20 12:17Z';
+const BUILD_ID='2026-08-20 19:28Z';
 console.log('dash build '+BUILD_ID);
 let FEED_STATUS={state:'idle', detail:''};
 function setFeedStatus(state, detail){
