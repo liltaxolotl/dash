@@ -2015,7 +2015,13 @@ function buildRoleGroups(body, items, type){
     body.appendChild(roleCat(type+':'+k, g.label, '', g.items, false)); });
 }
 function buildFitGroups(body, items, type){
-  const good=items.filter(it=>(it.fit||'good')==='good');
+  /* Only 'good' | 'stretch' | 'nomatch' are grouped here, so any other value used
+     to render NOTHING: a hunt that tagged 20 client gigs fit:"great" (fine in the
+     role/flat categories) shipped a category header with no rows under it, and the
+     gigs were invisible on the board. Anything unrecognised now falls into good
+     rather than disappearing. */
+  const KNOWN=['good','stretch','nomatch'];
+  const good=items.filter(it=>!KNOWN.includes(it.fit||'good') || (it.fit||'good')==='good');
   const stretch=items.filter(it=>it.fit==='stretch');
   /* Nothing found gets thrown away: a gig that reads wrong for her still lands
      here, just folded shut, so she can disagree with me and open it. */
@@ -2315,7 +2321,7 @@ async function fetchLeads(){
 /* 🏷️ which copy of this page am I looking at? The phone cached a broken build for
    hours and every "is it updated yet?" was pure guesswork, so the build stamps
    itself and the header says it in small grey text. build-shell.js overwrites this. */
-const BUILD_ID='2026-09-25 07:57Z';
+const BUILD_ID='2026-10-07 03:23Z';
 console.log('dash build '+BUILD_ID);
 let FEED_STATUS={state:'idle', detail:''};
 function setFeedStatus(state, detail){
