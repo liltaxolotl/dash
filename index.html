@@ -1969,6 +1969,21 @@ const LEAD_CATS = [
   ['client','🤝 Client gigs','fit'],
   ['remotework','🏠 Remote work platforms','flat'],
 ];
+/* More categories ride in the private feed (dashboard-data.json `leadCats`):
+   [{type, label, mode, tag, apart}]. A shelf for someone else's job hunt names
+   that person, so it can never be a literal here. apart:true = ✓ still files the
+   lead in the tracker, but it stays out of her own application stats. */
+const APART_TYPES=new Set();
+function applyLeadCats(list){
+  (list||[]).forEach(c=>{
+    if(!c||!c.type||!c.label) return;
+    const row=[c.type, c.label, c.mode||'flat'];
+    const i=LEAD_CATS.findIndex(([t])=>t===c.type);
+    if(i>=0) LEAD_CATS[i]=row; else LEAD_CATS.push(row);
+    if(c.tag) LEAD_TYPE_LBL[c.type]=c.tag;
+    if(c.apart) APART_TYPES.add(c.type); else APART_TYPES.delete(c.type);
+  });
+}
 // Role buckets, checked top to bottom (first match wins).
 const ROLE_ORDER = [
   ['teach','🍎 Teaching / Instructor', /instructor|teacher|teaching|faculty|adjunct|\btutor\b|professor/i],
@@ -2030,6 +2045,12 @@ function buildFitGroups(body, items, type){
   if(stretch.length) body.appendChild(roleCat(type+':stretch','🤔 Maybe / a stretch','fitstretch', stretch, true));
   if(nomatch.length) body.appendChild(roleCat(type+':nomatch','🙃 Probably not your thing','fitno', nomatch, false));
 }
+// 'grp' = sub-bucket by the lead's own grp label (the hunt sets it), in data order
+function buildGrpGroups(body, items, type){
+  const groups=new Map();
+  items.forEach(it=>{ const g=it.grp||'✨ Other'; if(!groups.has(g)) groups.set(g,[]); groups.get(g).push(it); });
+  groups.forEach((list,g)=>body.appendChild(roleCat(type+':'+g, g, '', list, false)));
+}
 function buildCat(type,label,mode,items){
   const d=document.createElement('details'); d.className='leadcat';
   d.open = (catOpen[type]===undefined) ? true : !!catOpen[type];
@@ -2043,6 +2064,7 @@ function buildCat(type,label,mode,items){
   const body=document.createElement('div'); body.className='catbody';
   if(mode==='role') buildRoleGroups(body, items, type);
   else if(mode==='fit') buildFitGroups(body, items, type);
+  else if(mode==='grp') buildGrpGroups(body, items, type);
   else items.forEach(it=>body.appendChild(leadRow(it)));
   d.appendChild(body);
   d.addEventListener('toggle',()=>{ catOpen[type]=d.open; localStorage.setItem(LS_CATOPEN, JSON.stringify(catOpen)); });
@@ -2253,7 +2275,12 @@ function renderJobTrack(){
     ? (applied.length+' sent'+(closed.length?(' · '+live.length+' open'):'')) : '';
   document.getElementById('jobsPassedCount').textContent=passed.length?String(passed.length):'';
 
-  /* 📊 how it's going: counts up top, one proportion bar of what came back */
+  /* 📊 how it's going: counts up top, one proportion bar of what came back.
+     Her applications only: a lead off someone else's shelf (an apart category)
+     still sits in the list above, it just never pads her numbers. */
+  renderJobStats(applied.filter(([,j])=>!APART_TYPES.has(j.ty)), passed);
+}
+function renderJobStats(applied, passed){
   const counts={};
   JOB_STATUSES.forEach(([k])=>{ counts[k]=applied.filter(([,j])=>(j.r||'wait')===k).length; });
   const thisWeek=applied.filter(([,j])=>(j.at||'')>=appsWeekKey()).length;
@@ -2321,7 +2348,7 @@ async function fetchLeads(){
 /* 🏷️ which copy of this page am I looking at? The phone cached a broken build for
    hours and every "is it updated yet?" was pure guesswork, so the build stamps
    itself and the header says it in small grey text. build-shell.js overwrites this. */
-const BUILD_ID='2026-10-09 03:12Z';
+const BUILD_ID='2026-11-05 20:27Z';
 console.log('dash build '+BUILD_ID);
 let FEED_STATUS={state:'idle', detail:''};
 function setFeedStatus(state, detail){
@@ -2372,7 +2399,7 @@ function applyIdentity(id){
 }
 async function fetchData(){
   const d=await fetchPrivate('dashboard-data.json');
-  if(d){ REMOTE=d; applyIdentity(d.identity); }
+  if(d){ REMOTE=d; applyIdentity(d.identity); applyLeadCats(d.leadCats); }
   const ev=await fetchPrivate('events.json', true);   // calendar sync was never set up; absence is fine
   if(ev) EVENTS=ev.events||[];
   if(d||ev){ render(); rebuildWeeks(); }   // fresh schedule: redraw the day cards too
